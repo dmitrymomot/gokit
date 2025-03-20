@@ -36,16 +36,53 @@ import (
 //
 // The package is thread-safe and can be used in concurrent applications.
 
+// Error types for the i18n package
+var (
+	// ErrLanguageNotSupported is returned when a requested language doesn't have translations.
+	ErrLanguageNotSupported = func(lang string) error {
+		return fmt.Errorf("language not supported: %s", lang)
+	}
+
+	// ErrTranslationNotFound is returned when a translation key doesn't exist.
+	ErrTranslationNotFound = func(lang, key string) error {
+		return fmt.Errorf("translation not found for %s: %s", lang, key)
+	}
+
+	// ErrInvalidTranslationFormat is returned when a translation file has an invalid format.
+	ErrInvalidTranslationFormat = func(file string, err error) error {
+		return fmt.Errorf("invalid translation format in %s: %w", file, err)
+	}
+
+	// ErrFileSystemError is returned when there's an error accessing the file system.
+	ErrFileSystemError = func(err error) error {
+		return fmt.Errorf("file system error: %w", err)
+	}
+)
+
+// Configuration options
+var (
+	// DefaultLang is the default language used when no other language is available.
+	DefaultLang = "en"
+
+	// FallbackToKey determines whether to fall back to the key when a translation is not found.
+	// Default is true for backward compatibility.
+	FallbackToKey = true
+
+	// LogMissingTranslations determines whether to log missing translations.
+	// Default is false to avoid excessive logging.
+	LogMissingTranslations = false
+
+	// Logger provides a customizable logger for the i18n package.
+	// Default is a discard logger.
+	Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+)
+
 var (
 	translations = make(map[string]map[string]any)
 	mu           sync.RWMutex
 )
 
-// DefaultLang is the default language used when no other language is available.
-const DefaultLang = "en"
-
 // LoadTranslations loads localization data from a single YAML file.
-// The file must follow the syntax from: https://github.com/invopop/ctxi18n/blob/main/README.md.
 // This call overwrites any existing translations.
 //
 // Example:
@@ -57,15 +94,22 @@ const DefaultLang = "en"
 func LoadTranslations(filename string) error {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return err
+		return ErrFileSystemError(err)
 	}
+
 	var fileTranslations map[string]map[string]any
 	if err := yaml.Unmarshal(data, &fileTranslations); err != nil {
+		return ErrInvalidTranslationFormat(filename, err)
+	}
+
+	if err := validateTranslations(fileTranslations); err != nil {
 		return err
 	}
+
 	mu.Lock()
 	defer mu.Unlock()
 	translations = fileTranslations
+	Logger.Info("Translations loaded", "file", filename, "languages", mapKeys(fileTranslations))
 	return nil
 }
 
@@ -93,22 +137,35 @@ func LoadTranslationsDir(dir string) error {
 		return nil
 	})
 	if err != nil {
-		return err
+		return ErrFileSystemError(err)
+	}
+
+	if len(files) == 0 {
+		Logger.Warn("No translation files found", "directory", dir)
+		return nil
 	}
 
 	for _, file := range files {
 		data, err := os.ReadFile(file)
 		if err != nil {
-			return err
+			return ErrFileSystemError(err)
 		}
 		var fileTranslations map[string]map[string]any
 		if err := yaml.Unmarshal(data, &fileTranslations); err != nil {
+			return ErrInvalidTranslationFormat(file, err)
+		}
+
+		if err := validateTranslations(fileTranslations); err != nil {
 			return err
 		}
+
 		mu.Lock()
 		mergeTranslations(fileTranslations, translations)
 		mu.Unlock()
+		Logger.Debug("Translations merged", "file", file, "languages", mapKeys(fileTranslations))
 	}
+
+	Logger.Info("Translations loaded from directory", "directory", dir, "files", len(files))
 	return nil
 }
 
@@ -134,19 +191,19 @@ func LoadTranslationsFS(fs http.FileSystem, root string) error {
 func loadTranslationsFromFS(fs http.FileSystem, root string) error {
 	f, err := fs.Open(root)
 	if err != nil {
-		return err
+		return ErrFileSystemError(err)
 	}
 	defer f.Close()
 
 	info, err := f.Stat()
 	if err != nil {
-		return err
+		return ErrFileSystemError(err)
 	}
 
 	if info.IsDir() {
 		entries, err := f.Readdir(-1)
 		if err != nil {
-			return err
+			return ErrFileSystemError(err)
 		}
 		for _, entry := range entries {
 			entryPath := filepath.Join(root, entry.Name())
@@ -177,21 +234,46 @@ func loadTranslationsFromFS(fs http.FileSystem, root string) error {
 func loadTranslationFileFromFS(fs http.FileSystem, filePath string) error {
 	f, err := fs.Open(filePath)
 	if err != nil {
-		return err
+		return ErrFileSystemError(err)
 	}
 	defer f.Close()
 
 	data, err := io.ReadAll(f)
 	if err != nil {
-		return err
+		return ErrFileSystemError(err)
 	}
 	var fileTranslations map[string]map[string]any
 	if err := yaml.Unmarshal(data, &fileTranslations); err != nil {
+		return ErrInvalidTranslationFormat(filePath, err)
+	}
+
+	if err := validateTranslations(fileTranslations); err != nil {
 		return err
 	}
+
 	mu.Lock()
 	mergeTranslations(fileTranslations, translations)
 	mu.Unlock()
+	Logger.Debug("Translations loaded from FS", "file", filePath)
+	return nil
+}
+
+// validateTranslations checks if the translations map has a valid structure.
+// It ensures that language codes are valid and that translations are properly formatted.
+func validateTranslations(trans map[string]map[string]any) error {
+	if len(trans) == 0 {
+		Logger.Warn("Empty translations file")
+		return nil
+	}
+
+	for lang, entries := range trans {
+		if lang == "" {
+			return fmt.Errorf("empty language code found")
+		}
+		if entries == nil {
+			return fmt.Errorf("nil translations for language: %s", lang)
+		}
+	}
 	return nil
 }
 
@@ -339,6 +421,15 @@ func contains(langs []string, target string) bool {
 	return false
 }
 
+// mapKeys returns a slice containing all keys of the provided map.
+func mapKeys(m map[string]map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 // buildParams converts a slice of strings (expected as key, value, key, value, …)
 // into a map. If the number of arguments is odd, the last one is ignored.
 //
@@ -383,7 +474,9 @@ func namedSprintf(tmpl string, params map[string]string) string {
 // It supports formatting with additional arguments provided as key-value pairs.
 // For example: i18n.T("en", "welcome", "name", "John") will substitute "%{name}" in the template.
 //
-// If the requested translation is not found, the function returns the key as a fallback.
+// If the requested translation is not found and FallbackToKey is true, the function returns
+// the key as a fallback. Otherwise, it returns an empty string and logs the error if
+// LogMissingTranslations is enabled.
 //
 // Example:
 //
@@ -397,23 +490,27 @@ func namedSprintf(tmpl string, params map[string]string) string {
 //
 //	// With missing translation
 //	msg := i18n.T("en", "missing_key")
-//	// Returns: "missing_key"
+//	// Returns: "missing_key" if FallbackToKey is true, otherwise ""
 func T(lang, key string, args ...string) string {
 	mu.RLock()
 	defer mu.RUnlock()
+
 	if langMap, ok := translations[lang]; ok {
-		if val, ok := getTranslation(langMap, key); ok {
-			if tmpl, ok := val.(string); ok {
-				return sprintf(tmpl, args)
+		if tpl, ok := getTranslation(langMap, key); ok {
+			if str, ok := tpl.(string); ok {
+				return sprintf(str, args)
 			}
+		} else if LogMissingTranslations {
+			Logger.Warn("Translation key not found", "language", lang, "key", key)
 		}
+	} else if LogMissingTranslations {
+		Logger.Warn("Language not supported", "language", lang)
 	}
-	slog.Warn("translation key not found",
-		"lang", lang,
-		"key", key,
-		"args", args,
-	)
-	return key
+
+	if FallbackToKey {
+		return key
+	}
+	return ""
 }
 
 // N translates a key with pluralization for the given language.
@@ -425,7 +522,8 @@ func T(lang, key string, args ...string) string {
 // - For n=1, it tries key+".one"
 // - For all other values, it uses key+".other"
 //
-// If no translation is found, it falls back to the key itself.
+// If no translation is found and FallbackToKey is true, it falls back to the key itself.
+// Otherwise, it returns an empty string and logs the error if LogMissingTranslations is enabled.
 //
 // Example:
 //
@@ -445,55 +543,43 @@ func T(lang, key string, args ...string) string {
 func N(lang, key string, n int, args ...string) string {
 	mu.RLock()
 	defer mu.RUnlock()
+
 	if langMap, ok := translations[lang]; ok {
-		if val, ok := getTranslation(langMap, key); ok {
-			switch v := val.(type) {
-			case map[string]any:
-				var tmpl string
-				if n == 1 {
-					if s, ok := v["one"].(string); ok {
-						tmpl = s
-					} else {
-						slog.Warn("plural form 'one' not found for translation key",
-							"lang", lang,
-							"key", key,
-							"n", n,
-						)
-					}
-				}
-				if tmpl == "" {
-					if s, ok := v["other"].(string); ok {
-						tmpl = s
-					} else {
-						slog.Warn("plural form 'other' not found for translation key",
-							"lang", lang,
-							"key", key,
-							"n", n,
-						)
-					}
-				}
-				if tmpl != "" {
-					return sprintf(tmpl, args)
-				}
-			case string:
-				return sprintf(v, args)
+		var tpl any
+		found := false
+
+		if n == 0 {
+			// Try zeroKey first; if not found, try otherKey
+			tpl, found = getTranslation(langMap, key+".zero")
+			if !found {
+				tpl, found = getTranslation(langMap, key+".other")
 			}
+		} else if n == 1 {
+			// Try oneKey
+			tpl, found = getTranslation(langMap, key+".one")
 		} else {
-			slog.Warn("translation key not found",
-				"lang", lang,
-				"key", key,
-				"n", n,
-				"args", args,
-			)
+			// Try otherKey
+			tpl, found = getTranslation(langMap, key+".other")
 		}
-	} else {
-		slog.Warn("language not found in translations",
-			"lang", lang,
-			"key", key,
-			"n", n,
-		)
+
+		if found {
+			if str, ok := tpl.(string); ok {
+				return sprintf(str, args)
+			}
+		} else if LogMissingTranslations {
+			Logger.Warn("Plural translation key not found",
+				"language", lang,
+				"key", key,
+				"count", n)
+		}
+	} else if LogMissingTranslations {
+		Logger.Warn("Language not supported", "language", lang)
 	}
-	return key
+
+	if FallbackToKey {
+		return key
+	}
+	return ""
 }
 
 // Wrapper for fmt.Sprintf for potential future customization.

@@ -1,10 +1,13 @@
 package i18n_test
 
 import (
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -105,67 +108,90 @@ fr:
 	}
 }
 
-// TestN verifies that N returns the proper pluralized string with named substitution.
+// TestN verifies that pluralization works.
 func TestN(t *testing.T) {
 	resetTranslations(t)
 	yamlContent := `
 en:
   datetime:
     days:
-      one: "1 day"
+      one: "%{count} day"
       other: "%{count} days"
+    hours:
+      one: "%{count} hour"
+      other: "%{count} hours"
+    minutes:
+      zero: "less than a minute"
+      one: "%{count} minute"
+      other: "%{count} minutes"
+  greeting:
+    one: "You have %{count} message"
+    other: "You have %{count} messages"
 `
 	filename := createTempYAML(t, yamlContent)
-	if err := i18n.LoadTranslations(filename); err != nil {
+	err := i18n.LoadTranslations(filename)
+	if err != nil {
 		t.Fatalf("LoadTranslations failed: %v", err)
 	}
 
-	result := i18n.N("en", "datetime.days.other", 5, "count", "5")
+	result := i18n.N("en", "greeting", 5, "count", "5")
+	if result != "You have 5 messages" {
+		t.Errorf("Expected 'You have 5 messages', got %q", result)
+	}
+
+	result = i18n.N("en", "greeting", 1, "count", "1")
+	if result != "You have 1 message" {
+		t.Errorf("Expected 'You have 1 message', got %q", result)
+	}
+
+	result = i18n.N("en", "datetime.days", 5, "count", "5")
 	if result != "5 days" {
 		t.Errorf("Expected '5 days', got %q", result)
 	}
 
-	result = i18n.N("en", "datetime.days.one", 1, "count", "1")
+	result = i18n.N("en", "datetime.days", 1, "count", "1")
 	if result != "1 day" {
 		t.Errorf("Expected '1 day', got %q", result)
 	}
 }
 
-// TestNamedParameters verifies that named placeholders are substituted correctly.
+// TestNamedParameters verifies that named parameters work in pluralized strings.
 func TestNamedParameters(t *testing.T) {
 	resetTranslations(t)
 	yamlContent := `
 en:
+  greeting:
+    one: "You have %{count} message"
+    other: "You have %{count} messages"
   datetime:
     days:
-      zero: "less than a day"
-      one: "1 day"
+      one: "%{count} day"
       other: "%{count} days"
     hours:
-      zero: "less than an hour"
-      one: "1 hour"
+      one: "%{count} hour"
       other: "%{count} hours"
     minutes:
       zero: "less than a minute"
-      one: "1 minute"
+      one: "%{count} minute"
       other: "%{count} minutes"
 `
 	filename := createTempYAML(t, yamlContent)
-	if err := i18n.LoadTranslations(filename); err != nil {
+	err := i18n.LoadTranslations(filename)
+	if err != nil {
 		t.Fatalf("LoadTranslations failed: %v", err)
 	}
 
-	result := i18n.N("en", "datetime.days.other", 5, "count", "5")
+	result := i18n.N("en", "datetime.days", 5, "count", "5")
 	if result != "5 days" {
 		t.Errorf("Expected '5 days', got %q", result)
 	}
 
-	result = i18n.N("en", "datetime.hours.one", 1, "count", "1")
+	result = i18n.N("en", "datetime.hours", 1, "count", "1")
 	if result != "1 hour" {
 		t.Errorf("Expected '1 hour', got %q", result)
 	}
 
-	result = i18n.N("en", "datetime.minutes.zero", 0, "count", "0")
+	result = i18n.N("en", "datetime.minutes", 0, "count", "0")
 	if result != "less than a minute" {
 		t.Errorf("Expected 'less than a minute', got %q", result)
 	}
@@ -428,5 +454,132 @@ func BenchmarkLoadTranslationsDir(b *testing.B) {
 		if err := i18n.LoadTranslationsDir(dir); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// TestValidateTranslations verifies that validation catches invalid translation structures.
+func TestValidateTranslations(t *testing.T) {
+	// Original logger and settings
+	origLogger := i18n.Logger
+	origLogMissing := i18n.LogMissingTranslations
+	origFallbackToKey := i18n.FallbackToKey
+	
+	// Restore original settings after test
+	defer func() {
+		i18n.Logger = origLogger
+		i18n.LogMissingTranslations = origLogMissing
+		i18n.FallbackToKey = origFallbackToKey
+	}()
+	
+	// Configure package for testing
+	i18n.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	
+	tests := []struct {
+		name    string
+		content string
+		wantErr bool
+	}{
+		{
+			name:    "valid translations",
+			content: `en: {greeting: "Hello"}`,
+			wantErr: false,
+		},
+		{
+			name:    "empty translations",
+			content: `{}`,
+			wantErr: false, // This produces a warning but not an error
+		},
+		{
+			name:    "empty language code",
+			content: `"": {greeting: "Hello"}`,
+			wantErr: true,
+		},
+		{
+			name:    "nil entries",
+			content: `en: null`,
+			wantErr: true,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetTranslations(t)
+			filename := createTempYAML(t, tt.content)
+			err := i18n.LoadTranslations(filename)
+			
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoadTranslations() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestErrorTypes verifies that the package returns the expected error types.
+func TestErrorTypes(t *testing.T) {
+	t.Run("file system error", func(t *testing.T) {
+		err := i18n.LoadTranslations("nonexistent_file.yaml")
+		if err == nil {
+			t.Fatal("Expected error for nonexistent file, got nil")
+		}
+		if !strings.Contains(err.Error(), "file system error") {
+			t.Errorf("Expected file system error, got: %v", err)
+		}
+	})
+	
+	t.Run("invalid format error", func(t *testing.T) {
+		content := `invalid: yaml: [`
+		filename := createTempYAML(t, content)
+		err := i18n.LoadTranslations(filename)
+		if err == nil {
+			t.Fatal("Expected error for invalid YAML, got nil")
+		}
+		if !strings.Contains(err.Error(), "invalid translation format") {
+			t.Errorf("Expected invalid format error, got: %v", err)
+		}
+	})
+}
+
+// TestFallbackBehavior verifies the configurable fallback behavior.
+func TestFallbackBehavior(t *testing.T) {
+	resetTranslations(t)
+	yamlContent := `
+en:
+  welcome: "Welcome"
+`
+	filename := createTempYAML(t, yamlContent)
+	if err := i18n.LoadTranslations(filename); err != nil {
+		t.Fatalf("LoadTranslations failed: %v", err)
+	}
+	
+	// Original settings
+	origFallbackToKey := i18n.FallbackToKey
+	origLogMissing := i18n.LogMissingTranslations
+	
+	// Restore settings after test
+	defer func() {
+		i18n.FallbackToKey = origFallbackToKey
+		i18n.LogMissingTranslations = origLogMissing
+	}()
+	
+	// Test with fallback enabled (default)
+	i18n.FallbackToKey = true
+	result := i18n.T("en", "missing_key")
+	if result != "missing_key" {
+		t.Errorf("Expected fallback to key with FallbackToKey=true, got %q", result)
+	}
+	
+	// Test with fallback disabled
+	i18n.FallbackToKey = false
+	result = i18n.T("en", "missing_key")
+	if result != "" {
+		t.Errorf("Expected empty string with FallbackToKey=false, got %q", result)
+	}
+	
+	// Test with unsupported language
+	result = i18n.T("fr", "welcome")
+	if i18n.FallbackToKey && result != "welcome" {
+		t.Errorf("Expected fallback to key for unsupported language, got %q", result)
+	} else if !i18n.FallbackToKey && result != "" {
+		t.Errorf("Expected empty string for unsupported language with FallbackToKey=false, got %q", result)
 	}
 }

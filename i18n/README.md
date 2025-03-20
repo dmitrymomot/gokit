@@ -17,6 +17,9 @@ go get github.com/dmitrymomot/gokit/i18n
 - Pluralization support for different languages
 - Accept-Language header parsing for automatic language selection
 - Fallback mechanisms for missing translations
+- Custom error types for better error handling
+- Validation of translation files
+- Configurable logging for diagnostics
 
 ## Usage
 
@@ -126,10 +129,51 @@ All operations in this package are thread-safe and can be used in concurrent app
 
 ## Error Handling
 
-When translations are missing, the package falls back to the provided key:
+The package now provides custom error types for better error diagnostics:
+
+```go
+// Handling file loading errors
+err := i18n.LoadTranslations("nonexistent.yaml")
+if err != nil {
+    // Error will be of type ErrFileSystemError
+    log.Fatalf("Failed to load translations: %v", err)
+}
+
+// Invalid YAML format
+err = i18n.LoadTranslations("invalid.yaml")
+if err != nil {
+    // Error will be of type ErrInvalidTranslationFormat
+    log.Fatalf("Invalid translation format: %v", err)
+}
+```
+
+By default, when translations are missing, the package falls back to the provided key:
 
 ```go
 // If "missing_key" doesn't exist for "en"
 result := i18n.T("en", "missing_key")
 // result will be "missing_key"
 ```
+
+You can customize this behavior with the following configuration options:
+
+```go
+// Disable fallback to key (will return empty string instead)
+i18n.FallbackToKey = false
+
+// Enable logging of missing translations
+i18n.LogMissingTranslations = true
+
+// Configure custom logger (uses slog)
+i18n.Logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+```
+
+## Validation
+
+The package now validates translation files during loading:
+
+1. Checks for empty language codes
+2. Ensures all language entries are properly formatted
+3. Warns about empty translation files
+
+This helps catch configuration errors early and provides better error messages.
