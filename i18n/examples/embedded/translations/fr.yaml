@@ -1,0 +1,7 @@
+fr:
+  welcome: "Bienvenue à l'exemple de traductions intégrées, %{name}!"
+  about: "Cet exemple démontre le chargement de traductions à partir d'un système de fichiers intégré."
+  status:
+    zero: "Aucune opération en cours"
+    one: "%{count} opération en cours"
+    other: "%{count} opérations en cours"

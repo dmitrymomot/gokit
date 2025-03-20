@@ -16,6 +16,26 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Package i18n provides internationalization and localization capabilities for Go applications.
+// It supports translations from YAML files, pluralization rules, variable substitution,
+// and automatic language detection from Accept-Language headers.
+//
+// Translation files use a simple YAML structure with language codes as top-level keys:
+//
+//	en:
+//	  welcome: "Welcome, %{name}!"
+//	  items:
+//	    one: "%{count} item"
+//	    other: "%{count} items"
+//
+//	fr:
+//	  welcome: "Bienvenue, %{name}!"
+//	  items:
+//	    one: "%{count} élément"
+//	    other: "%{count} éléments"
+//
+// The package is thread-safe and can be used in concurrent applications.
+
 var (
 	translations = make(map[string]map[string]any)
 	mu           sync.RWMutex
@@ -27,6 +47,13 @@ const DefaultLang = "en"
 // LoadTranslations loads localization data from a single YAML file.
 // The file must follow the syntax from: https://github.com/invopop/ctxi18n/blob/main/README.md.
 // This call overwrites any existing translations.
+//
+// Example:
+//
+//	err := i18n.LoadTranslations("translations.yaml")
+//	if err != nil {
+//	    log.Fatalf("Failed to load translations: %v", err)
+//	}
 func LoadTranslations(filename string) error {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -44,6 +71,13 @@ func LoadTranslations(filename string) error {
 
 // LoadTranslationsDir loads all YAML files (with .yaml or .yml extensions)
 // from the provided directory recursively and merges them into the global translations.
+//
+// Example:
+//
+//	err := i18n.LoadTranslationsDir("./translations")
+//	if err != nil {
+//	    log.Fatalf("Failed to load translations: %v", err)
+//	}
 func LoadTranslationsDir(dir string) error {
 	var files []string
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -81,6 +115,18 @@ func LoadTranslationsDir(dir string) error {
 // LoadTranslationsFS loads all YAML files (with .yaml or .yml extensions)
 // from the provided http.FileSystem starting at root, recursively,
 // and merges them into the global translations.
+//
+// This is useful for embedding translations in your binary using Go 1.16+ embed package.
+//
+// Example:
+//
+//	//go:embed translations
+//	var translationsFS embed.FS
+//	httpFS := http.FS(translationsFS)
+//	err := i18n.LoadTranslationsFS(httpFS, ".")
+//	if err != nil {
+//	    log.Fatalf("Failed to load translations: %v", err)
+//	}
 func LoadTranslationsFS(fs http.FileSystem, root string) error {
 	return loadTranslationsFromFS(fs, root)
 }
@@ -186,6 +232,11 @@ func getTranslation(m map[string]any, key string) (any, bool) {
 // It takes an Accept-Language string and optional default languages.
 // Returns the most suitable language based on supported translations.
 // It's a convenience wrapper around BestLangFromAcceptLanguage().
+//
+// Example:
+//
+//	acceptLang := "fr-CA,fr;q=0.9,en;q=0.8"
+//	lang := i18n.Lang(acceptLang) // Returns the best matching language code
 func Lang(accepted string, defaultLang ...string) string {
 	return BestLangFromAcceptLanguage(accepted, defaultLang...)
 }
@@ -194,6 +245,15 @@ func Lang(accepted string, defaultLang ...string) string {
 // and returns the best matching language from the supported translations.
 // It considers both full matches and primary subtags. An optional defaultLocale may be provided;
 // if no candidates match, the default is returned if supported, otherwise "en" is returned.
+//
+// The function implements the language matching algorithm according to RFC 2616:
+// https://datatracker.ietf.org/doc/html/rfc2616#section-14.4
+//
+// Example:
+//
+//	acceptLang := "fr-CA,fr;q=0.9,en;q=0.8"
+//	lang := i18n.BestLangFromAcceptLanguage(acceptLang, "en")
+//	// Returns "fr" if supported, otherwise falls back to "en"
 func BestLangFromAcceptLanguage(header string, defaultLocale ...string) string {
 	if header == "" {
 		supported := supportedLanguages()
@@ -258,6 +318,7 @@ func BestLangFromAcceptLanguage(header string, defaultLocale ...string) string {
 	return "en"
 }
 
+// supportedLanguages returns a list of language codes that have translations available.
 func supportedLanguages() []string {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -268,6 +329,7 @@ func supportedLanguages() []string {
 	return langs
 }
 
+// contains checks if a string is present in a slice of strings.
 func contains(langs []string, target string) bool {
 	for _, l := range langs {
 		if l == target {
@@ -279,6 +341,9 @@ func contains(langs []string, target string) bool {
 
 // buildParams converts a slice of strings (expected as key, value, key, value, …)
 // into a map. If the number of arguments is odd, the last one is ignored.
+//
+// This is an internal helper function used by T() and N() to convert the variadic
+// arguments into a parameter map for variable substitution.
 func buildParams(args []string) map[string]string {
 	params := make(map[string]string)
 	for i := 0; i < len(args)-1; i += 2 {
@@ -288,13 +353,21 @@ func buildParams(args []string) map[string]string {
 }
 
 // sprintf always uses named substitution. It builds a parameter map from the key-value pairs.
+//
+// This is an internal helper function that wraps namedSprintf to provide a simpler interface
+// for the T() and N() functions.
 func sprintf(tmpl string, args []string) string {
-	params := buildParams(args)
-	return namedSprintf(tmpl, params)
+	return namedSprintf(tmpl, buildParams(args))
 }
 
 // namedSprintf performs substitution of named placeholders in the form "%{key}"
 // using the provided map.
+//
+// Example:
+//
+//	params := map[string]string{"name": "John", "age": "30"}
+//	result := namedSprintf("Hello, %{name}! You are %{age} years old.", params)
+//	// Returns: "Hello, John! You are 30 years old."
 func namedSprintf(tmpl string, params map[string]string) string {
 	re := regexp.MustCompile(`%\{([^}]+)\}`)
 	return re.ReplaceAllStringFunc(tmpl, func(match string) string {
@@ -309,6 +382,22 @@ func namedSprintf(tmpl string, params map[string]string) string {
 // T translates a key for the given language.
 // It supports formatting with additional arguments provided as key-value pairs.
 // For example: i18n.T("en", "welcome", "name", "John") will substitute "%{name}" in the template.
+//
+// If the requested translation is not found, the function returns the key as a fallback.
+//
+// Example:
+//
+//	// With translation "welcome": "Hello, %{name}!"
+//	msg := i18n.T("en", "welcome", "name", "John")
+//	// Returns: "Hello, John!"
+//
+//	// With nested translation using dot notation
+//	msg := i18n.T("en", "messages.greeting", "name", "Alice")
+//	// Returns corresponding nested translation with "Alice" substituted
+//
+//	// With missing translation
+//	msg := i18n.T("en", "missing_key")
+//	// Returns: "missing_key"
 func T(lang, key string, args ...string) string {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -330,6 +419,29 @@ func T(lang, key string, args ...string) string {
 // N translates a key with pluralization for the given language.
 // The parameter n is used to select the plural form. It supports formatting with additional
 // arguments provided as key-value pairs.
+//
+// The function first tries the exact key with the appropriate plural suffix:
+// - For n=0, it tries key+".zero" first, falling back to key+".other"
+// - For n=1, it tries key+".one"
+// - For all other values, it uses key+".other"
+//
+// If no translation is found, it falls back to the key itself.
+//
+// Example:
+//
+//	// With translations:
+//	// "items.zero": "No items"
+//	// "items.one": "%{count} item"
+//	// "items.other": "%{count} items"
+//
+//	msg := i18n.N("en", "items", 0, "count", "0")
+//	// Returns: "No items"
+//
+//	msg := i18n.N("en", "items", 1, "count", "1")
+//	// Returns: "1 item"
+//
+//	msg := i18n.N("en", "items", 5, "count", "5")
+//	// Returns: "5 items"
 func N(lang, key string, n int, args ...string) string {
 	mu.RLock()
 	defer mu.RUnlock()
