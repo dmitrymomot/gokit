@@ -2,6 +2,12 @@
 
 The `async` package provides a simple way to run functions concurrently and wait for all of them to finish. It is designed to handle asynchronous computations with ease, allowing you to execute functions in parallel and retrieve their results once they are completed.
 
+## Installation
+
+```sh
+go get github.com/dmitrymomot/gokit/async
+```
+
 ## Usage
 
 ### Basic Usage
@@ -18,7 +24,7 @@ import (
 	"fmt"
 	"time"
 
-	"saas/pkg/async"
+	"github.com/dmitrymomot/gokit/async"
 )
 
 func main() {
@@ -52,7 +58,7 @@ import (
 	"fmt"
 	"time"
 
-	"saas/pkg/async"
+	"github.com/dmitrymomot/gokit/async"
 )
 
 func main() {
@@ -77,6 +83,76 @@ func main() {
 }
 ```
 
+### Waiting with Timeout
+
+The `AwaitWithTimeout` method allows you to wait for the future to complete with a specific timeout:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/dmitrymomot/gokit/async"
+)
+
+func main() {
+	ctx := context.Background()
+
+	future := async.Async[int, string](ctx, 42, func(ctx context.Context, num int) (string, error) {
+		time.Sleep(200 * time.Millisecond) // Simulate long work
+		return fmt.Sprintf("Number: %d", num), nil
+	})
+
+	// Wait with a timeout
+	result, err := future.AwaitWithTimeout(100 * time.Millisecond)
+	if err != nil {
+		fmt.Println("Error:", err) // Expected: future: timeout waiting for completion
+	} else {
+		fmt.Println("Result:", result)
+	}
+}
+```
+
+### Checking Completion Status
+
+You can check if a future has completed without blocking using the `IsComplete` method:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/dmitrymomot/gokit/async"
+)
+
+func main() {
+	ctx := context.Background()
+
+	future := async.Async[int, string](ctx, 42, func(ctx context.Context, num int) (string, error) {
+		time.Sleep(200 * time.Millisecond) // Simulate work
+		return fmt.Sprintf("Number: %d", num), nil
+	})
+
+	// Check immediately (will be false)
+	fmt.Println("Is complete?", future.IsComplete())
+
+	time.Sleep(300 * time.Millisecond)
+
+	// Check after waiting (will be true)
+	fmt.Println("Is complete?", future.IsComplete())
+
+	// Now get the result
+	result, _ := future.Await()
+	fmt.Println("Result:", result)
+}
+```
+
 ### Error Propagation
 
 Errors from the asynchronous function are propagated correctly and can be checked after calling `Await`.
@@ -90,7 +166,7 @@ import (
 	"fmt"
 	"time"
 
-	"saas/pkg/async"
+	"github.com/dmitrymomot/gokit/async"
 )
 
 func main() {
@@ -124,7 +200,7 @@ import (
 	"fmt"
 	"time"
 
-	"saas/pkg/async"
+	"github.com/dmitrymomot/gokit/async"
 )
 
 type Input struct {
@@ -153,7 +229,7 @@ func main() {
 }
 ```
 
-### Concurrency Example
+### Multiple Concurrent Operations
 
 The `async` package allows you to run multiple asynchronous functions concurrently and wait for all of them to complete.
 
@@ -166,7 +242,7 @@ import (
 	"sync"
 	"time"
 
-	"saas/pkg/async"
+	"github.com/dmitrymomot/gokit/async"
 )
 
 func main() {
@@ -213,10 +289,103 @@ func main() {
 }
 ```
 
+### Waiting for All Futures
+
+The `WaitAll` function allows you to wait for multiple futures to complete and returns all their results:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/dmitrymomot/gokit/async"
+)
+
+func main() {
+	ctx := context.Background()
+	startTime := time.Now()
+
+	futures := make([]*async.Future[int], 3)
+	
+	// Create three async tasks with different durations
+	futures[0] = async.Async[int, int](ctx, 1, func(ctx context.Context, v int) (int, error) {
+		time.Sleep(100 * time.Millisecond)
+		return v * 10, nil
+	})
+	
+	futures[1] = async.Async[int, int](ctx, 2, func(ctx context.Context, v int) (int, error) {
+		time.Sleep(50 * time.Millisecond)
+		return v * 10, nil
+	})
+	
+	futures[2] = async.Async[int, int](ctx, 3, func(ctx context.Context, v int) (int, error) {
+		time.Sleep(75 * time.Millisecond)
+		return v * 10, nil
+	})
+	
+	// Wait for all futures to complete
+	results, err := async.WaitAll(futures...)
+	
+	duration := time.Since(startTime)
+	fmt.Println("All results:", results)
+	fmt.Println("Error:", err)
+	fmt.Println("Duration:", duration) // Should be just over 100ms
+}
+```
+
+### Waiting for Any Future to Complete
+
+The `WaitAny` function allows you to wait for any of the futures to complete and returns the first one that finishes:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/dmitrymomot/gokit/async"
+)
+
+func main() {
+	ctx := context.Background()
+	startTime := time.Now()
+
+	futures := make([]*async.Future[int], 3)
+	
+	// Create three async tasks with different durations
+	futures[0] = async.Async[int, int](ctx, 1, func(ctx context.Context, v int) (int, error) {
+		time.Sleep(100 * time.Millisecond)
+		return v * 10, nil
+	})
+	
+	futures[1] = async.Async[int, int](ctx, 2, func(ctx context.Context, v int) (int, error) {
+		time.Sleep(50 * time.Millisecond)
+		return v * 10, nil
+	})
+	
+	futures[2] = async.Async[int, int](ctx, 3, func(ctx context.Context, v int) (int, error) {
+		time.Sleep(75 * time.Millisecond)
+		return v * 10, nil
+	})
+	
+	// Wait for any future to complete
+	index, result, err := async.WaitAny(futures...)
+	
+	duration := time.Since(startTime)
+	fmt.Printf("Future %d completed first with result: %d\n", index, result)
+	fmt.Println("Error:", err)
+	fmt.Println("Duration:", duration) // Should be just over 50ms
+}
+```
+
 ## Benchmarks
 
 The package includes benchmark tests to measure the performance of the `Async` helper under different conditions. You can run the benchmarks using the following command:
 
 ```sh
-go test -bench=. saas/pkg/async
-```
+go test -bench=. github.com/dmitrymomot/gokit/async
