@@ -1,11 +1,11 @@
-package i18nx
+package i18n
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
-	"embed"
 )
 
 // TranslationAdapter interface defines how translations are loaded
@@ -293,11 +293,11 @@ func NewEmbeddedFsAdapter(parser Parser, fs embed.FS, dir string) *EmbeddedFsAda
 	if parser == nil {
 		return nil
 	}
-	
+
 	if dir == "" {
 		return nil
 	}
-	
+
 	return &EmbeddedFsAdapter{
 		parser: parser,
 		fs:     fs,
@@ -311,56 +311,56 @@ func (a *EmbeddedFsAdapter) Load(ctx context.Context) (map[string]map[string]any
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("loading translations canceled before starting: %w", err)
 	}
-	
+
 	// Read directory entries
 	entries, err := a.fs.ReadDir(a.dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read embedded directory '%s': %w", a.dir, err)
 	}
-	
+
 	// Check if there are any files to process
 	if len(entries) == 0 {
 		return nil, fmt.Errorf("no files found in embedded directory '%s'", a.dir)
 	}
-	
+
 	// Create the result map to hold all translations
 	allTranslations := make(map[string]map[string]any)
-	
+
 	// Flag to check if we processed at least one valid file
 	validFileProcessed := false
-	
+
 	// Process each file in the directory
 	for _, entry := range entries {
 		// Skip directories
 		if entry.IsDir() {
 			continue
 		}
-		
+
 		// Check if this file's extension is supported by the parser
 		filename := entry.Name()
 		ext := filepath.Ext(filename)
 		if ext == "" || !a.parser.SupportsFileExtension(ext[1:]) {
 			continue
 		}
-		
+
 		// Construct full path to the file in the embedded filesystem
 		filePath := filepath.Join(a.dir, filename)
-		
+
 		// Process the file and merge translations
 		if err := a.processFile(ctx, filePath, allTranslations); err != nil {
 			// Log the error but continue processing other files
 			fmt.Printf("Warning: failed to process file '%s': %v\n", filePath, err)
 			continue
 		}
-		
+
 		validFileProcessed = true
 	}
-	
+
 	// If no valid files were processed, return an error
 	if !validFileProcessed {
 		return nil, fmt.Errorf("no valid translation files found in embedded directory '%s'", a.dir)
 	}
-	
+
 	return allTranslations, nil
 }
 
@@ -371,13 +371,13 @@ func (a *EmbeddedFsAdapter) processFile(ctx context.Context, filePath string, al
 	done := make(chan struct{})
 	var content []byte
 	var readErr error
-	
+
 	// Start file reading in a goroutine
 	go func() {
 		content, readErr = a.fs.ReadFile(filePath)
 		close(done)
 	}()
-	
+
 	// Wait for either context cancellation or file reading completion
 	select {
 	case <-ctx.Done():
@@ -385,28 +385,28 @@ func (a *EmbeddedFsAdapter) processFile(ctx context.Context, filePath string, al
 	case <-done:
 		// Continue with normal processing
 	}
-	
+
 	// Handle file reading error
 	if readErr != nil {
 		return fmt.Errorf("failed to read embedded translation file '%s': %w", filePath, readErr)
 	}
-	
+
 	// Skip empty files
 	if len(content) == 0 {
 		return fmt.Errorf("embedded translation file '%s' is empty", filePath)
 	}
-	
+
 	// Parse the file content
 	fileTranslations, err := a.parser.Parse(ctx, string(content))
 	if err != nil {
 		return fmt.Errorf("failed to parse embedded translation file '%s': %w", filePath, err)
 	}
-	
+
 	// Check if parsing returned nil translations
 	if fileTranslations == nil {
 		return fmt.Errorf("parser returned nil translations for embedded file '%s'", filePath)
 	}
-	
+
 	// Merge translations from this file into the overall result
 	for lang, translations := range fileTranslations {
 		if allTranslations[lang] == nil {
@@ -417,6 +417,6 @@ func (a *EmbeddedFsAdapter) processFile(ctx context.Context, filePath string, al
 			allTranslations[lang][key] = value
 		}
 	}
-	
+
 	return nil
 }

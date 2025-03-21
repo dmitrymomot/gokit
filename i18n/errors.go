@@ -1,8 +1,8 @@
-package i18nx
+package i18n
 
 import "fmt"
 
-// Error types for the i18nx package
+// Error types for the i18n package
 var (
 	// ErrLanguageNotSupported is returned when a requested language doesn't have translations.
 	ErrLanguageNotSupported = func(lang string) error {

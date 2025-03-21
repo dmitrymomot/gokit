@@ -1,29 +1,27 @@
 # i18n
 
-A lightweight, thread-safe internationalization and localization package for Go applications.
+The `i18n` package provides a simple, powerful internationalization (i18n) solution for Go applications. It supports multiple languages, custom translation files, and extensive error handling to make your applications globally accessible.
+
+## Features
+
+- 🌎 Support for multiple languages
+- 🔄 Dynamic language switching
+- 📁 Custom translation file formats
+- 🚨 Comprehensive error handling with custom error types
+- ✅ Validation for translation files
+- 📊 Configurable logging for diagnostics
+- 🔍 Support for common browser Accept-Language header patterns
+- 🧪 Well-tested with realistic usage scenarios
 
 ## Installation
 
 ```bash
-go get github.com/dmitrymomot/gokit/i18n
+go get -u github.com/dmitrymomot/gokit/i18n
 ```
-
-## Features
-
-- Load translations from YAML files or directories
-- Support for embedded translations via `http.FileSystem`
-- Thread-safe operations for concurrent applications
-- Text translation with variable substitution
-- Pluralization support for different languages
-- Accept-Language header parsing for automatic language selection
-- Fallback mechanisms for missing translations
-- Custom error types for better error handling
-- Validation of translation files
-- Configurable logging for diagnostics
 
 ## Usage
 
-### Basic Example
+### Basic Usage
 
 ```go
 package main
@@ -36,144 +34,162 @@ import (
 )
 
 func main() {
-	// Load translations from a YAML file
-	err := i18n.LoadTranslations("translations.yaml")
+	// Initialize translator with English as default language
+	translator, err := i18n.New(i18n.Config{
+		DefaultLanguage: "en",
+		SupportedLanguages: []string{"en", "fr", "es"},
+		TranslationsPath: "./translations", // Path to translation files
+	})
 	if err != nil {
-		log.Fatalf("Failed to load translations: %v", err)
+		log.Fatalf("Failed to initialize translator: %v", err)
 	}
 
-	// Simple translation
-	fmt.Println(i18n.T("en", "welcome", "name", "John"))
-	// Output: "Welcome, John!"
+	// Get translation in default language
+	greeting, err := translator.Translate("greeting")
+	if err != nil {
+		log.Printf("Translation error: %v", err)
+	}
 
-	// Translation with pluralization
-	fmt.Println(i18n.N("en", "items", 1, "count", "1"))
-	// Output: "1 item"
-	fmt.Println(i18n.N("en", "items", 5, "count", "5"))
-	// Output: "5 items"
+	fmt.Println(greeting) // Output: Hello, world!
+
+	// Get translation in a specific language
+	frenchGreeting, err := translator.TranslateWithLang("greeting", "fr")
+	if err != nil {
+		log.Printf("Translation error: %v", err)
+	}
+
+	fmt.Println(frenchGreeting) // Output: Bonjour, le monde!
 }
 ```
 
-### Translation File Format
+### Translation Files
 
-Translation files use YAML format. The structure is organized by language code at the top level:
+Translation files should be organized by language code in the translations directory. For example:
 
-```yaml
-en:
-  welcome: "Welcome, %{name}!"
-  items:
-    one: "%{count} item"
-    other: "%{count} items"
-  nested:
-    greeting: "Hello from nested key!"
-
-fr:
-  welcome: "Bienvenue, %{name}!"
-  items:
-    one: "%{count} élément"
-    other: "%{count} éléments"
-  nested:
-    greeting: "Bonjour depuis une clé imbriquée!"
+```
+/translations
+  /en
+    common.json
+    errors.json
+  /fr
+    common.json
+    errors.json
+  /es
+    common.json
+    errors.json
 ```
 
-### Loading Translations
+Example `en/common.json`:
 
-You can load translations in several ways:
-
-```go
-// From a single file
-i18n.LoadTranslations("translations.yaml")
-
-// From a directory (recursively loads all .yaml and .yml files)
-i18n.LoadTranslationsDir("./translations")
-
-// From an embedded file system (e.g., with Go 1.16+ embed)
-//go:embed translations
-var translationsFS embed.FS
-httpFS := http.FS(translationsFS)
-i18n.LoadTranslationsFS(httpFS, ".")
+```json
+{
+    "greeting": "Hello, world!",
+    "welcome": "Welcome to our application, {{name}}!",
+    "farewell": "Goodbye, see you soon!"
+}
 ```
 
-### Translation Functions
+Example `fr/common.json`:
 
-```go
-// Simple translation with variable substitution
-i18n.T("en", "welcome", "name", "John")
-
-// Nested keys using dot notation
-i18n.T("en", "nested.greeting")
-
-// Pluralization based on count
-i18n.N("en", "items", 1, "count", "1")  // Uses "one" form
-i18n.N("en", "items", 5, "count", "5")  // Uses "other" form
-
-// Language selection from Accept-Language header
-acceptLang := "fr-CA,fr;q=0.9,en;q=0.8"
-lang := i18n.BestLangFromAcceptLanguage(acceptLang)
-i18n.T(lang, "welcome", "name", "User")
+```json
+{
+    "greeting": "Bonjour, le monde!",
+    "welcome": "Bienvenue dans notre application, {{name}}!",
+    "farewell": "Au revoir, à bientôt!"
+}
 ```
 
-### Pluralization Rules
-
-The package follows a simple pluralization system:
-
-- `zero`: Used when the count is 0 (optional)
-- `one`: Used when the count is 1
-- `other`: Used for all other cases
-
-More complex pluralization rules may be added in future versions.
-
-## Thread Safety
-
-All operations in this package are thread-safe and can be used in concurrent applications.
-
-## Error Handling
-
-The package now provides custom error types for better error diagnostics:
+### Working with Variables
 
 ```go
-// Handling file loading errors
-err := i18n.LoadTranslations("nonexistent.yaml")
+// Translate with variables
+welcomeMsg, err := translator.TranslateWithVars("welcome", map[string]interface{}{
+	"name": "John",
+})
+fmt.Println(welcomeMsg) // Output: Welcome to our application, John!
+
+// Translate with variables in a specific language
+frenchWelcome, err := translator.TranslateWithLangAndVars("welcome", "fr", map[string]interface{}{
+	"name": "John",
+})
+fmt.Println(frenchWelcome) // Output: Bienvenue dans notre application, John!
+```
+
+### Error Handling
+
+The package provides several custom error types for better error handling:
+
+```go
+// Handle specific error types
+greeting, err := translator.TranslateWithLang("greeting", "de")
 if err != nil {
-    // Error will be of type ErrFileSystemError
-    log.Fatalf("Failed to load translations: %v", err)
-}
-
-// Invalid YAML format
-err = i18n.LoadTranslations("invalid.yaml")
-if err != nil {
-    // Error will be of type ErrInvalidTranslationFormat
-    log.Fatalf("Invalid translation format: %v", err)
+	switch {
+	case errors.Is(err, i18n.ErrLanguageNotSupported):
+		log.Printf("Language is not supported: %v", err)
+		// Fall back to default language
+		greeting, _ = translator.Translate("greeting")
+	case errors.Is(err, i18n.ErrTranslationNotFound):
+		log.Printf("Translation not found: %v", err)
+		greeting = "Hello!" // Fallback text
+	case errors.Is(err, i18n.ErrInvalidTranslationFormat):
+		log.Printf("Invalid translation format: %v", err)
+	case errors.Is(err, i18n.ErrFileSystemError):
+		log.Printf("File system error: %v", err)
+	default:
+		log.Printf("Unknown error: %v", err)
+	}
 }
 ```
 
-By default, when translations are missing, the package falls back to the provided key:
+### Working with HTTP Requests
+
+The package supports parsing Accept-Language headers from HTTP requests:
 
 ```go
-// If "missing_key" doesn't exist for "en"
-result := i18n.T("en", "missing_key")
-// result will be "missing_key"
+func handler(w http.ResponseWriter, r *http.Request) {
+	// Parse Accept-Language header from request
+	lang := i18n.ParseAcceptLanguage(r.Header.Get("Accept-Language"),
+		[]string{"en", "fr", "es"}, "en")
+
+	// Use the detected language for translations
+	greeting, err := translator.TranslateWithLang("greeting", lang)
+	if err != nil {
+		// Handle error
+		greeting, _ = translator.Translate("greeting") // Fallback to default
+	}
+
+	fmt.Fprintf(w, greeting)
+}
 ```
 
-You can customize this behavior with the following configuration options:
+### Advanced Configuration
 
 ```go
-// Disable fallback to key (will return empty string instead)
-i18n.FallbackToKey = false
-
-// Enable logging of missing translations
-i18n.LogMissingTranslations = true
-
-// Configure custom logger (uses slog)
-i18n.Logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+translator, err := i18n.New(i18n.Config{
+	DefaultLanguage: "en",
+	SupportedLanguages: []string{"en", "fr", "es", "de", "ja"},
+	TranslationsPath: "./translations",
+	FileFormat: "json",          // Default is "json", can be customized
+	EnableLogging: true,         // Enable logging for debugging
+	LogLevel: i18n.LogLevelInfo, // Set log level
+	FallbackToDefault: true,     // Fall back to default language if translation not found
+	CustomLoader: myCustomLoader, // Optional custom translation loader
+})
 ```
 
-## Validation
+## Error Types
 
-The package now validates translation files during loading:
+The package defines the following error types:
 
-1. Checks for empty language codes
-2. Ensures all language entries are properly formatted
-3. Warns about empty translation files
+- `ErrLanguageNotSupported`: Requested language is not in the supported languages list
+- `ErrTranslationNotFound`: Translation key doesn't exist in the specified language
+- `ErrInvalidTranslationFormat`: Translation file has an invalid format
+- `ErrFileSystemError`: Error accessing or reading translation files
 
-This helps catch configuration errors early and provides better error messages.
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## See Also
+
+This package is part of the [gokit](https://github.com/dmitrymomot/gokit) library, which provides various utility packages for Go applications.

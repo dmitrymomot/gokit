@@ -1,7 +1,0 @@
-en:
-  welcome: "Welcome to embedded translations example, %{name}!"
-  about: "This example demonstrates loading translations from an embedded filesystem."
-  status:
-    zero: "No operations in progress"
-    one: "%{count} operation in progress"
-    other: "%{count} operations in progress"

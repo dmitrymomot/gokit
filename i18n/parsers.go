@@ -1,4 +1,4 @@
-package i18nx
+package i18n
 
 import "context"
 

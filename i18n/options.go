@@ -1,4 +1,4 @@
-package i18nx
+package i18n
 
 import (
 	"io"
@@ -19,7 +19,7 @@ func WithDefaultLanguage(lang string) Option {
 	}
 }
 
-// WithFallbackToKey determines whether to fall back to the key 
+// WithFallbackToKey determines whether to fall back to the key
 // when a translation is not found. Default is true.
 func WithFallbackToKey(fallback bool) Option {
 	return func(t *Translator) {

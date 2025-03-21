@@ -1,4 +1,4 @@
-package i18nx
+package i18n
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"sync"
 )
 
-// Translator is the core type of the i18nx package that provides internationalization
+// Translator is the core type of the i18n package that provides internationalization
 // capabilities with an object-oriented design.
 type Translator struct {
 	translations   map[string]map[string]any
