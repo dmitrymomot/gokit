@@ -177,6 +177,109 @@ translator, err := i18n.New(i18n.Config{
 })
 ```
 
+### HTTP Middleware
+
+The package includes middleware support for integrating with HTTP servers to automatically detect and set the user's preferred language based on request headers.
+
+#### Standard Go HTTP Middleware
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/dmitrymomot/gokit/i18n"
+)
+
+func main() {
+	// Initialize translator
+	translator, err := i18n.New(i18n.Config{
+		DefaultLanguage:    "en",
+		SupportedLanguages: []string{"en", "fr", "es"},
+		TranslationsPath:   "./translations",
+	})
+	if err != nil {
+		log.Fatalf("Failed to initialize translator: %v", err)
+	}
+
+	// Create a custom language extractor (optional)
+	// This example extracts language from a URL query parameter
+	customExtractor := func(r *http.Request) string {
+		return r.URL.Query().Get("lang")
+	}
+
+	// Create a handler that uses translations
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Get the locale from the request context
+		locale := i18n.GetLocale(r.Context())
+		
+		// Use the detected language for translations
+		greeting, err := translator.TranslateWithLang("greeting", locale)
+		if err != nil {
+			greeting, _ = translator.Translate("greeting") // Fallback to default
+		}
+		
+		fmt.Fprintf(w, "Detected language: %s\n", locale)
+		fmt.Fprintf(w, "Greeting: %s\n", greeting)
+	})
+
+	// Apply the i18n middleware to automatically detect language
+	// Pass nil instead of customExtractor if you want to rely only on Accept-Language header
+	http.Handle("/", i18n.Middleware(translator, customExtractor)(handler))
+	
+	log.Println("Server started at http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+```
+
+#### Context Utilities
+
+The package provides utility functions for working with locale in request contexts:
+
+```go
+// Set locale in context
+ctx = i18n.SetLocale(context.Background(), "fr")
+
+// Get locale from context (returns "en" as default if not set)
+locale := i18n.GetLocale(ctx)
+```
+
+#### Usage with Third-Party Frameworks
+
+While the package provides middleware for standard Go HTTP servers, you can easily adapt it for use with third-party web frameworks by:
+
+1. Creating a custom middleware for your framework
+2. Using the `SetLocale` and `GetLocale` functions to store and retrieve the locale
+3. Using the translator's `Lang` method to parse Accept-Language headers
+
+Example with a custom framework middleware:
+
+```go
+// Pseudocode for framework middleware
+func I18nMiddleware(translator *i18n.Translator) FrameworkMiddleware {
+	return func(c *Context) error {
+		// Extract language from request headers
+		acceptLanguage := c.Request.Header.Get("Accept-Language")
+		lang := translator.Lang(acceptLanguage)
+		
+		// Store in framework context
+		c.Set("locale", lang)
+		
+		return c.Next()
+	}
+}
+
+// In your handler
+func Handler(c *Context) error {
+	locale := c.Get("locale").(string)
+	greeting, _ := translator.TranslateWithLang("greeting", locale)
+	return c.String(200, greeting)
+}
+```
+
 ## Error Types
 
 The package defines the following error types:
