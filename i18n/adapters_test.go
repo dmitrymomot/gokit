@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -31,12 +32,7 @@ func (p *mockParser) SupportsFileExtension(ext string) bool {
 	}
 	ext = strings.ToLower(ext)
 
-	for _, supported := range p.supportsFileExtensions {
-		if supported == ext {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(p.supportsFileExtensions, ext)
 }
 
 // newYamlMockParser creates a mock parser that handles YAML content
