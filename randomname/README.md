@@ -14,6 +14,12 @@ A Go package for generating random, human-readable workspace names in the format
     - 42 adjectives × 44 nouns = 1,848 base combinations
     - With 24-bit suffix: 1,848 × 16,777,215 ≈ 31 billion possible combinations
 
+## Installation
+
+```bash
+go get github.com/dmitrymomot/gokit/randomname
+```
+
 ## Usage
 
 ### Basic Usage
@@ -104,4 +110,4 @@ These words are chosen to create memorable, friendly, and professional workspace
 
 ## License
 
-This package is part of the SaaSKit project. See the LICENSE file in the root directory for details.
+This package is part of the github.com/dmitrymomot/gokit project. See the LICENSE file in the root directory for details.
