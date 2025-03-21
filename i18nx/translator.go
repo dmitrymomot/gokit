@@ -26,6 +26,10 @@ type Translator struct {
 
 // NewTranslator creates a new Translator instance with the given adapter and options.
 func NewTranslator(ctx context.Context, adapter TranslationAdapter, options ...Option) (*Translator, error) {
+	if adapter == nil {
+		return nil, fmt.Errorf("adapter is nil")
+	}
+
 	t := &Translator{
 		translations:   make(map[string]map[string]any),
 		defaultLang:    "en",
