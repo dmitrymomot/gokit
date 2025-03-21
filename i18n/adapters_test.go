@@ -724,7 +724,7 @@ func TestEmbeddedFsAdapterIntegration(t *testing.T) {
 			parseFunc: func(ctx context.Context, content string) (map[string]map[string]any, error) {
 				// Return error for content containing "error" or "corrupted"
 				if strings.Contains(content, "error") || strings.Contains(content, "corrupted") {
-					return nil, i18n.ErrInvalidTranslationFormat("test-file.json", fmt.Errorf("invalid syntax in translation file"))
+					return nil, fmt.Errorf("invalid syntax in translation file: test-file.json")
 				}
 
 				// Parse other content normally
