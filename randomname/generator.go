@@ -75,7 +75,7 @@ func generate(check func(name string) bool, withSuffix bool) string {
 	}
 }
 
-// Generate returns a random workspace name in the format "adjective-noun-xxxxxx".
+// Generate returns a random name in the format "adjective-noun-xxxxxx".
 // The "xxxxxx" suffix is a 6-character hexadecimal number, making collisions extremely unlikely.
 // It ensures uniqueness within the current session and allows for external validation through
 // the optional check callback.
@@ -83,7 +83,7 @@ func Generate(check func(name string) bool) string {
 	return generate(check, true)
 }
 
-// GenerateSimple returns a random workspace name in the format "adjective-noun"
+// GenerateSimple returns a random name in the format "adjective-noun"
 // without the hexadecimal suffix. Note that this has a higher chance of collisions
 // due to the smaller namespace.
 func GenerateSimple(check func(name string) bool) string {
