@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log/slog"
 	"net/http"
 
 	"golang.org/x/oauth2"
@@ -17,6 +16,12 @@ type Client struct {
 	oauth        *oauth2.Config
 	stateKey     string // The key to store the state in the session.
 	verifiedOnly bool   // If true, only verified accounts are allowed. Default is true.
+	log          logger
+}
+
+type logger interface {
+	WarnContext(ctx context.Context, msg string, args ...any)
+	ErrorContext(ctx context.Context, msg string, args ...any)
 }
 
 // Profile represents the user's profile from Google.
@@ -32,7 +37,7 @@ type Profile struct {
 }
 
 // New creates a new Google OAuth 2.0 client.
-func New(cfg Config) (*Client, error) {
+func New(cfg Config, log logger) (*Client, error) {
 	return &Client{
 		oauth: &oauth2.Config{
 			RedirectURL:  cfg.RedirectURL,
@@ -43,6 +48,7 @@ func New(cfg Config) (*Client, error) {
 		},
 		stateKey:     cfg.StateKey,
 		verifiedOnly: cfg.VerifiedOnly,
+		log:          log,
 	}, nil
 }
 
@@ -62,7 +68,7 @@ func (c *Client) GetProfile(ctx context.Context, token string) (Profile, error) 
 	}
 	defer func(Body io.ReadCloser) {
 		if err := Body.Close(); err != nil {
-			slog.ErrorContext(ctx, "Failed to close response body", "error", err)
+			c.log.ErrorContext(ctx, "Failed to close response body", "error", err)
 		}
 	}(response.Body)
 
@@ -91,6 +97,7 @@ func (c *Client) Auth(ctx context.Context, code string) (Profile, error) {
 		return Profile{}, err
 	}
 	if c.verifiedOnly && !profile.VerifiedEmail {
+		c.log.WarnContext(ctx, "Account is not verified", "email", profile.Email)
 		return Profile{}, ErrAccountNotVerified
 	}
 
