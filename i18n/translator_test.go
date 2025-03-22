@@ -592,7 +592,6 @@ func TestTranslatorLangWithComplexCases(t *testing.T) {
 	})
 }
 
-// TestTranslatorLangErrorHandling tests language detection edge cases and error handling
 func TestTranslatorLangErrorHandling(t *testing.T) {
 	translations := map[string]map[string]any{
 		"en": {"greeting": "Hello"},
@@ -629,7 +628,6 @@ func TestTranslatorLangErrorHandling(t *testing.T) {
 	})
 }
 
-// TestTranslatorWithEmptyLanguageSet tests behavior with an empty language set
 func TestTranslatorWithEmptyLanguageSet(t *testing.T) {
 	// Create an empty adapter
 	emptyAdapter := &i18n.MapAdapter{
@@ -1043,7 +1041,7 @@ func TestTranslatorDurationWithMissingTranslations(t *testing.T) {
 	// Create a new translator with logging enabled
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	translator, err := i18n.NewTranslator(
-		context.Background(), 
+		context.Background(),
 		adapter,
 		i18n.WithMissingTranslationsLogging(true),
 		i18n.WithLogger(logger),
@@ -1060,7 +1058,7 @@ func TestTranslatorDurationWithMissingTranslations(t *testing.T) {
 		{name: "Missing hours translation", lang: "en", duration: 5 * time.Hour, expected: "5h0m0s"},
 		{name: "Missing minutes translation", lang: "en", duration: 30 * time.Minute, expected: "30m0s"},
 		{name: "Days translation works", lang: "en", duration: 3 * 24 * time.Hour, expected: "3 days"},
-		
+
 		// Test with completely missing translations
 		{name: "Empty language - days", lang: "minimal", duration: 2 * 24 * time.Hour, expected: "48h0m0s"},
 		{name: "Empty language - hours", lang: "minimal", duration: 4 * time.Hour, expected: "4h0m0s"},
@@ -1103,7 +1101,7 @@ func TestTranslatorTimeSinceWithMissingTranslations(t *testing.T) {
 	// Create a new translator with logging enabled
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	translator, err := i18n.NewTranslator(
-		context.Background(), 
+		context.Background(),
 		adapter,
 		i18n.WithMissingTranslationsLogging(true),
 		i18n.WithLogger(logger),
@@ -1123,7 +1121,7 @@ func TestTranslatorTimeSinceWithMissingTranslations(t *testing.T) {
 		{name: "Missing hours translation", lang: "en", time: now.Add(-5 * time.Hour), expected: "5h0m0s ago"},
 		{name: "Missing minutes translation", lang: "en", time: now.Add(-30 * time.Minute), expected: "30m0s ago"},
 		{name: "Days translation works", lang: "en", time: now.Add(-3 * 24 * time.Hour), expected: "3 days ago"},
-		
+
 		// Test with completely missing translations
 		{name: "Empty language - days", lang: "minimal", time: now.Add(-2 * 24 * time.Hour), expected: "48h0m0s ago"},
 		{name: "Empty language - hours", lang: "minimal", time: now.Add(-4 * time.Hour), expected: "4h0m0s ago"},
@@ -1137,4 +1135,112 @@ func TestTranslatorTimeSinceWithMissingTranslations(t *testing.T) {
 			assert.Equal(t, tt.expected, result, "TimeSince did not handle missing translations correctly")
 		})
 	}
+}
+
+func TestTranslatorExportJSON(t *testing.T) {
+	// Create a translation map with various structures
+	translations := map[string]map[string]any{
+		"en": {
+			"hello":   "Hello",
+			"welcome": "Welcome, %{name}!",
+			"nested": map[string]any{
+				"key": "Nested value",
+			},
+			"items": map[string]any{
+				"zero":  "No items",
+				"one":   "One item",
+				"other": "%{count} items",
+			},
+		},
+		"fr": {
+			"hello": "Bonjour",
+		},
+	}
+
+	// Create a MapAdapter with the translations
+	adapter := &i18n.MapAdapter{
+		Data: translations,
+	}
+
+	// Create a new translator
+	translator, err := i18n.NewTranslator(context.Background(), adapter)
+	require.NoError(t, err)
+
+	t.Run("successful export", func(t *testing.T) {
+		// Export translations for English
+		jsonStr, err := translator.ExportJSON("en")
+		require.NoError(t, err)
+		assert.NotEmpty(t, jsonStr)
+
+		// Verify the JSON content contains expected keys
+		assert.Contains(t, jsonStr, "hello")
+		assert.Contains(t, jsonStr, "Welcome, %{name}!")
+		assert.Contains(t, jsonStr, "nested")
+		assert.Contains(t, jsonStr, "items")
+
+		// Verify for French (should be a simpler structure)
+		jsonStr, err = translator.ExportJSON("fr")
+		require.NoError(t, err)
+		assert.Contains(t, jsonStr, "Bonjour")
+	})
+
+	t.Run("language not supported", func(t *testing.T) {
+		// Try to export translations for a non-existent language
+		_, err := translator.ExportJSON("es")
+		require.Error(t, err)
+		assert.IsType(t, &i18n.ErrLanguageNotSupported{}, err)
+		assert.Contains(t, err.Error(), "language not supported")
+	})
+}
+
+func TestTranslatorTd(t *testing.T) {
+	// Create a translation map
+	translations := map[string]map[string]any{
+		"en": {
+			"hello":      "Hello",
+			"welcome":    "Welcome, %{name}!",
+			"non_string": 123,
+		},
+	}
+
+	// Create a MapAdapter with the translations
+	adapter := &i18n.MapAdapter{
+		Data: translations,
+	}
+
+	// Create a new translator
+	translator, err := i18n.NewTranslator(context.Background(), adapter)
+	require.NoError(t, err)
+
+	t.Run("existing translation", func(t *testing.T) {
+		// Test with existing key
+		result := translator.Td("en", "hello", "Default Hello")
+		assert.Equal(t, "Hello", result)
+
+		// Test with parameters
+		result = translator.Td("en", "welcome", "Default Welcome, %{name}!", "name", "John")
+		assert.Equal(t, "Welcome, John!", result)
+	})
+
+	t.Run("missing translation", func(t *testing.T) {
+		// Test with missing key
+		result := translator.Td("en", "missing", "Default Text")
+		assert.Equal(t, "Default Text", result)
+
+		// Test with parameters in default text
+		result = translator.Td("en", "missing", "Default with %{param}", "param", "value")
+		assert.Equal(t, "Default with value", result)
+	})
+
+	t.Run("non-string translation", func(t *testing.T) {
+		// Test with non-string value
+		result := translator.Td("en", "non_string", "Default for non-string")
+		assert.Equal(t, "Default for non-string", result)
+	})
+
+	t.Run("language not supported", func(t *testing.T) {
+		// Test with non-existent language
+		result := translator.Td("fr", "hello", "Default Hello")
+		assert.Equal(t, "Default Hello", result)
+	})
 }

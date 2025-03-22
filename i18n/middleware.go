@@ -21,7 +21,7 @@ type translator interface {
 type langExtractor func(r *http.Request) string
 
 // ContextKeyLocale is the context key for the locale in the request context.
-const ContextKeyLocale = "gokit/i18n:locale"
+var ContextKeyLocale = struct{ name string }{name: "gokit/i18n:locale"}
 
 // SetLocale sets the locale in the context.
 func SetLocale(ctx context.Context, locale string) context.Context {
