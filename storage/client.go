@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path/filepath"
+	"path"
 	"strings"
 	"time"
 
@@ -26,7 +26,12 @@ type storageClient struct {
 }
 
 // New creates a new S3-compatible storage client with the given config and options.
-func New(cfg Config, opts ...ClientOption) (Storage, error) {
+func New(ctx context.Context, cfg Config, opts ...ClientOption) (Storage, error) {
+	// Use provided context instead of creating background context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	// Validate minimum required configuration
 	if cfg.Key == "" || cfg.Secret == "" || cfg.Region == "" || cfg.Bucket == "" {
 		return nil, ErrMissingConfig
@@ -80,8 +85,8 @@ func New(cfg Config, opts ...ClientOption) (Storage, error) {
 		// Add any additional S3 config options
 		s3Options = append(s3Options, options.s3ConfigOptions...)
 
-		// Load AWS configuration
-		awsCfg, err := s3config.LoadDefaultConfig(context.TODO(), s3Options...)
+		// Load AWS configuration using the provided context
+		awsCfg, err := s3config.LoadDefaultConfig(ctx, s3Options...)
 		if err != nil {
 			return nil, errors.Join(ErrFailedToLoadConfig, err)
 		}
@@ -140,9 +145,9 @@ func (sc *storageClient) UploadFile(ctx context.Context, file []byte, opts Uploa
 	// Ensure the path is properly formatted
 	filePath := opts.Path
 	if filePath == "" {
-		filePath = filepath.Join(sc.config.UploadBasePath, fmt.Sprintf("%d%s", time.Now().UnixNano(), getExtByContentType(contentType)))
+		filePath = path.Join(sc.config.UploadBasePath, fmt.Sprintf("%d%s", time.Now().UnixNano(), getExtByContentType(contentType)))
 	} else {
-		filePath = filepath.Join(sc.config.UploadBasePath, filePath)
+		filePath = path.Join(sc.config.UploadBasePath, filePath)
 	}
 	filePath = strings.TrimPrefix(filePath, "/")
 
@@ -174,10 +179,15 @@ func (sc *storageClient) UploadFile(ctx context.Context, file []byte, opts Uploa
 
 // UploadFileFromRequest uploads a file from an HTTP request
 func (sc *storageClient) UploadFileFromRequest(ctx context.Context, r *http.Request, opts UploadFromRequestOptions) (File, error) {
+	// Check for nil request
+	if r == nil {
+		return File{}, errors.Join(ErrInvalidRequest, errors.New("nil request"))
+	}
+
 	// Default form field name is "file" if not specified
 	field := opts.Field
 	if field == "" {
-		field = "file"
+		field = DefaultFieldName
 	}
 
 	// Parse multipart form
@@ -190,6 +200,7 @@ func (sc *storageClient) UploadFileFromRequest(ctx context.Context, r *http.Requ
 	if err != nil {
 		return File{}, errors.Join(ErrInvalidRequest, err)
 	}
+	// Ensure the file is closed after use
 	defer formFile.Close()
 
 	// Check file size
@@ -206,23 +217,30 @@ func (sc *storageClient) UploadFileFromRequest(ctx context.Context, r *http.Requ
 	// Determine content type
 	contentType := opts.ContentType
 	if contentType == "" {
-		contentType = header.Header.Get("Content-Type")
+		// Try to get content type from file header first
+		if header.Header != nil {
+			contentType = header.Header.Get("Content-Type")
+		}
+		// If still empty, try to detect from content
 		if contentType == "" {
 			contentType = http.DetectContentType(fileBytes)
 		}
 	}
 
-	// Generate file path if not provided
+	// Generate file path
 	filePath := opts.Path
 	if filePath == "" {
-		// Use original filename or generate one
-		filePath = header.Filename
-		if filePath == "" {
-			filePath = fmt.Sprintf("%d%s", time.Now().UnixNano(), filepath.Ext(header.Filename))
+		// Attempt to use the original filename if available
+		filename := header.Filename
+		if filename != "" {
+			filePath = filename
+		} else {
+			// Generate a timestamp-based name with appropriate extension
+			filePath = fmt.Sprintf("%d%s", time.Now().UnixNano(), getExtByContentType(contentType))
 		}
 	}
 
-	// Upload the file
+	// Upload using the general upload function
 	return sc.UploadFile(ctx, fileBytes, UploadOptions{
 		ContentType: contentType,
 		Path:        filePath,
@@ -238,7 +256,7 @@ func (sc *storageClient) ListFiles(ctx context.Context, dirPath string) ([]File,
 		dirPath += "/"
 	}
 
-	prefix := filepath.Join(sc.config.UploadBasePath, dirPath)
+	prefix := path.Join(sc.config.UploadBasePath, dirPath)
 	prefix = strings.TrimPrefix(prefix, "/")
 
 	// List objects in the directory
@@ -247,7 +265,7 @@ func (sc *storageClient) ListFiles(ctx context.Context, dirPath string) ([]File,
 		Prefix: aws.String(prefix),
 	})
 	if err != nil {
-		return nil, errors.Join(errors.New("failed to list files"), err)
+		return nil, errors.Join(ErrFailedToListFiles, err)
 	}
 
 	files := make([]File, 0, len(result.Contents))
@@ -257,12 +275,21 @@ func (sc *storageClient) ListFiles(ctx context.Context, dirPath string) ([]File,
 			continue
 		}
 
+		// Get content type via HeadObject request
+		contentType := ""
+		headObj, err := sc.client.HeadObject(ctx, &s3.HeadObjectInput{
+			Bucket: aws.String(sc.config.Bucket),
+			Key:    obj.Key,
+		})
+		if err == nil && headObj.ContentType != nil {
+			contentType = *headObj.ContentType
+		}
+
 		files = append(files, File{
-			Path: *obj.Key,
-			URL:  sc.GetFileURL(*obj.Key),
-			Size: *obj.Size,
-			// ContentType is not available in ListObjectsV2 response
-			ContentType: "",
+			Path:        *obj.Key,
+			URL:         sc.GetFileURL(*obj.Key),
+			Size:        *obj.Size,
+			ContentType: contentType,
 		})
 	}
 
@@ -271,7 +298,7 @@ func (sc *storageClient) ListFiles(ctx context.Context, dirPath string) ([]File,
 
 // DeleteFile deletes a file from storage
 func (sc *storageClient) DeleteFile(ctx context.Context, filePath string) error {
-	filePath = filepath.Join(sc.config.UploadBasePath, filePath)
+	filePath = path.Join(sc.config.UploadBasePath, filePath)
 	filePath = strings.TrimPrefix(filePath, "/")
 
 	_, err := sc.client.DeleteObject(ctx, &s3.DeleteObjectInput{
@@ -292,7 +319,7 @@ func (sc *storageClient) DeleteDirectory(ctx context.Context, dirPath string) er
 		dirPath += "/"
 	}
 
-	prefix := filepath.Join(sc.config.UploadBasePath, dirPath)
+	prefix := path.Join(sc.config.UploadBasePath, dirPath)
 	prefix = strings.TrimPrefix(prefix, "/")
 
 	// List all objects to delete
@@ -304,8 +331,10 @@ func (sc *storageClient) DeleteDirectory(ctx context.Context, dirPath string) er
 		return errors.Join(ErrFailedToDeleteDirectory, err)
 	}
 
+	// Check for empty result but still ensure there was no error
 	if len(result.Contents) == 0 {
-		return nil // No files to delete
+		// No files found - this is not necessarily an error
+		return nil
 	}
 
 	// Prepare objects to delete

@@ -18,6 +18,9 @@ var (
 	// ErrFailedToDeleteDirectory indicates a failure during directory deletion.
 	ErrFailedToDeleteDirectory = errors.New("failed to delete directory")
 
+	// ErrFailedToListFiles indicates a failure during file listing.
+	ErrFailedToListFiles = errors.New("failed to list files")
+
 	// ErrInvalidRequest indicates an invalid request or missing required file data.
 	ErrInvalidRequest = errors.New("invalid request or missing file data")
 
