@@ -1,10 +1,27 @@
 package storage
 
-import "errors"
+import (
+	"errors"
+)
 
+// Package-level error declarations.
 var (
-	ErrFailedToUploadFile      = errors.New("failed to upload file")
-	ErrFailedToListFiles       = errors.New("failed to list files")
-	ErrFailedToDeleteFile      = errors.New("failed to delete file")
+	// ErrFailedToUploadFile indicates a failure during file upload.
+	ErrFailedToUploadFile = errors.New("failed to upload file")
+
+	// ErrFileTooLarge indicates that the file size exceeds the allowed maximum.
+	ErrFileTooLarge = errors.New("file size exceeds the maximum allowed limit")
+
+	// ErrFailedToDeleteFile indicates a failure during file deletion.
+	ErrFailedToDeleteFile = errors.New("failed to delete file")
+
+	// ErrFailedToDeleteDirectory indicates a failure during directory deletion.
 	ErrFailedToDeleteDirectory = errors.New("failed to delete directory")
+
+	// ErrInvalidRequest indicates an invalid request or missing required file data.
+	ErrInvalidRequest = errors.New("invalid request or missing file data")
+
+	// ErrMissingConfig indicates that the required configuration is missing.
+	// This error is returned when the minimum required configuration is not provided.
+	ErrMissingConfig = errors.New("missing required configuration")
 )
