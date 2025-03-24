@@ -29,7 +29,10 @@ go.work.sum
 .vscode
 *.sublime-workspace
 .fleet
+.aider*
 
 # windsurf rules
 .windsurfrules
-.aider*
+
+# other files
+_legacy_packages/
