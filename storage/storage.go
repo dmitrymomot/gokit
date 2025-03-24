@@ -27,11 +27,15 @@ type (
 	UploadOptions struct {
 		ContentType string
 		Path        string
+		IsPublic    bool
+		Metadata    map[string]string
 	}
 
 	UploadFromRequestOptions struct {
 		ContentType string
 		Path        string
 		Field       string
+		IsPublic    bool
+		Metadata    map[string]string
 	}
 )

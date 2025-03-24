@@ -24,4 +24,11 @@ var (
 	// ErrMissingConfig indicates that the required configuration is missing.
 	// This error is returned when the minimum required configuration is not provided.
 	ErrMissingConfig = errors.New("missing required configuration")
+
+	// ErrInvalidEndpoint indicates that the provided endpoint is invalid.
+	// This error is returned when the endpoint URL is not a valid URL.
+	ErrInvalidEndpoint = errors.New("invalid endpoint URL")
+
+	// ErrFailedToLoadConfig indicates a failure to load the AWS configuration.
+	ErrFailedToLoadConfig = errors.New("failed to load AWS configuration")
 )

@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,67 +25,92 @@ type storageClient struct {
 	config  Config
 }
 
-// New creates a new S3-compatible storage client.
-func New(cfg Config) (Storage, error) {
+// New creates a new S3-compatible storage client with the given config and options.
+func New(cfg Config, opts ...ClientOption) (Storage, error) {
 	// Validate minimum required configuration
 	if cfg.Key == "" || cfg.Secret == "" || cfg.Region == "" || cfg.Bucket == "" {
 		return nil, ErrMissingConfig
 	}
 
-	// Create a custom HTTP client with timeouts if configured
-	var httpClient *http.Client
-	if cfg.RequestTimeout > 0 || cfg.ConnectTimeout > 0 {
-		timeout := cfg.RequestTimeout
-		if cfg.ConnectTimeout > 0 {
-			timeout = cfg.ConnectTimeout
+	// Initialize client options
+	options := &clientOptions{}
+
+	// Apply provided options
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	// If a pre-configured S3 client is provided, use it directly
+	var client *s3.Client
+	if options.s3Client != nil {
+		client = options.s3Client
+	} else {
+		// Create a custom HTTP client with timeouts if configured and not already provided
+		httpClient := options.httpClient
+		if httpClient == nil && (cfg.RequestTimeout > 0 || cfg.ConnectTimeout > 0) {
+			timeout := cfg.RequestTimeout
+			if cfg.ConnectTimeout > 0 {
+				timeout = cfg.ConnectTimeout
+			}
+			httpClient = &http.Client{
+				Timeout: timeout,
+			}
 		}
-		httpClient = &http.Client{
-			Timeout: timeout,
+
+		// Configure AWS SDK options
+		s3Options := []func(*s3config.LoadOptions) error{
+			s3config.WithRegion(cfg.Region),
+			s3config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+				cfg.Key, cfg.Secret, "")),
 		}
-	}
 
-	// Create retry options if configured
-	options := []func(*s3config.LoadOptions) error{
-		s3config.WithRegion(cfg.Region),
-		s3config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.Key, cfg.Secret, "")),
-	}
-
-	// Add HTTP client with timeout if configured
-	if httpClient != nil {
-		options = append(options, s3config.WithHTTPClient(httpClient))
-	}
-
-	// Add custom retry configuration if needed
-	if cfg.MaxRetries > 0 {
-		options = append(options, s3config.WithRetryMaxAttempts(cfg.MaxRetries))
-		if cfg.RetryBaseDelay > 0 {
-			options = append(options, s3config.WithRetryMode(aws.RetryModeStandard))
+		// Add HTTP client with timeout if configured
+		if httpClient != nil {
+			s3Options = append(s3Options, s3config.WithHTTPClient(httpClient))
 		}
+
+		// Add retry configuration if needed
+		if cfg.MaxRetries > 0 {
+			s3Options = append(s3Options, s3config.WithRetryMaxAttempts(cfg.MaxRetries))
+			if cfg.RetryBaseDelay > 0 {
+				s3Options = append(s3Options, s3config.WithRetryMode(aws.RetryModeStandard))
+			}
+		}
+
+		// Add any additional S3 config options
+		s3Options = append(s3Options, options.s3ConfigOptions...)
+
+		// Load AWS configuration
+		awsCfg, err := s3config.LoadDefaultConfig(context.TODO(), s3Options...)
+		if err != nil {
+			return nil, errors.Join(ErrFailedToLoadConfig, err)
+		}
+
+		// Create the S3 client with endpoint configuration
+		client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+			if cfg.Endpoint != "" {
+				o.BaseEndpoint = aws.String(cfg.Endpoint)
+			}
+			o.UsePathStyle = cfg.ForcePathStyle
+
+			// Apply any additional S3 client options
+			for _, opt := range options.s3ClientOptions {
+				opt(o)
+			}
+		})
 	}
 
-	awsCfg, err := s3config.LoadDefaultConfig(context.TODO(), options...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load AWS config: %w", err)
-	}
-
-	// Derive BaseURL: if CDN is provided, use it; otherwise, construct it from bucket and endpoint.
+	// Derive BaseURL: if CDN is provided, use it; otherwise, construct it from bucket and endpoint
 	var baseURL string
 	if cfg.CDN != "" {
 		baseURL = strings.TrimSuffix(cfg.CDN, "/") + "/"
 	} else {
 		u, err := url.Parse(cfg.Endpoint)
 		if err != nil {
-			return nil, fmt.Errorf("invalid endpoint: %w", err)
+			return nil, errors.Join(ErrInvalidEndpoint, err)
 		}
 		baseURL = "https://" + cfg.Bucket + "." + u.Host + "/"
 	}
-
-	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		if cfg.Endpoint != "" {
-			o.BaseEndpoint = aws.String(cfg.Endpoint)
-		}
-		o.UsePathStyle = cfg.ForcePathStyle
-	})
 
 	return &storageClient{
 		client:  client,
@@ -108,13 +134,13 @@ func (sc *storageClient) UploadFile(ctx context.Context, file []byte, opts Uploa
 	// Set default content type if not provided
 	contentType := opts.ContentType
 	if contentType == "" {
-		contentType = "application/octet-stream"
+		contentType = http.DetectContentType(file)
 	}
 
 	// Ensure the path is properly formatted
 	filePath := opts.Path
 	if filePath == "" {
-		filePath = filepath.Join(sc.config.UploadBasePath, fmt.Sprintf("%d", time.Now().UnixNano()))
+		filePath = filepath.Join(sc.config.UploadBasePath, fmt.Sprintf("%d%s", time.Now().UnixNano(), getExtByContentType(contentType)))
 	} else {
 		filePath = filepath.Join(sc.config.UploadBasePath, filePath)
 	}
@@ -126,9 +152,16 @@ func (sc *storageClient) UploadFile(ctx context.Context, file []byte, opts Uploa
 		Key:         aws.String(filePath),
 		Body:        bytes.NewReader(file),
 		ContentType: aws.String(contentType),
+		ACL: func() types.ObjectCannedACL {
+			if opts.IsPublic {
+				return types.ObjectCannedACLPublicRead
+			}
+			return types.ObjectCannedACLPrivate
+		}(),
+		Metadata: opts.Metadata,
 	})
 	if err != nil {
-		return File{}, fmt.Errorf("%w: %v", ErrFailedToUploadFile, err)
+		return File{}, errors.Join(ErrFailedToUploadFile, err)
 	}
 
 	return File{
@@ -149,13 +182,13 @@ func (sc *storageClient) UploadFileFromRequest(ctx context.Context, r *http.Requ
 
 	// Parse multipart form
 	if err := r.ParseMultipartForm(sc.config.MaxFileSize); err != nil {
-		return File{}, fmt.Errorf("%w: %v", ErrInvalidRequest, err)
+		return File{}, errors.Join(ErrInvalidRequest, err)
 	}
 
 	// Get the file from the form
 	formFile, header, err := r.FormFile(field)
 	if err != nil {
-		return File{}, fmt.Errorf("%w: %v", ErrInvalidRequest, err)
+		return File{}, errors.Join(ErrInvalidRequest, err)
 	}
 	defer formFile.Close()
 
@@ -167,7 +200,7 @@ func (sc *storageClient) UploadFileFromRequest(ctx context.Context, r *http.Requ
 	// Read file content
 	fileBytes, err := io.ReadAll(formFile)
 	if err != nil {
-		return File{}, fmt.Errorf("%w: %v", ErrInvalidRequest, err)
+		return File{}, errors.Join(ErrInvalidRequest, err)
 	}
 
 	// Determine content type
@@ -193,6 +226,8 @@ func (sc *storageClient) UploadFileFromRequest(ctx context.Context, r *http.Requ
 	return sc.UploadFile(ctx, fileBytes, UploadOptions{
 		ContentType: contentType,
 		Path:        filePath,
+		IsPublic:    opts.IsPublic,
+		Metadata:    opts.Metadata,
 	})
 }
 
@@ -212,7 +247,7 @@ func (sc *storageClient) ListFiles(ctx context.Context, dirPath string) ([]File,
 		Prefix: aws.String(prefix),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list files: %w", err)
+		return nil, errors.Join(errors.New("failed to list files"), err)
 	}
 
 	files := make([]File, 0, len(result.Contents))
@@ -244,7 +279,7 @@ func (sc *storageClient) DeleteFile(ctx context.Context, filePath string) error 
 		Key:    aws.String(filePath),
 	})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrFailedToDeleteFile, err)
+		return errors.Join(ErrFailedToDeleteFile, err)
 	}
 
 	return nil
@@ -266,7 +301,7 @@ func (sc *storageClient) DeleteDirectory(ctx context.Context, dirPath string) er
 		Prefix: aws.String(prefix),
 	})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrFailedToDeleteDirectory, err)
+		return errors.Join(ErrFailedToDeleteDirectory, err)
 	}
 
 	if len(result.Contents) == 0 {
@@ -290,7 +325,7 @@ func (sc *storageClient) DeleteDirectory(ctx context.Context, dirPath string) er
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrFailedToDeleteDirectory, err)
+		return errors.Join(ErrFailedToDeleteDirectory, err)
 	}
 
 	return nil
