@@ -19,8 +19,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
+// storageClient is the implementation of the Storage interface
 type storageClient struct {
-	client  *s3.Client
+	client  S3Client
 	baseURL string
 	config  Config
 }
@@ -46,7 +47,7 @@ func New(ctx context.Context, cfg Config, opts ...ClientOption) (Storage, error)
 	}
 
 	// If a pre-configured S3 client is provided, use it directly
-	var client *s3.Client
+	var client S3Client
 	if options.s3Client != nil {
 		client = options.s3Client
 	} else {
@@ -136,18 +137,28 @@ func (sc *storageClient) UploadFile(ctx context.Context, file []byte, opts Uploa
 		return File{}, ErrFileTooLarge
 	}
 
-	// Set default content type if not provided
+	// Determine content type
 	contentType := opts.ContentType
 	if contentType == "" {
+		// Try to detect content type from file data
 		contentType = http.DetectContentType(file)
 	}
+	// Clean up content type (remove parameters)
+	contentType = strings.Split(contentType, ";")[0]
 
-	// Ensure the path is properly formatted
+	// Determine file path
 	filePath := opts.Path
 	if filePath == "" {
-		filePath = path.Join(sc.config.UploadBasePath, fmt.Sprintf("%d%s", time.Now().UnixNano(), getExtByContentType(contentType)))
-	} else {
-		filePath = path.Join(sc.config.UploadBasePath, filePath)
+		// Generate a filename with timestamp and extension based on content type
+		ext := getExtByContentType(contentType)
+		filePath = fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
+	}
+
+	// Handle path with upload base path if configured
+	if sc.config.UploadBasePath != "" {
+		if !strings.HasPrefix(filePath, sc.config.UploadBasePath+"/") && !strings.HasPrefix(filePath, "/"+sc.config.UploadBasePath+"/") {
+			filePath = path.Join(sc.config.UploadBasePath, filePath)
+		}
 	}
 	filePath = strings.TrimPrefix(filePath, "/")
 
@@ -214,49 +225,75 @@ func (sc *storageClient) UploadFileFromRequest(ctx context.Context, r *http.Requ
 		return File{}, errors.Join(ErrInvalidRequest, err)
 	}
 
-	// Determine content type
+	// Determine file path
+	filePath := opts.Path
+	if filePath == "" {
+		// If no path specified, use the original filename
+		filePath = header.Filename
+	}
+
+	// Handle path with upload base path if configured
+	if sc.config.UploadBasePath != "" {
+		if !strings.HasPrefix(filePath, sc.config.UploadBasePath+"/") && !strings.HasPrefix(filePath, "/"+sc.config.UploadBasePath+"/") {
+			filePath = path.Join(sc.config.UploadBasePath, filePath)
+		}
+	}
+	filePath = strings.TrimPrefix(filePath, "/")
+
+	// Set content type
 	contentType := opts.ContentType
 	if contentType == "" {
-		// Try to get content type from file header first
-		if header.Header != nil {
-			contentType = header.Header.Get("Content-Type")
-		}
-		// If still empty, try to detect from content
+		contentType = header.Header.Get("Content-Type")
 		if contentType == "" {
 			contentType = http.DetectContentType(fileBytes)
 		}
 	}
 
-	// Generate file path
-	filePath := opts.Path
-	if filePath == "" {
-		// Attempt to use the original filename if available
-		filename := header.Filename
-		if filename != "" {
-			filePath = filename
-		} else {
-			// Generate a timestamp-based name with appropriate extension
-			filePath = fmt.Sprintf("%d%s", time.Now().UnixNano(), getExtByContentType(contentType))
-		}
+	// Upload the file
+	_, err = sc.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(sc.config.Bucket),
+		Key:         aws.String(filePath),
+		Body:        bytes.NewReader(fileBytes),
+		ContentType: aws.String(contentType),
+		ACL: func() types.ObjectCannedACL {
+			if opts.IsPublic {
+				return types.ObjectCannedACLPublicRead
+			}
+			return types.ObjectCannedACLPrivate
+		}(),
+		Metadata: opts.Metadata,
+	})
+	if err != nil {
+		return File{}, errors.Join(ErrFailedToUploadFile, err)
 	}
 
-	// Upload using the general upload function
-	return sc.UploadFile(ctx, fileBytes, UploadOptions{
-		ContentType: contentType,
+	// Return file info
+	return File{
 		Path:        filePath,
-		IsPublic:    opts.IsPublic,
-		Metadata:    opts.Metadata,
-	})
+		URL:         sc.GetFileURL(filePath),
+		Size:        header.Size,
+		ContentType: contentType,
+	}, nil
 }
 
 // ListFiles lists files in a directory
 func (sc *storageClient) ListFiles(ctx context.Context, dirPath string) ([]File, error) {
-	// Ensure path is properly formatted
-	if !strings.HasSuffix(dirPath, "/") && dirPath != "" {
+	// Ensure path is properly formatted with trailing slash
+	if dirPath != "" && !strings.HasSuffix(dirPath, "/") {
 		dirPath += "/"
 	}
 
-	prefix := path.Join(sc.config.UploadBasePath, dirPath)
+	// Handle path with upload base path if configured
+	prefix := dirPath
+	if sc.config.UploadBasePath != "" {
+		if !strings.HasPrefix(prefix, sc.config.UploadBasePath+"/") && !strings.HasPrefix(prefix, "/"+sc.config.UploadBasePath+"/") {
+			prefix = path.Join(sc.config.UploadBasePath, prefix)
+			// Ensure trailing slash is preserved after path.Join
+			if dirPath != "" && !strings.HasSuffix(prefix, "/") {
+				prefix += "/"
+			}
+		}
+	}
 	prefix = strings.TrimPrefix(prefix, "/")
 
 	// List objects in the directory
@@ -298,7 +335,12 @@ func (sc *storageClient) ListFiles(ctx context.Context, dirPath string) ([]File,
 
 // DeleteFile deletes a file from storage
 func (sc *storageClient) DeleteFile(ctx context.Context, filePath string) error {
-	filePath = path.Join(sc.config.UploadBasePath, filePath)
+	// Handle path with upload base path if configured
+	if sc.config.UploadBasePath != "" {
+		if !strings.HasPrefix(filePath, sc.config.UploadBasePath+"/") && !strings.HasPrefix(filePath, "/"+sc.config.UploadBasePath+"/") {
+			filePath = path.Join(sc.config.UploadBasePath, filePath)
+		}
+	}
 	filePath = strings.TrimPrefix(filePath, "/")
 
 	_, err := sc.client.DeleteObject(ctx, &s3.DeleteObjectInput{
@@ -314,12 +356,22 @@ func (sc *storageClient) DeleteFile(ctx context.Context, filePath string) error 
 
 // DeleteDirectory deletes all files in a directory
 func (sc *storageClient) DeleteDirectory(ctx context.Context, dirPath string) error {
-	// Ensure path is properly formatted
-	if !strings.HasSuffix(dirPath, "/") && dirPath != "" {
+	// Ensure path is properly formatted with trailing slash
+	if dirPath != "" && !strings.HasSuffix(dirPath, "/") {
 		dirPath += "/"
 	}
 
-	prefix := path.Join(sc.config.UploadBasePath, dirPath)
+	// Handle path with upload base path if configured
+	prefix := dirPath
+	if sc.config.UploadBasePath != "" {
+		if !strings.HasPrefix(prefix, sc.config.UploadBasePath+"/") && !strings.HasPrefix(prefix, "/"+sc.config.UploadBasePath+"/") {
+			prefix = path.Join(sc.config.UploadBasePath, prefix)
+			// Ensure trailing slash is preserved after path.Join
+			if dirPath != "" && !strings.HasSuffix(prefix, "/") {
+				prefix += "/"
+			}
+		}
+	}
 	prefix = strings.TrimPrefix(prefix, "/")
 
 	// List all objects to delete
@@ -331,26 +383,24 @@ func (sc *storageClient) DeleteDirectory(ctx context.Context, dirPath string) er
 		return errors.Join(ErrFailedToDeleteDirectory, err)
 	}
 
-	// Check for empty result but still ensure there was no error
+	// If directory is empty, we're done
 	if len(result.Contents) == 0 {
-		// No files found - this is not necessarily an error
 		return nil
 	}
 
-	// Prepare objects to delete
-	toDelete := make([]types.ObjectIdentifier, 0, len(result.Contents))
+	// Create delete objects input with identified objects
+	objects := make([]types.ObjectIdentifier, 0, len(result.Contents))
 	for _, obj := range result.Contents {
-		toDelete = append(toDelete, types.ObjectIdentifier{
+		objects = append(objects, types.ObjectIdentifier{
 			Key: obj.Key,
 		})
 	}
 
-	// Delete objects in batch
+	// Delete all objects
 	_, err = sc.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
 		Bucket: aws.String(sc.config.Bucket),
 		Delete: &types.Delete{
-			Objects: toDelete,
-			Quiet:   aws.Bool(true),
+			Objects: objects,
 		},
 	})
 	if err != nil {
