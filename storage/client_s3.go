@@ -39,7 +39,7 @@ func New(cfg Config) (Storage, error) {
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.UsePathStyle = cfg.ForcePathStyle
 		if cfg.Endpoint != "" {
-			o.BaseEndpoint = aws.String(cfg.Endpoint)
+			o.EndpointOptions.BaseEndpoint = aws.String(cfg.Endpoint)
 		}
 	})
 	presigner := s3.NewPresignClient(client)
