@@ -30,19 +30,7 @@ func New(cfg Config) (Storage, error) {
 		config.WithRegion(cfg.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.Key, cfg.Secret, "")),
 	}
-	if cfg.Endpoint != "" {
-		resolver := aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
-			if service == s3.ServiceID {
-				return aws.Endpoint{
-					URL:               cfg.Endpoint,
-					SigningRegion:     cfg.Region,
-					HostnameImmutable: true,
-				}, nil
-			}
-			return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-		})
-		loadOptions = append(loadOptions, config.WithEndpointResolver(resolver))
-	}
+	// No custom endpoint resolver needed - we'll set endpoint directly on the S3 client options
 	awsCfg, err := config.LoadDefaultConfig(context.TODO(), loadOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
@@ -50,6 +38,9 @@ func New(cfg Config) (Storage, error) {
 
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.UsePathStyle = cfg.ForcePathStyle
+		if cfg.Endpoint != "" {
+			o.BaseEndpoint = aws.String(cfg.Endpoint)
+		}
 	})
 	presigner := s3.NewPresignClient(client)
 
