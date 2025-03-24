@@ -52,20 +52,20 @@ func New(cfg Config) (Storage, error) {
 func (s *s3Client) GetFileURL(path string) string {
 	// Prepend UploadBasePath to key.
 	key := s.config.UploadBasePath + "/" + path
-	
+
 	// If CDN is configured, use it
 	if s.config.CDN != "" {
 		// Ensure CDN URL doesn't have trailing slash
 		cdnBase := strings.TrimSuffix(s.config.CDN, "/")
 		return fmt.Sprintf("%s/%s", cdnBase, key)
 	}
-	
+
 	// Generate a presigned URL (with a 15-minute expiry).
 	presignResult, err := s.presigner.PresignGetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: &s.config.Bucket,
 		Key:    aws.String(key),
 	}, s3.WithPresignExpires(15*time.Minute))
-	
+
 	if err != nil {
 		return ""
 	}
@@ -153,13 +153,13 @@ func (s *s3Client) DeleteFile(ctx context.Context, path string) error {
 
 func (s *s3Client) DeleteDirectory(ctx context.Context, path string) error {
 	prefix := s.config.UploadBasePath + "/" + path
-	
+
 	// First list all objects with the given prefix
 	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
 		Bucket: &s.config.Bucket,
 		Prefix: aws.String(prefix),
 	})
-	
+
 	// Collect objects to delete
 	var objectsToDelete []types.ObjectIdentifier
 	for paginator.HasMorePages() {
@@ -167,13 +167,13 @@ func (s *s3Client) DeleteDirectory(ctx context.Context, path string) error {
 		if err != nil {
 			return errors.Join(ErrFailedToDeleteDirectory, fmt.Errorf("retrieving objects failed: %w", err))
 		}
-		
+
 		for _, obj := range page.Contents {
 			objectsToDelete = append(objectsToDelete, types.ObjectIdentifier{
 				Key: obj.Key,
 			})
 		}
-		
+
 		// If we have a batch of objects, delete them
 		if len(objectsToDelete) > 0 {
 			if err := s.deleteObjects(ctx, objectsToDelete); err != nil {
@@ -182,7 +182,7 @@ func (s *s3Client) DeleteDirectory(ctx context.Context, path string) error {
 			objectsToDelete = nil // Reset for next batch
 		}
 	}
-	
+
 	return nil
 }
 
@@ -191,7 +191,7 @@ func (s *s3Client) deleteObjects(ctx context.Context, objects []types.ObjectIden
 	if len(objects) == 0 {
 		return nil
 	}
-	
+
 	_, err := s.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
 		Bucket: &s.config.Bucket,
 		Delete: &types.Delete{
@@ -199,10 +199,10 @@ func (s *s3Client) deleteObjects(ctx context.Context, objects []types.ObjectIden
 			Quiet:   aws.Bool(true),
 		},
 	})
-	
+
 	if err != nil {
 		return errors.Join(ErrFailedToDeleteDirectory, fmt.Errorf("batch deletion failed: %w", err))
 	}
-	
+
 	return nil
 }
