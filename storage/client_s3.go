@@ -1,7 +1,19 @@
 package storage
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 // s3Client implements Storage.
@@ -114,7 +126,7 @@ func (s *s3Client) ListFiles(ctx context.Context, path string) ([]File, error) {
 			files = append(files, File{
 				Path: trimmedPath,
 				URL:  s.GetFileURL(trimmedPath),
-				Size: obj.Size,
+				Size: aws.ToInt64(obj.Size),
 			})
 		}
 	}
