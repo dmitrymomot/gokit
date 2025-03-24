@@ -26,29 +26,30 @@ type s3Client struct {
 
 // New creates an S3-compatible client using the provided Config.
 func New(cfg Config) (Storage, error) {
-	awsCfg, err := config.LoadDefaultConfig(context.TODO(),
+	loadOptions := []func(*config.LoadOptions) error{
 		config.WithRegion(cfg.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.Key, cfg.Secret, "")),
-	)
+	}
+	if cfg.Endpoint != "" {
+		resolver := aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+			if service == s3.ServiceID {
+				return aws.Endpoint{
+					URL:               cfg.Endpoint,
+					SigningRegion:     cfg.Region,
+					HostnameImmutable: true,
+				}, nil
+			}
+			return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+		})
+		loadOptions = append(loadOptions, config.WithEndpointResolver(resolver))
+	}
+	awsCfg, err := config.LoadDefaultConfig(context.TODO(), loadOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.UsePathStyle = cfg.ForcePathStyle
-		if cfg.Endpoint != "" {
-			o.EndpointResolverWithOptions = aws.EndpointResolverWithOptionsFunc(
-				func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-					if service == s3.ServiceID { // Only override for S3 service.
-						return aws.Endpoint{
-							URL:               cfg.Endpoint,
-							HostnameImmutable: true,
-						}, nil
-					}
-					return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-				},
-			)
-		}
 	})
 	presigner := s3.NewPresignClient(client)
 
