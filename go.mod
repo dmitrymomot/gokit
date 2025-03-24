@@ -8,8 +8,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.63
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.78.2
 	github.com/caarlos0/env/v11 v11.3.1
-	github.com/dmitrymomot/random v1.0.6
-	github.com/gabriel-vasile/mimetype v1.4.8
 	github.com/iancoleman/strcase v0.3.0
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/joho/godotenv v1.5.1
@@ -50,7 +48,6 @@ require (
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
