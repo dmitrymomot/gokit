@@ -37,7 +37,17 @@ func New(cfg Config) (Storage, error) {
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.UsePathStyle = cfg.ForcePathStyle
 		if cfg.Endpoint != "" {
-			o.EndpointResolver = s3.EndpointResolverFromURL(cfg.Endpoint)
+			o.EndpointResolverWithOptions = aws.EndpointResolverWithOptionsFunc(
+				func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+					if service == s3.ServiceID { // Only override for S3 service.
+						return aws.Endpoint{
+							URL:               cfg.Endpoint,
+							HostnameImmutable: true,
+						}, nil
+					}
+					return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+				},
+			)
 		}
 	})
 	presigner := s3.NewPresignClient(client)
