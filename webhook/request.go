@@ -58,9 +58,9 @@ func createHTTPRequest(req *Request) (*http.Request, error) {
 	// Handle parameters based on HTTP method
 	if methodSupportsRequestBody(req.Method) {
 		// For methods that support a body (POST, PUT, PATCH, etc.)
-		data, err := marshalParams(req.Params)
-		if err != nil {
-			return nil, err
+		data, marshalErr := marshalParams(req.Params)
+		if marshalErr != nil {
+			return nil, marshalErr
 		}
 		httpReq, err = http.NewRequest(req.Method, baseURL, data)
 	} else {

@@ -79,7 +79,7 @@ func WithRetryOnStatus(statusCodes ...int) RetryOption {
 		for _, code := range statusCodes {
 			statusMap[code] = true
 		}
-		
+
 		// Keep existing retry condition and add status code check
 		existingCheck := r.retryOn
 		r.retryOn = func(resp *Response, err error) bool {
@@ -87,12 +87,12 @@ func WithRetryOnStatus(statusCodes ...int) RetryOption {
 			if existingCheck != nil && existingCheck(resp, err) {
 				return true
 			}
-			
+
 			// Also retry if the response has one of the specified status codes
 			if resp != nil && statusMap[resp.StatusCode] {
 				return true
 			}
-			
+
 			return false
 		}
 	}
@@ -108,12 +108,12 @@ func WithRetryOnServerErrors() RetryOption {
 			if existingCheck != nil && existingCheck(resp, err) {
 				return true
 			}
-			
+
 			// Retry on any 5xx status code
 			if resp != nil && resp.StatusCode >= 500 && resp.StatusCode < 600 {
 				return true
 			}
-			
+
 			return false
 		}
 	}
@@ -129,14 +129,14 @@ func WithRetryOnNetworkErrors() RetryOption {
 			if existingCheck != nil && existingCheck(resp, err) {
 				return true
 			}
-			
+
 			// Check for network-related errors
 			var netErr *NetworkError
-			if err != nil && (errors.Is(err, context.DeadlineExceeded) || 
-			   errors.As(err, &netErr) || isTemporaryError(err)) {
+			if err != nil && (errors.Is(err, context.DeadlineExceeded) ||
+				errors.As(err, &netErr) || isTemporaryError(err)) {
 				return true
 			}
-			
+
 			return false
 		}
 	}
@@ -156,16 +156,16 @@ func isTemporaryError(err error) bool {
 	if errors.As(err, &urlErr) {
 		return urlErr.Temporary()
 	}
-	
+
 	// Check for temporary interface (some errors implement this)
 	type temporary interface {
 		Temporary() bool
 	}
-	
+
 	if te, ok := err.(temporary); ok {
 		return te.Temporary()
 	}
-	
+
 	// Check error strings for common temporary error patterns
 	errStr := err.Error()
 	return strings.Contains(errStr, "connection refused") ||
@@ -180,20 +180,13 @@ func isRetryableError(err error) bool {
 	if err == nil {
 		return false
 	}
-	
-	// Check for context cancellation (don't retry)
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+
+	// Most errors are retryable by default, except context cancellation
+	if errors.Is(err, context.Canceled) {
 		return false
 	}
-	
-	// Check for network-related errors
-	var netErr *NetworkError
-	if errors.As(err, &netErr) {
-		return true
-	}
-	
-	// Check for temporary errors
-	return isTemporaryError(err)
+
+	return true
 }
 
 // NewRetryDecorator creates a new webhook sender with retry capabilities
@@ -203,106 +196,92 @@ func NewRetryDecorator(sender WebhookSender, opts ...RetryOption) WebhookSender 
 		maxRetries:    DefaultMaxRetries,
 		retryInterval: DefaultRetryInterval,
 		retryOn: func(resp *Response, err error) bool {
-			// By default, retry on any error except context cancellation
-			return err != nil && 
-				!errors.Is(err, context.Canceled) && 
-				!errors.Is(err, context.DeadlineExceeded)
+			return isRetryableError(err)
 		},
 	}
-	
+
 	// Apply options
 	for _, opt := range opts {
 		opt(rd)
 	}
-	
+
 	return rd
 }
 
 // Send sends a webhook with retry logic based on configuration
 func (r *RetryDecorator) Send(ctx context.Context, url string, params any, opts ...RequestOption) (*Response, error) {
 	var (
-		resp        *Response
-		err         error
-		lastErr     error
-		attempt     int
-		shouldRetry bool
+		resp         *Response
+		err          error
+		retryCount   int
 		nextInterval = r.retryInterval
-		didRetry    bool
 	)
-	
-	// Make initial attempt (attempt 0)
+
+	// Initial request (not counted as a retry)
 	resp, err = r.sender.Send(ctx, url, params, opts...)
-	if err != nil {
-		lastErr = err
+
+	// Check if context is already canceled
+	if ctx.Err() != nil {
+		return resp, errors.Join(err, ctx.Err())
 	}
-	
-	// Check if context is already canceled - if so, return immediately
-	if errors.Is(ctx.Err(), context.Canceled) {
-		return resp, errors.Join(lastErr, ctx.Err())
-	}
-	
-	// Retry logic (attempts 1 to maxRetries)
-	for attempt = 1; attempt <= r.maxRetries; attempt++ {
+
+	// Try again up to maxRetries times if needed
+	for retryCount < r.maxRetries {
 		// Check if we should retry
-		shouldRetry = r.retryOn(resp, err)
-		if !shouldRetry {
+		if !r.retryOn(resp, err) {
 			break
 		}
-		
-		// Mark that we did at least one retry
-		didRetry = true
-		
+
 		// Log retry attempt if logger is provided
 		if r.logger != nil {
 			r.logger.InfoContext(ctx, "Retrying webhook request",
 				slog.String("url", url),
-				slog.Int("attempt", attempt),
+				slog.Int("attempt", retryCount+1),
 				slog.Int("max_retries", r.maxRetries),
 				slog.Duration("next_interval", nextInterval),
 			)
 		}
-		
-		// Wait before next retry
+
+		// Wait before retrying
 		select {
 		case <-ctx.Done():
-			// Context canceled during wait
-			return resp, errors.Join(lastErr, ctx.Err())
+			// Context was canceled during wait
+			return resp, errors.Join(err, ctx.Err())
 		case <-time.After(nextInterval):
-			// Wait completed, proceed with retry
+			// Continue with retry
 		}
-		
-		// Make retry attempt
+
+		// Perform the retry
 		resp, err = r.sender.Send(ctx, url, params, opts...)
-		if err != nil {
-			lastErr = err
-		} else if resp.StatusCode < 400 {
-			// If we got a successful response, break the retry loop
-			lastErr = nil
+		retryCount++
+
+		// If successful, stop retrying
+		if err == nil && resp != nil && resp.IsSuccessful() {
 			break
 		}
-		
-		// If using backoff, double the interval for next retry
+
+		// Update backoff interval if enabled
 		if r.useBackoff {
 			nextInterval *= 2
 		}
 	}
-	
-	// Log final retry result if logger is provided
-	if r.logger != nil && didRetry {
-		if lastErr != nil {
+
+	// Log final retry status if logger was provided and we did retry
+	if r.logger != nil && retryCount > 0 {
+		if err != nil {
 			r.logger.ErrorContext(ctx, "Webhook retry failed",
 				slog.String("url", url),
-				slog.Int("attempts", attempt),
-				slog.Any("error", lastErr),
+				slog.Int("attempts", retryCount+1),
+				slog.Any("error", err),
 			)
 		} else {
 			r.logger.InfoContext(ctx, "Webhook retry succeeded",
 				slog.String("url", url),
-				slog.Int("attempts", attempt),
+				slog.Int("attempts", retryCount+1),
 				slog.Int("status_code", resp.StatusCode),
 			)
 		}
 	}
-	
-	return resp, lastErr
+
+	return resp, err
 }
