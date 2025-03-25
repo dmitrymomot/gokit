@@ -2,6 +2,7 @@ package logger_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -52,6 +53,52 @@ func TestNewDevelopmentLogger(t *testing.T) {
 	})
 }
 
+func TestNewDevelopmentLoggerWithExtractors(t *testing.T) {
+	t.Run("creates development logger with context extractors", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		
+		// Define context key for testing
+		type contextKey string
+		testKey := contextKey("test-key")
+		
+		// Create context extractor
+		extractor := func(ctx context.Context) (slog.Attr, bool) {
+			if val := ctx.Value(testKey); val != nil {
+				return slog.String("test_id", val.(string)), true
+			}
+			return slog.Attr{}, false
+		}
+		
+		// Create logger with context extractor
+		serviceName := "test-service"
+		devLogger := logger.NewDevelopmentLoggerWithExtractors(
+			serviceName, 
+			[]logger.ContextExtractor{extractor},
+		)
+		
+		// Verify logger was created
+		require.NotNil(t, devLogger)
+		
+		// Create a handler with our buffer for testing
+		handler := slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})
+		wrapped := logger.NewLogHandlerDecorator(
+			handler,
+			logger.WithContextExtractor(extractor),
+		)
+		testLogger := slog.New(wrapped)
+		
+		// Create context with test value
+		ctx := context.WithValue(context.Background(), testKey, "test-value")
+		
+		// Log with context
+		testLogger.InfoContext(ctx, "test message")
+		
+		// Verify context value was extracted
+		output := buf.String()
+		assert.Contains(t, output, "test_id=test-value")
+	})
+}
+
 func TestNewProductionLogger(t *testing.T) {
 	t.Run("creates production logger with correct configuration", func(t *testing.T) {
 		buf := &bytes.Buffer{}
@@ -98,6 +145,55 @@ func TestNewProductionLogger(t *testing.T) {
 	})
 }
 
+func TestNewProductionLoggerWithExtractors(t *testing.T) {
+	t.Run("creates production logger with context extractors", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		
+		// Define context key for testing
+		type contextKey string
+		testKey := contextKey("test-key")
+		
+		// Create context extractor
+		extractor := func(ctx context.Context) (slog.Attr, bool) {
+			if val := ctx.Value(testKey); val != nil {
+				return slog.String("test_id", val.(string)), true
+			}
+			return slog.Attr{}, false
+		}
+		
+		// Create logger with context extractor
+		serviceName := "test-service"
+		prodLogger := logger.NewProductionLoggerWithExtractors(
+			serviceName, 
+			[]logger.ContextExtractor{extractor},
+		)
+		
+		// Verify logger was created
+		require.NotNil(t, prodLogger)
+		
+		// Create a handler with our buffer for testing
+		handler := slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelInfo})
+		wrapped := logger.NewLogHandlerDecorator(
+			handler,
+			logger.WithContextExtractor(extractor),
+		)
+		testLogger := slog.New(wrapped)
+		
+		// Create context with test value
+		ctx := context.WithValue(context.Background(), testKey, "test-value")
+		
+		// Log with context
+		testLogger.InfoContext(ctx, "test message")
+		
+		// Verify context value was extracted
+		var logEntry map[string]interface{}
+		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		require.NoError(t, err)
+		
+		assert.Equal(t, "test-value", logEntry["test_id"])
+	})
+}
+
 func TestNewEnvironmentLogger(t *testing.T) {
 	t.Run("creates logger based on environment", func(t *testing.T) {
 		// Test development environment
@@ -111,5 +207,40 @@ func TestNewEnvironmentLogger(t *testing.T) {
 		// Test unknown environment (should default to production)
 		defaultLogger := logger.NewEnvironmentLogger("test-service", logger.Environment("unknown"))
 		require.NotNil(t, defaultLogger)
+	})
+}
+
+func TestNewEnvironmentLoggerWithExtractors(t *testing.T) {
+	t.Run("creates environment-specific logger with context extractors", func(t *testing.T) {
+		// Define context key for testing
+		type contextKey string
+		testKey := contextKey("test-key")
+		
+		// Create context extractor
+		extractor := func(ctx context.Context) (slog.Attr, bool) {
+			if val := ctx.Value(testKey); val != nil {
+				return slog.String("test_id", val.(string)), true
+			}
+			return slog.Attr{}, false
+		}
+		
+		// Test with different environments
+		environments := []struct {
+			env  logger.Environment
+			name string
+		}{
+			{logger.EnvDevelopment, "development"},
+			{logger.EnvProduction, "production"},
+			{logger.Environment("unknown"), "unknown"},
+		}
+		
+		for _, tc := range environments {
+			envLogger := logger.NewEnvironmentLoggerWithExtractors(
+				"test-service", 
+				tc.env,
+				[]logger.ContextExtractor{extractor},
+			)
+			require.NotNil(t, envLogger, "Logger should be created for %s environment", tc.name)
+		}
 	})
 }

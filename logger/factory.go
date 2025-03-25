@@ -114,24 +114,59 @@ func SetAsDefault(logger *slog.Logger) {
 // - Debug log level for more verbose output
 // - Standard output (os.Stdout)
 // - Service name and environment attributes
+// - Optional context extractors for adding context values to logs
 //
 // Example:
 //
+//	// Basic usage
 //	logger := logger.NewDevelopmentLogger("my-service")
-//	logger.Debug("Server starting", "port", 8080)
+//	
+//	// With additional attributes
+//	logger := logger.NewDevelopmentLogger("my-service", 
+//	    slog.String("version", "1.0.0"),
+//	    slog.Int("server_id", 42))
+//	
+//	// With context extractors
+//	logger := logger.NewDevelopmentLoggerWithExtractors("my-service", 
+//	    []logger.ContextExtractor{
+//	        logger.WithContextValue("request_id", requestIDKey),
+//	    })
 func NewDevelopmentLogger(serviceName string, attrs ...slog.Attr) *slog.Logger {
 	defaultAttrs := []slog.Attr{
 		slog.String("service", serviceName),
 		slog.String("env", string(EnvDevelopment)),
 	}
 	
-	defaultAttrs = append(defaultAttrs, attrs...)
+	if len(attrs) > 0 {
+		defaultAttrs = append(defaultAttrs, attrs...)
+	}
 	
 	return NewLogger(Config{
 		Level:        slog.LevelDebug,
 		Format:       FormatText,
 		Output:       os.Stdout,
 		DefaultAttrs: defaultAttrs,
+	})
+}
+
+// NewDevelopmentLoggerWithExtractors creates a new development logger with support for
+// context extractors to add request context values to log entries.
+func NewDevelopmentLoggerWithExtractors(serviceName string, extractors []ContextExtractor, attrs ...slog.Attr) *slog.Logger {
+	defaultAttrs := []slog.Attr{
+		slog.String("service", serviceName),
+		slog.String("env", string(EnvDevelopment)),
+	}
+	
+	if len(attrs) > 0 {
+		defaultAttrs = append(defaultAttrs, attrs...)
+	}
+	
+	return NewLogger(Config{
+		Level:            slog.LevelDebug,
+		Format:           FormatText,
+		Output:           os.Stdout,
+		DefaultAttrs:     defaultAttrs,
+		ContextExtractors: extractors,
 	})
 }
 
@@ -143,18 +178,32 @@ func NewDevelopmentLogger(serviceName string, attrs ...slog.Attr) *slog.Logger {
 // - Info log level to reduce noise
 // - Standard output (os.Stdout)
 // - Service name and environment attributes
+// - Optional context extractors for adding context values to logs
 //
 // Example:
 //
+//	// Basic usage
 //	logger := logger.NewProductionLogger("my-service")
-//	logger.Info("Server started", "port", 8080)
+//	
+//	// With additional attributes
+//	logger := logger.NewProductionLogger("my-service", 
+//	    slog.String("version", "1.0.0"),
+//	    slog.String("region", "eu-west"))
+//	
+//	// With context extractors
+//	logger := logger.NewProductionLoggerWithExtractors("my-service", 
+//	    []logger.ContextExtractor{
+//	        logger.WithContextValue("request_id", requestIDKey),
+//	    })
 func NewProductionLogger(serviceName string, attrs ...slog.Attr) *slog.Logger {
 	defaultAttrs := []slog.Attr{
 		slog.String("service", serviceName),
 		slog.String("env", string(EnvProduction)),
 	}
 	
-	defaultAttrs = append(defaultAttrs, attrs...)
+	if len(attrs) > 0 {
+		defaultAttrs = append(defaultAttrs, attrs...)
+	}
 	
 	return NewLogger(Config{
 		Level:        slog.LevelInfo,
@@ -164,12 +213,39 @@ func NewProductionLogger(serviceName string, attrs ...slog.Attr) *slog.Logger {
 	})
 }
 
+// NewProductionLoggerWithExtractors creates a new production logger with support for
+// context extractors to add request context values to log entries.
+func NewProductionLoggerWithExtractors(serviceName string, extractors []ContextExtractor, attrs ...slog.Attr) *slog.Logger {
+	defaultAttrs := []slog.Attr{
+		slog.String("service", serviceName),
+		slog.String("env", string(EnvProduction)),
+	}
+	
+	if len(attrs) > 0 {
+		defaultAttrs = append(defaultAttrs, attrs...)
+	}
+	
+	return NewLogger(Config{
+		Level:            slog.LevelInfo,
+		Format:           FormatJSON,
+		Output:           os.Stdout,
+		DefaultAttrs:     defaultAttrs,
+		ContextExtractors: extractors,
+	})
+}
+
 // NewEnvironmentLogger creates a new logger with predefined configuration 
 // based on the specified environment.
 //
 // Example:
 //
+//	// Basic usage
 //	logger := logger.NewEnvironmentLogger("my-service", logger.EnvProduction)
+//	
+//	// With additional attributes
+//	logger := logger.NewEnvironmentLogger("my-service", 
+//	    logger.EnvProduction,
+//	    slog.String("version", "1.0.0"))
 func NewEnvironmentLogger(serviceName string, env Environment, attrs ...slog.Attr) *slog.Logger {
 	switch env {
 	case EnvDevelopment:
@@ -178,5 +254,27 @@ func NewEnvironmentLogger(serviceName string, env Environment, attrs ...slog.Att
 		return NewProductionLogger(serviceName, attrs...)
 	default:
 		return NewProductionLogger(serviceName, attrs...)
+	}
+}
+
+// NewEnvironmentLoggerWithExtractors creates a new environment-specific logger
+// with support for context extractors.
+//
+// Example:
+//
+//	logger := logger.NewEnvironmentLoggerWithExtractors(
+//	    "my-service", 
+//	    logger.EnvProduction,
+//	    []logger.ContextExtractor{
+//	        logger.WithContextValue("request_id", requestIDKey),
+//	    })
+func NewEnvironmentLoggerWithExtractors(serviceName string, env Environment, extractors []ContextExtractor, attrs ...slog.Attr) *slog.Logger {
+	switch env {
+	case EnvDevelopment:
+		return NewDevelopmentLoggerWithExtractors(serviceName, extractors, attrs...)
+	case EnvProduction:
+		return NewProductionLoggerWithExtractors(serviceName, extractors, attrs...)
+	default:
+		return NewProductionLoggerWithExtractors(serviceName, extractors, attrs...)
 	}
 }

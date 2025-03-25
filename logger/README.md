@@ -154,51 +154,110 @@ logger := logger.NewLogger(logger.Config{
 
 ## Environment-Specific Loggers
 
-The package provides helper functions to create pre-configured loggers for different environments:
+The logger package provides helper functions to create loggers with predefined configurations suitable for different environments:
 
-### Development Logger
+#### Development Logger
 
 ```go
-// Create a development logger with text format and debug level
+// Basic usage
 logger := logger.NewDevelopmentLogger("my-service")
 
-// Add additional attributes
-logger := logger.NewDevelopmentLogger("my-service",
+// With additional attributes
+logger := logger.NewDevelopmentLogger("my-service", 
     slog.String("version", "1.0.0"),
-    slog.Int("server_id", 42),
-)
+    slog.Int("server_id", 42))
 
-// Log using the development logger
-logger.Debug("Starting server", "port", 8080)
+// With context extractors
+logger := logger.NewDevelopmentLoggerWithExtractors("my-service", 
+    []logger.ContextExtractor{
+        logger.WithContextValue("request_id", requestIDKey),
+    })
 ```
 
-### Production Logger
+Development configuration uses:
+- Text format for better human readability
+- Debug log level for more verbose output
+- Standard output (os.Stdout)
+- Service name and environment attributes
+
+#### Production Logger
 
 ```go
-// Create a production logger with JSON format and info level
+// Basic usage
 logger := logger.NewProductionLogger("my-service")
 
-// Add additional attributes
-logger := logger.NewProductionLogger("my-service",
+// With additional attributes
+logger := logger.NewProductionLogger("my-service", 
     slog.String("version", "1.0.0"),
-    slog.String("region", "eu-west"),
-)
+    slog.String("region", "eu-west"))
 
-// Log using the production logger
-logger.Info("Server started", "port", 8080)
+// With context extractors
+logger := logger.NewProductionLoggerWithExtractors("my-service", 
+    []logger.ContextExtractor{
+        logger.WithContextValue("request_id", requestIDKey),
+    })
 ```
 
-### Environment-Based Logger
+Production configuration uses:
+- JSON format for easier machine parsing
+- Info log level to reduce noise
+- Standard output (os.Stdout)
+- Service name and environment attributes
+
+#### Environment-based Logger
+
+You can also create a logger based on a specified environment:
 
 ```go
-// Create a logger based on the environment
-env := logger.EnvProduction
-if os.Getenv("APP_ENV") == "development" {
-    env = logger.EnvDevelopment
+// Basic usage
+logger := logger.NewEnvironmentLogger("my-service", logger.EnvProduction)
+
+// With additional attributes
+logger := logger.NewEnvironmentLogger("my-service", 
+    logger.EnvProduction,
+    slog.String("version", "1.0.0"))
+
+// With context extractors
+logger := logger.NewEnvironmentLoggerWithExtractors(
+    "my-service", 
+    logger.EnvProduction,
+    []logger.ContextExtractor{
+        logger.WithContextValue("request_id", requestIDKey),
+    })
+```
+
+### Context Extraction
+
+Context extractors allow you to automatically extract values from the context in `*Context` logging methods and add them to log entries:
+
+```go
+// Define a context key
+type requestIDKey struct{}
+
+// Create a context extractor
+requestIDExtractor := logger.WithContextValue("request_id", requestIDKey{})
+
+// Create a logger with the extractor
+log := logger.NewDevelopmentLoggerWithExtractors("my-service", []logger.ContextExtractor{requestIDExtractor})
+
+// Use with context
+ctx := context.WithValue(context.Background(), requestIDKey{}, "abc-123")
+log.InfoContext(ctx, "Request started")
+// Output: ... msg="Request started" ... request_id=abc-123
+```
+
+You can create multiple context extractors and combine them:
+
+```go
+// Define context keys
+type userIDKey struct{}
+type traceIDKey struct{}
+
+// Create context extractors
+extractors := []logger.ContextExtractor{
+    logger.WithContextValue("user_id", userIDKey{}),
+    logger.WithContextValue("trace_id", traceIDKey{}),
 }
 
-logger := logger.NewEnvironmentLogger("my-service", env)
-
-// The environment determines the logger configuration automatically
-// - Development: text format, debug level
-// - Production: JSON format, info level
+// Create a logger with multiple extractors
+log := logger.NewProductionLoggerWithExtractors("my-service", extractors)
