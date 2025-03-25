@@ -309,3 +309,110 @@ func NewLoggerDecorator(sender WebhookSender, logger *slog.Logger, opts ...Logge
 - `WithHeader(key, value string) RequestOption`
 - `WithHeaders(headers map[string]string) RequestOption`
 - `WithRequestTimeout(timeout time.Duration) RequestOption`
+
+## Retry Decorator
+
+The retry decorator adds advanced retry capabilities to any webhook sender. It allows you to configure retry behavior separately from the base sender implementation.
+
+```go
+// Create a base webhook sender
+baseSender := webhook.NewWebhookSender()
+
+// Add retry capabilities
+sender := webhook.NewRetryDecorator(
+    baseSender,
+    webhook.WithRetryCount(5),
+    webhook.WithRetryDelay(1 * time.Second),
+    webhook.WithRetryBackoff(),
+    webhook.WithRetryOnServerErrors(),
+)
+
+// Use the decorated sender
+resp, err := sender.Send(ctx, "https://api.example.com/webhook", params)
+```
+
+### Retry Options
+
+- `WithRetryCount(max int) RetryOption` - Sets the maximum number of retry attempts (default: 3)
+- `WithRetryDelay(interval time.Duration) RetryOption` - Sets the interval between retry attempts (default: 500ms)
+- `WithRetryBackoff() RetryOption` - Enables exponential backoff for retry intervals (doubles interval after each retry)
+- `WithRetryOnStatus(statusCodes ...int) RetryOption` - Adds specific HTTP status codes that should trigger a retry
+- `WithRetryOnServerErrors() RetryOption` - Configures the decorator to retry on all 5xx server errors
+- `WithRetryOnNetworkErrors() RetryOption` - Configures the decorator to retry on network-related errors
+- `WithRetryLogger(logger *slog.Logger) RetryOption` - Sets a logger for retry operations
+
+### Retry Behavior
+
+By default, the retry decorator will:
+
+1. Retry up to 3 times (configurable with `WithRetryCount`)
+2. Wait 500ms between retries (configurable with `WithRetryDelay`)
+3. Retry on network errors and 5xx server errors
+
+When using the exponential backoff option, the wait time doubles after each retry attempt. For example, with an initial delay of 500ms:
+- First retry: Wait 500ms
+- Second retry: Wait 1000ms
+- Third retry: Wait 2000ms
+
+### Example: Retry with Backoff
+
+```go
+// Create a base webhook sender
+baseSender := webhook.NewWebhookSender()
+
+// Add retry capabilities with exponential backoff
+sender := webhook.NewRetryDecorator(
+    baseSender,
+    webhook.WithRetryCount(5),
+    webhook.WithRetryDelay(200 * time.Millisecond),
+    webhook.WithRetryBackoff(),
+)
+
+// Use the decorated sender
+resp, err := sender.Send(ctx, "https://api.example.com/webhook", params)
+```
+
+### Example: Retry on Specific Status Codes
+
+```go
+// Create a base webhook sender
+baseSender := webhook.NewWebhookSender()
+
+// Add retry capabilities for specific status codes
+sender := webhook.NewRetryDecorator(
+    baseSender,
+    webhook.WithRetryOnStatus(408, 429, 503),
+)
+
+// Use the decorated sender
+resp, err := sender.Send(ctx, "https://api.example.com/webhook", params)
+```
+
+### Example: Combining Multiple Decorators
+
+You can combine multiple decorators to add both logging and retry capabilities:
+
+```go
+// Create a base webhook sender
+baseSender := webhook.NewWebhookSender()
+
+// Add logging capability
+loggedSender := webhook.NewLoggerDecorator(
+    baseSender,
+    slog.Default(),
+    webhook.WithMaskedFields("password", "token"),
+)
+
+// Add retry capability on top of logging
+sender := webhook.NewRetryDecorator(
+    loggedSender,
+    webhook.WithRetryCount(3),
+    webhook.WithRetryBackoff(),
+    webhook.WithRetryLogger(slog.Default()),
+)
+
+// Use the decorated sender
+resp, err := sender.Send(ctx, "https://api.example.com/webhook", params)
+```
+
+In this example, each request will be logged (with sensitive fields masked) and will be retried up to 3 times if it fails, with exponential backoff between retries.
