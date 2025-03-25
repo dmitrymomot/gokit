@@ -112,7 +112,7 @@ func bindValues(values url.Values, v any) error {
 		return ErrUnsupportedType
 	}
 
-	for i := 0; i < rt.NumField(); i++ {
+	for i := range rt.NumField() {
 		field := rt.Field(i)
 		fieldValue := rv.Field(i)
 
@@ -145,13 +145,13 @@ func getFieldName(field reflect.StructField) string {
 	if tag == "" {
 		tag = field.Tag.Get("json")
 	}
-	
+
 	// Extract the name from the tag (before any options)
 	if tag != "" {
 		parts := strings.Split(tag, ",")
 		return parts[0]
 	}
-	
+
 	// Default to field name
 	return field.Name
 }
@@ -205,7 +205,7 @@ func setFieldValue(fieldValue reflect.Value, values []string) error {
 	case reflect.Slice:
 		elemType := fieldValue.Type().Elem()
 		slice := reflect.MakeSlice(fieldValue.Type(), len(values), len(values))
-		
+
 		for i, val := range values {
 			elem := reflect.New(elemType).Elem()
 			if err := setSingleValue(elem, val); err != nil {
@@ -213,13 +213,13 @@ func setFieldValue(fieldValue reflect.Value, values []string) error {
 			}
 			slice.Index(i).Set(elem)
 		}
-		
+
 		fieldValue.Set(slice)
 
 	default:
 		return ErrUnsupportedType
 	}
-	
+
 	return nil
 }
 
@@ -255,6 +255,6 @@ func setSingleValue(value reflect.Value, strVal string) error {
 	default:
 		return ErrUnsupportedType
 	}
-	
+
 	return nil
 }
