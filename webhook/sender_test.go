@@ -69,11 +69,15 @@ func TestWebhookSender_Send(t *testing.T) {
 		assert.True(t, resp.IsSuccessful())
 	})
 
-	t.Run("GET request with query params", func(t *testing.T) {
+	t.Run("GET request with query params from map", func(t *testing.T) {
 		// Create a test server
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Check method
 			assert.Equal(t, http.MethodGet, r.Method)
+			
+			// Check that params were converted to query string
+			assert.Equal(t, "value1", r.URL.Query().Get("key1"))
+			assert.Equal(t, "value2", r.URL.Query().Get("key2"))
 			
 			// Write response
 			w.WriteHeader(http.StatusOK)
@@ -84,9 +88,13 @@ func TestWebhookSender_Send(t *testing.T) {
 		// Create webhook sender
 		sender := webhook.NewWebhookSender()
 
-		// Send webhook
+		// Send webhook with params that should be converted to query string
 		ctx := context.Background()
-		resp, err := sender.Send(ctx, server.URL+"?param=value", nil, 
+		params := map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		}
+		resp, err := sender.Send(ctx, server.URL, params, 
 			webhook.WithMethod(http.MethodGet))
 
 		// Check response
@@ -94,6 +102,100 @@ func TestWebhookSender_Send(t *testing.T) {
 		require.NotNil(t, resp)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Contains(t, string(resp.Body), "data")
+	})
+
+	t.Run("GET request with struct params", func(t *testing.T) {
+		// Create a test server
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check method
+			assert.Equal(t, http.MethodGet, r.Method)
+			
+			// Check that struct fields were converted to query string
+			assert.Equal(t, "123", r.URL.Query().Get("id"))
+			assert.Equal(t, "test user", r.URL.Query().Get("name"))
+			
+			// Write response
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"success":true}`))
+		}))
+		defer server.Close()
+
+		// Create webhook sender
+		sender := webhook.NewWebhookSender()
+
+		// Define a struct with json tags
+		type User struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		}
+
+		// Send webhook with struct params
+		ctx := context.Background()
+		params := User{ID: 123, Name: "test user"}
+		resp, err := sender.Send(ctx, server.URL, params, 
+			webhook.WithMethod(http.MethodGet))
+
+		// Check response
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Contains(t, string(resp.Body), "success")
+	})
+
+	t.Run("DELETE request with query params", func(t *testing.T) {
+		// Create a test server
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check method
+			assert.Equal(t, http.MethodDelete, r.Method)
+			
+			// Check that params were converted to query string
+			assert.Equal(t, "123", r.URL.Query().Get("id"))
+			
+			// Write response
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"deleted":true}`))
+		}))
+		defer server.Close()
+
+		// Create webhook sender
+		sender := webhook.NewWebhookSender()
+
+		// Send webhook with params that should be converted to query string
+		ctx := context.Background()
+		params := map[string]int{"id": 123}
+		resp, err := sender.Send(ctx, server.URL, params, 
+			webhook.WithMethod(http.MethodDelete))
+
+		// Check response
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Contains(t, string(resp.Body), "deleted")
+	})
+
+	t.Run("existing query params should be preserved", func(t *testing.T) {
+		// Create a test server
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check that both existing and new params are present
+			assert.Equal(t, "existing", r.URL.Query().Get("original"))
+			assert.Equal(t, "new value", r.URL.Query().Get("added"))
+			
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		// Create webhook sender
+		sender := webhook.NewWebhookSender()
+
+		// Send webhook to URL with existing query params
+		ctx := context.Background()
+		params := map[string]string{"added": "new value"}
+		resp, err := sender.Send(ctx, server.URL+"?original=existing", params, 
+			webhook.WithMethod(http.MethodGet))
+
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 
 	t.Run("error - invalid URL", func(t *testing.T) {

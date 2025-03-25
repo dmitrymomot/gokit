@@ -13,7 +13,7 @@ import (
 // WebhookSender is the interface for sending webhooks
 type WebhookSender interface {
 	// Send webhooks with minimal required parameters and optional request options
-	Send(ctx context.Context, url string, params interface{}, opts ...RequestOption) (*Response, error)
+	Send(ctx context.Context, url string, params any, opts ...RequestOption) (*Response, error)
 }
 
 // webhookSender implements the WebhookSender interface
@@ -48,7 +48,7 @@ func NewWebhookSender(opts ...SenderOption) WebhookSender {
 }
 
 // Send implements the WebhookSender interface
-func (s *webhookSender) Send(ctx context.Context, url string, params interface{}, opts ...RequestOption) (*Response, error) {
+func (s *webhookSender) Send(ctx context.Context, url string, params any, opts ...RequestOption) (*Response, error) {
 	if url == "" {
 		return nil, ErrInvalidURL
 	}
@@ -159,7 +159,7 @@ func (s *webhookSender) doSend(ctx context.Context, req *Request) (*Response, er
 }
 
 // marshalParams marshals the parameters to JSON and returns a buffer
-func marshalParams(params interface{}) (*bytes.Buffer, error) {
+func marshalParams(params any) (*bytes.Buffer, error) {
 	if params == nil {
 		return bytes.NewBuffer(nil), nil
 	}

@@ -10,6 +10,7 @@ The webhook package provides a simple but powerful client for sending webhook re
 - Custom headers for each request
 - Default and per-request configuration options
 - Automatic JSON marshaling of request parameters
+- Automatic conversion of parameters to query string for GET, HEAD, DELETE methods
 - Retry mechanism for failed requests
 - Response processing with status code validation
 - Context support for cancellation and timeouts
@@ -63,6 +64,46 @@ resp, err := sender.Send(
 )
 ```
 
+### GET Request with Query Parameters
+
+For HTTP methods that don't support request bodies (GET, HEAD, DELETE), parameters are automatically converted to query string parameters:
+
+```go
+// Parameters will be automatically converted to query string
+// This will make a request to: https://api.example.com/search?term=golang&limit=10
+params := map[string]string{
+	"term": "golang",
+	"limit": "10",
+}
+resp, err := sender.Send(
+	ctx, 
+	"https://api.example.com/search", 
+	params,
+	webhook.WithMethod("GET"),
+)
+```
+
+### Using Structs as Parameters
+
+You can also use structs as parameters, which will be automatically marshaled to JSON for POST/PUT requests, or converted to query string parameters for GET/HEAD/DELETE requests:
+
+```go
+// Define a struct with JSON tags
+type SearchParams struct {
+	Term  string `json:"term"`
+	Limit int    `json:"limit"`
+}
+
+// For GET request, this will be converted to: ?term=golang&limit=10
+// For POST request, this will be marshaled to JSON: {"term":"golang","limit":10}
+params := SearchParams{
+	Term: "golang",
+	Limit: 10,
+}
+
+resp, err := sender.Send(ctx, "https://api.example.com/search", params, webhook.WithMethod("GET"))
+```
+
 ### Creating a Configured Sender
 
 ```go
@@ -113,7 +154,7 @@ if !resp.IsSuccessful() {
 
 ```go
 type WebhookSender interface {
-	Send(ctx context.Context, url string, params interface{}, opts ...RequestOption) (*Response, error)
+	Send(ctx context.Context, url string, params any, opts ...RequestOption) (*Response, error)
 }
 ```
 
