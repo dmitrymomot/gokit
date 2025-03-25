@@ -69,6 +69,20 @@ func BindForm(r *http.Request, v any) error {
 		return ErrInvalidRequest
 	}
 
+	// Check content type to handle multipart forms appropriately
+	contentType := r.Header.Get("Content-Type")
+	isMultipart := strings.Contains(contentType, "multipart/form-data")
+
+	if isMultipart {
+		// For multipart forms, use ParseMultipartForm
+		if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB max memory
+			return errors.Join(ErrInvalidFormData, err)
+		}
+		// Use r.Form which contains both URL query parameters and form data
+		return bindValues(r.Form, v)
+	}
+
+	// For regular forms, use ParseForm
 	if err := r.ParseForm(); err != nil {
 		return errors.Join(ErrInvalidFormData, err)
 	}

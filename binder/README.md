@@ -119,24 +119,3 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "created"})
 }
 ```
-
-### With Router Middleware
-
-You can create middleware to handle binding for all routes:
-
-```go
-func BindMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Get the appropriate struct based on the route or store in context
-		var data SomeStruct
-		
-		if err := binder.Bind(r, &data); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		
-		// Store bound data in request context
-		ctx := context.WithValue(r.Context(), "boundData", data)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}

@@ -11,6 +11,7 @@ import (
 	"github.com/dmitrymomot/gokit/binder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"mime/multipart"
 )
 
 type testStruct struct {
@@ -186,4 +187,80 @@ func TestBind_UnsupportedType(t *testing.T) {
 	
 	require.Error(t, err)
 	assert.ErrorIs(t, err, binder.ErrUnsupportedType)
+}
+
+func TestBindMultipartForm(t *testing.T) {
+	// Create a new multipart writer
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	
+	// Add form fields
+	require.NoError(t, writer.WriteField("name", "David"))
+	require.NoError(t, writer.WriteField("age", "50"))
+	require.NoError(t, writer.WriteField("email", "david@example.com"))
+	require.NoError(t, writer.WriteField("tags", "tag9"))
+	require.NoError(t, writer.WriteField("tags", "tag10"))
+	
+	// Close the writer to set the terminating boundary
+	require.NoError(t, writer.Close())
+	
+	// Create the request with the multipart form
+	req, err := http.NewRequest(
+		http.MethodPost,
+		"http://example.com",
+		body,
+	)
+	require.NoError(t, err)
+	
+	// Set the content type with the boundary
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	
+	// Bind the form data
+	var result testStruct
+	err = binder.BindForm(req, &result)
+	
+	// Verify the results
+	require.NoError(t, err)
+	assert.Equal(t, "David", result.Name)
+	assert.Equal(t, 50, result.Age)
+	assert.Equal(t, "david@example.com", result.Email)
+	assert.Equal(t, []string{"tag9", "tag10"}, result.Tags)
+}
+
+func TestBind_MultipartForm(t *testing.T) {
+	// Create a new multipart writer
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	
+	// Add form fields
+	require.NoError(t, writer.WriteField("name", "Emma"))
+	require.NoError(t, writer.WriteField("age", "55"))
+	require.NoError(t, writer.WriteField("email", "emma@example.com"))
+	require.NoError(t, writer.WriteField("tags", "tag11"))
+	require.NoError(t, writer.WriteField("tags", "tag12"))
+	
+	// Close the writer to set the terminating boundary
+	require.NoError(t, writer.Close())
+	
+	// Create the request with the multipart form
+	req, err := http.NewRequest(
+		http.MethodPost,
+		"http://example.com",
+		body,
+	)
+	require.NoError(t, err)
+	
+	// Set the content type with the boundary
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	
+	// Bind the form data using the general Bind function
+	var result testStruct
+	err = binder.Bind(req, &result)
+	
+	// Verify the results
+	require.NoError(t, err)
+	assert.Equal(t, "Emma", result.Name)
+	assert.Equal(t, 55, result.Age)
+	assert.Equal(t, "emma@example.com", result.Email)
+	assert.Equal(t, []string{"tag11", "tag12"}, result.Tags)
 }
