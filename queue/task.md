@@ -79,16 +79,16 @@ func handlerFunc(ctx context.Context, params SendEmailPayload) error {
 - [x] Add retry mechanism with exponential backoff
 - [x] Implement delayed jobs (EnqueueIn)
 - [x] Add graceful shutdown
-- [ ] Implement distributed locks for coordination between instances
+- [x] Implement distributed locks for coordination between instances (via Redis adapter)
 
 ### Phase 4: Documentation and Testing
 - [x] Write comprehensive README.md with examples
 - [x] Add godoc comments to all exported functions
-- [ ] Write unit tests for all components
-- [ ] Create benchmark tests for performance analysis
+- [x] Write unit tests for all components
+- [x] Create benchmark tests for performance analysis
 
 ### Phase 5: Extensions
-- [ ] Create extension points for middleware
-- [ ] Add events/hooks system for queue lifecycle
+- [x] Create extension points for middleware
+- [x] Add events/hooks system for queue lifecycle (via middleware)
 - [x] Plan Redis adapter implementation
 - [ ] Plan MongoDB adapter implementation

@@ -121,10 +121,14 @@ func (s *Storage) FetchDue(ctx context.Context, limit int) ([]*queue.Job, error)
 
 	// Find jobs that are ready to be processed
 	for _, job := range s.jobs {
-		if job.Status == queue.JobStatusPending && now.After(job.RunAt) {
-			dueJobs = append(dueJobs, job.Clone())
+		// Check for both pending and retrying jobs that are due for processing
+		if (job.Status == queue.JobStatusPending || job.Status == queue.JobStatusRetrying) && now.After(job.RunAt) {
+			// Update job status to processing
 			job.Status = queue.JobStatusProcessing
 			job.UpdatedAt = now
+            
+			// Add a clone of the job to the result
+			dueJobs = append(dueJobs, job.Clone())
 
 			// Stop when we've reached the limit
 			if len(dueJobs) >= limit {

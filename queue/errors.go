@@ -24,4 +24,6 @@ var (
 	ErrUnknownJobStatus = errors.New("unknown job status")
 	// ErrInvalidHandler is returned when trying to register an invalid handler.
 	ErrInvalidHandler = errors.New("invalid handler")
+	// ErrJobPanicked is returned when a job handler panics during execution.
+	ErrJobPanicked = errors.New("job handler panicked")
 )

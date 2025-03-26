@@ -51,6 +51,7 @@ type SimpleQueue struct {
 	stopChan       chan struct{}      // Channel to signal workers to stop
 	wg             sync.WaitGroup     // WaitGroup for worker goroutines
 	retryDelayFunc RetryDelayFunc     // Function to calculate retry delay
+	middleware     Middleware         // Middleware chain to apply to all handlers
 }
 
 // RetryDelayFunc is a function that calculates the delay before retrying a failed job.
@@ -85,6 +86,18 @@ func WithRetryDelayFunc(fn RetryDelayFunc) Option {
 	return func(q *SimpleQueue) {
 		if fn != nil {
 			q.retryDelayFunc = fn
+		}
+	}
+}
+
+// WithMiddleware sets the middleware to be applied to all handlers.
+// If multiple middleware are provided, they will be chained together.
+func WithMiddleware(middleware ...Middleware) Option {
+	return func(q *SimpleQueue) {
+		if len(middleware) == 1 {
+			q.middleware = middleware[0]
+		} else if len(middleware) > 1 {
+			q.middleware = Chain(middleware...)
 		}
 	}
 }
@@ -164,8 +177,14 @@ func (q *SimpleQueue) AddHandler(taskName string, handlerFunc any) error {
 		return results[0].Interface().(error)
 	}
 
+	// Apply middleware if configured
+	handler := wrapper
+	if q.middleware != nil {
+		handler = q.middleware(wrapper)
+	}
+
 	// Store the wrapper function in the handlers map
-	q.handlers[taskName] = wrapper
+	q.handlers[taskName] = handler
 	return nil
 }
 
