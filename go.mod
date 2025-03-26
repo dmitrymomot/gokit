@@ -3,6 +3,7 @@ module github.com/dmitrymomot/gokit
 go 1.24
 
 require (
+	github.com/alicebob/miniredis/v2 v2.34.0
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/config v1.29.10
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.63
@@ -25,6 +26,7 @@ require (
 
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
+	github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.10 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.30 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.34 // indirect
@@ -56,6 +58,7 @@ require (
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

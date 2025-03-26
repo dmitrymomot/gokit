@@ -188,6 +188,9 @@ func (b *Broker) Subscribe(ctx context.Context) (<-chan sse.Message, error) {
 	b.subscribers[ch] = struct{}{}
 	b.mu.Unlock()
 
+	// Use a sync.Once to ensure we only unregister and close once
+	var closeOnce sync.Once
+
 	// Start goroutine to handle context cancellation
 	go func() {
 		select {
@@ -197,13 +200,23 @@ func (b *Broker) Subscribe(ctx context.Context) (<-chan sse.Message, error) {
 			// Broker closed
 		}
 
-		// Unregister subscriber
-		b.mu.Lock()
-		delete(b.subscribers, ch)
-		b.mu.Unlock()
+		// Safely unregister subscriber and close channel
+		closeOnce.Do(func() {
+			// Unregister subscriber
+			b.mu.Lock()
+			delete(b.subscribers, ch)
+			b.mu.Unlock()
 
-		// Close the channel
-		close(ch)
+			// Use a recover to handle any panics from closing already closed channel
+			defer func() {
+				if r := recover(); r != nil {
+					// Channel was already closed, ignore the panic
+				}
+			}()
+			
+			// Close the channel
+			close(ch)
+		})
 	}()
 
 	return ch, nil
@@ -221,13 +234,30 @@ func (b *Broker) Close() error {
 		}
 	}
 
-	// Clear subscribers
+	// Clear subscribers - take a copy of the channels we need to close
+	// to avoid race conditions where channels might get closed multiple times
+	var channelsToClose []chan sse.Message
+	
 	b.mu.Lock()
 	for ch := range b.subscribers {
-		close(ch)
+		channelsToClose = append(channelsToClose, ch)
 	}
+	// Clear the subscribers map while we have the lock
 	b.subscribers = make(map[chan sse.Message]struct{})
 	b.mu.Unlock()
+	
+	// Now close the channels without holding the lock
+	for _, ch := range channelsToClose {
+		// Use a recover in case a channel was already closed by another goroutine
+		func(c chan sse.Message) {
+			defer func() {
+				if r := recover(); r != nil {
+					// Channel was already closed, ignore the panic
+				}
+			}()
+			close(c)
+		}(ch) // Immediately invoke the function with ch as the argument
+	}
 
 	// Wait for all goroutines to finish
 	b.wg.Wait()
