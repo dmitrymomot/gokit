@@ -23,6 +23,7 @@ const (
 )
 
 // Job represents a task to be processed by the queue.
+// It contains all the metadata and payload for a specific task.
 type Job struct {
 	// ID is the unique identifier for the job.
 	ID string `json:"id"`
@@ -47,6 +48,8 @@ type Job struct {
 }
 
 // NewJob creates a new job with the given task name and payload.
+// The payload must be a type that can be marshaled to JSON.
+// Returns the created job and any error that occurred during serialization.
 func NewJob(taskName string, payload any) (*Job, error) {
 	serializedPayload, err := json.Marshal(payload)
 	if err != nil {
@@ -67,6 +70,8 @@ func NewJob(taskName string, payload any) (*Job, error) {
 }
 
 // GetPayload deserializes the job payload into the provided value.
+// The value must be a pointer to a type that the payload can be unmarshaled into.
+// Returns ErrInvalidJobPayload if deserialization fails.
 func (j *Job) GetPayload(value any) error {
 	if err := json.Unmarshal(j.Payload, value); err != nil {
 		return ErrInvalidJobPayload
@@ -75,6 +80,7 @@ func (j *Job) GetPayload(value any) error {
 }
 
 // Clone returns a deep copy of the job.
+// This is useful when returning jobs from the storage to prevent concurrent modifications.
 func (j *Job) Clone() *Job {
 	payload := make([]byte, len(j.Payload))
 	copy(payload, j.Payload)
@@ -94,11 +100,13 @@ func (j *Job) Clone() *Job {
 }
 
 // ShouldRetry returns true if the job should be retried.
+// A job should be retried if its retry count is less than the maximum allowed retries.
 func (j *Job) ShouldRetry() bool {
 	return j.RetryCount < j.MaxRetries
 }
 
 // IsReady returns true if the job is ready to be processed.
+// A job is ready if it's in the pending status and its scheduled run time is in the past.
 func (j *Job) IsReady() bool {
 	return j.Status == JobStatusPending && time.Now().After(j.RunAt)
 }
@@ -109,4 +117,5 @@ type Handler func(ctx context.Context, job *Job) error
 
 // HandlerFunc is a generic type that represents a type-safe handler function.
 // The function takes a context and a strongly-typed payload parameter.
+// T is the type of the payload, which must be compatible with JSON marshaling/unmarshaling.
 type HandlerFunc[T any] func(ctx context.Context, payload T) error

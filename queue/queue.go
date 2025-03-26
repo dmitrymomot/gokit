@@ -1,3 +1,5 @@
+// Package queue provides a concurrent job processing system with support for
+// type-safe handlers, job retries, and delayed job execution.
 package queue
 
 import (
@@ -8,6 +10,8 @@ import (
 )
 
 // Queue defines the interface for interacting with the job queue.
+// It provides methods for registering handlers, enqueueing jobs,
+// and controlling the queue's lifecycle.
 type Queue interface {
 	// AddHandler registers a type-safe handler function for the given task name.
 	// Handler function must have the signature func(context.Context, T) error
@@ -16,22 +20,28 @@ type Queue interface {
 
 	// Enqueue adds a job to the queue for immediate processing.
 	// Payload must be a type that can be marshaled to and from JSON.
+	// Returns the job ID and any error that occurred.
 	Enqueue(ctx context.Context, taskName string, payload any) (string, error)
 
 	// EnqueueIn adds a job to the queue to be processed after the specified delay.
 	// Payload must be a type that can be marshaled to and from JSON.
+	// Returns the job ID and any error that occurred.
 	EnqueueIn(ctx context.Context, taskName string, payload any, delay time.Duration) (string, error)
 
 	// Run starts processing jobs from the queue. This method is blocking
 	// and should be started in a goroutine.
+	// It will continue processing jobs until the context is cancelled.
 	Run(ctx context.Context) error
 
 	// Stop gracefully stops the queue, allowing in-progress jobs to complete
 	// but not processing any new jobs.
+	// Returns an error if the queue could not be stopped.
 	Stop(ctx context.Context) error
 }
 
 // SimpleQueue is the default implementation of the Queue interface.
+// It provides a concurrent job processing system with support for
+// type-safe handlers, job retries, and delayed job execution.
 type SimpleQueue struct {
 	storage        Storage           // Storage backend for jobs
 	handlers       map[string]Handler // Registered handlers
@@ -44,19 +54,23 @@ type SimpleQueue struct {
 }
 
 // RetryDelayFunc is a function that calculates the delay before retrying a failed job.
+// It takes the number of previous retries and returns a duration to wait before the next attempt.
 type RetryDelayFunc func(retryCount int) time.Duration
 
 // DefaultRetryDelayFunc returns a default exponential backoff function
 // with an initial delay of 1 second and a multiplier of 2.
+// This creates delays of 1s, 2s, 4s, 8s, 16s, etc. for sequential retries.
 func DefaultRetryDelayFunc(retryCount int) time.Duration {
 	// Exponential backoff: 1s, 2s, 4s, 8s, 16s, etc.
 	return time.Duration(1<<uint(retryCount)) * time.Second
 }
 
 // Option is a function that configures a SimpleQueue.
+// This follows the functional options pattern for configuring structs.
 type Option func(*SimpleQueue)
 
 // WithConcurrency sets the number of worker goroutines.
+// If the value is less than or equal to zero, the default concurrency will be used.
 func WithConcurrency(concurrency int) Option {
 	return func(q *SimpleQueue) {
 		if concurrency > 0 {
@@ -66,6 +80,7 @@ func WithConcurrency(concurrency int) Option {
 }
 
 // WithRetryDelayFunc sets the function used to calculate retry delays.
+// If nil is provided, the default retry delay function will be used.
 func WithRetryDelayFunc(fn RetryDelayFunc) Option {
 	return func(q *SimpleQueue) {
 		if fn != nil {
@@ -75,6 +90,8 @@ func WithRetryDelayFunc(fn RetryDelayFunc) Option {
 }
 
 // New creates a new SimpleQueue with the given storage and options.
+// The storage parameter is required and must not be nil.
+// Optional configurations can be provided through Option functions.
 func New(storage Storage, opts ...Option) *SimpleQueue {
 	queue := &SimpleQueue{
 		storage:        storage,
@@ -93,6 +110,9 @@ func New(storage Storage, opts ...Option) *SimpleQueue {
 }
 
 // AddHandler registers a type-safe handler function for the given task name.
+// The handler function must have the signature func(context.Context, T) error
+// where T is any type that can be marshaled to and from JSON.
+// Returns an error if the handler function has an invalid signature.
 func (q *SimpleQueue) AddHandler(taskName string, handlerFunc any) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -150,6 +170,10 @@ func (q *SimpleQueue) AddHandler(taskName string, handlerFunc any) error {
 }
 
 // Enqueue adds a job to the queue for immediate processing.
+// The payload must be a type that can be marshaled to JSON.
+// Returns the job ID and any error that occurred.
+// If the queue is not running, ErrQueueClosed will be returned.
+// If no handler is registered for the task name, ErrHandlerNotFound will be returned.
 func (q *SimpleQueue) Enqueue(ctx context.Context, taskName string, payload any) (string, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
@@ -178,6 +202,10 @@ func (q *SimpleQueue) Enqueue(ctx context.Context, taskName string, payload any)
 }
 
 // EnqueueIn adds a job to the queue to be processed after the specified delay.
+// The payload must be a type that can be marshaled to JSON.
+// Returns the job ID and any error that occurred.
+// If the queue is not running, ErrQueueClosed will be returned.
+// If no handler is registered for the task name, ErrHandlerNotFound will be returned.
 func (q *SimpleQueue) EnqueueIn(ctx context.Context, taskName string, payload any, delay time.Duration) (string, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
@@ -209,6 +237,9 @@ func (q *SimpleQueue) EnqueueIn(ctx context.Context, taskName string, payload an
 }
 
 // Run starts processing jobs from the queue.
+// This method is blocking and should be started in a goroutine.
+// It will continue processing jobs until the context is cancelled.
+// Returns an error if the queue is already running.
 func (q *SimpleQueue) Run(ctx context.Context) error {
 	q.mu.Lock()
 	if q.running {
@@ -229,6 +260,8 @@ func (q *SimpleQueue) Run(ctx context.Context) error {
 }
 
 // Stop gracefully stops the queue.
+// It allows in-progress jobs to complete but does not process any new jobs.
+// Returns an error if the queue is not running or if the stop operation times out.
 func (q *SimpleQueue) Stop(ctx context.Context) error {
 	q.mu.Lock()
 	if !q.running {

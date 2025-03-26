@@ -153,9 +153,39 @@ storage := memory.New()
 q := queue.New(storage)
 ```
 
-### Redis Storage (Planned)
+### Redis Storage
 
-Redis storage will be implemented in a future release.
+Redis storage provides persistence and enables distributed queue processing across multiple application instances.
+
+```go
+import (
+    "github.com/dmitrymomot/gokit/queue"
+    "github.com/dmitrymomot/gokit/queue/redis"
+    redisClient "github.com/redis/go-redis/v9"
+)
+
+// Create Redis client
+client := redisClient.NewClient(&redisClient.Options{
+    Addr: "localhost:6379",
+})
+
+// Create Redis storage with default options
+storage := redis.New(client)
+
+// Or with custom options
+storage := redis.New(client, redis.Options{
+    Prefix:      "myapp:queue:",
+    LockTimeout: 60 * time.Second,
+})
+
+q := queue.New(storage)
+```
+
+For distributed deployments, the Redis storage adapter provides:
+- Thread-safe job claiming mechanism
+- Automatic recovery from worker crashes via CleanStaleJobs
+- Persistent job storage across application restarts
+- Coordination between multiple queue instances
 
 ### MongoDB Storage (Planned)
 
