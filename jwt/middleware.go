@@ -1,14 +1,9 @@
 package jwt
 
 import (
-	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 )
-
-// ContextKey is a type for context keys used by the jwt middleware
-type ContextKey string
 
 // TokenExtractorFunc defines a function that extracts a token from an HTTP request
 type TokenExtractorFunc func(r *http.Request) (string, error)
@@ -20,42 +15,32 @@ type SkipFunc func(r *http.Request) bool
 type MiddlewareConfig struct {
 	// Service is the JWT service to use for parsing tokens
 	Service *Service
-	
-	// ContextKey is the key to use for storing claims in the request context
-	ContextKey ContextKey
-	
+
 	// Extractor is a function that extracts a token from an HTTP request
-	// If not specified, DefaultTokenExtractor is used
+	// If not specified, BearerTokenExtractor is used
 	Extractor TokenExtractorFunc
-	
+
 	// Skip is a function that determines whether to skip the middleware
 	// If not specified, the middleware is never skipped
 	Skip SkipFunc
 }
 
-// DefaultTokenExtractor extracts a JWT token from the Authorization header
-// It expects the format "Bearer <token>"
-func DefaultTokenExtractor(r *http.Request) (string, error) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		return "", ErrInvalidToken
-	}
-	
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		return "", ErrInvalidToken
-	}
-	
-	return parts[1], nil
+// Middleware returns a new JWT middleware handler with default configuration.
+// The default configuration uses the BearerTokenExtractor and does not skip the middleware.
+// The claims are stored in the request context using the default ContextKey.
+func Middleware(service *Service) func(next http.Handler) http.Handler {
+	return MiddlewareWithConfig(MiddlewareConfig{
+		Service: service,
+	})
 }
 
 // Middleware returns a new JWT middleware handler
-func Middleware(config MiddlewareConfig) func(next http.Handler) http.Handler {
+func MiddlewareWithConfig(config MiddlewareConfig) func(next http.Handler) http.Handler {
 	// Use default token extractor if none is provided
 	if config.Extractor == nil {
-		config.Extractor = DefaultTokenExtractor
+		config.Extractor = BearerTokenExtractor
 	}
-	
+
 	// Return the middleware handler
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -64,90 +49,49 @@ func Middleware(config MiddlewareConfig) func(next http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			
+
 			// Extract the token from the request
 			tokenString, err := config.Extractor(r)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 				return
 			}
-			
+
 			// Parse the token
-			claims := make(map[string]interface{})
+			claims := make(map[string]any)
 			if err := config.Service.Parse(tokenString, &claims); err != nil {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 				return
 			}
-			
+
+			ctx := r.Context()
+
+			// Add the token to the request context
+			ctx = SetToken(ctx, tokenString)
+
 			// Add the claims to the request context
-			ctx := context.WithValue(r.Context(), config.ContextKey, claims)
-			
+			ctx = SetClaims(ctx, claims)
+
 			// Call the next handler with the updated context
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
-// GetClaims extracts JWT claims from the request context
-func GetClaims(ctx context.Context, key ContextKey) (map[string]interface{}, bool) {
-	claims, ok := ctx.Value(key).(map[string]interface{})
-	return claims, ok
-}
-
-// GetClaimsAs extracts JWT claims from the request context and parses them into a struct
-func GetClaimsAs(ctx context.Context, key ContextKey, dest interface{}) error {
-	claims, ok := ctx.Value(key).(map[string]interface{})
-	if !ok {
-		return ErrInvalidClaims
+// BearerTokenExtractor extracts a JWT token from the Authorization header
+// It expects the format "Bearer <token>"
+func BearerTokenExtractor(r *http.Request) (string, error) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return "", ErrInvalidToken
 	}
-	
-	// Convert claims to JSON and then unmarshal into the destination struct
-	claimsJSON, err := json.Marshal(claims)
-	if err != nil {
-		return err
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return "", ErrInvalidToken
 	}
-	
-	if err := json.Unmarshal(claimsJSON, dest); err != nil {
-		return err
-	}
-	
-	return nil
-}
 
-// WithClaims is a helper function to create a middleware with a specific claims type
-func WithClaims[T any](service *Service, key ContextKey) func(next http.Handler) http.Handler {
-	return Middleware(MiddlewareConfig{
-		Service:    service,
-		ContextKey: key,
-	})
-}
-
-// WithClaimsAndExtractor is a helper function to create a middleware with a specific 
-// claims type and token extractor
-func WithClaimsAndExtractor[T any](
-	service *Service,
-	key ContextKey,
-	extractor TokenExtractorFunc,
-) func(next http.Handler) http.Handler {
-	return Middleware(MiddlewareConfig{
-		Service:    service,
-		ContextKey: key,
-		Extractor:  extractor,
-	})
-}
-
-// WithClaimsAndSkip is a helper function to create a middleware with a specific
-// claims type and skip function
-func WithClaimsAndSkip[T any](
-	service *Service,
-	key ContextKey,
-	skip SkipFunc,
-) func(next http.Handler) http.Handler {
-	return Middleware(MiddlewareConfig{
-		Service:    service,
-		ContextKey: key,
-		Skip:       skip,
-	})
+	return parts[1], nil
 }
 
 // CookieTokenExtractor creates a token extractor that extracts tokens from a cookie
