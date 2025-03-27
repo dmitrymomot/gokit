@@ -204,3 +204,188 @@ The package defines multiple error types for different failure scenarios:
 - `ErrMissingClaims` - Claims are missing
 - `ErrInvalidSignature` - Signature is invalid
 - `ErrUnexpectedSigningMethod` - Unexpected signing method
+
+### Middleware
+
+The package includes HTTP middleware for JWT authentication with the following features:
+
+- Automatically extract JWT tokens from requests (customizable)
+- Parse tokens and validate signatures
+- Add claims to the request context
+- Skip middleware based on custom conditions
+- Helper functions for common use cases
+
+#### Middleware Configuration
+
+The `MiddlewareConfig` struct allows you to configure the middleware:
+
+```go
+type MiddlewareConfig struct {
+    // Service is the JWT service to use for parsing tokens
+    Service *Service
+    
+    // ContextKey is the key to use for storing claims in the request context
+    ContextKey ContextKey
+    
+    // Extractor is a function that extracts a token from an HTTP request
+    // If not specified, DefaultTokenExtractor is used (Authorization: Bearer <token>)
+    Extractor TokenExtractorFunc
+    
+    // Skip is a function that determines whether to skip the middleware
+    // If not specified, the middleware is never skipped
+    Skip SkipFunc
+}
+```
+
+#### Basic Usage
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/dmitrymomot/gokit/jwt"
+)
+
+const (
+    JWTContextKey jwt.ContextKey = "user_claims"
+)
+
+func main() {
+    // Create a JWT service
+    jwtService, err := jwt.New([]byte("your-secret-key"))
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Create middleware with default configuration
+    jwtMiddleware := jwt.Middleware(jwt.MiddlewareConfig{
+        Service:    jwtService,
+        ContextKey: JWTContextKey,
+    })
+
+    // Create a protected handler
+    protectedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Get claims from context
+        claims, ok := jwt.GetClaims(r.Context(), JWTContextKey)
+        if !ok {
+            http.Error(w, "Unauthorized", http.StatusUnauthorized)
+            return
+        }
+
+        // Use the claims
+        username, _ := claims["sub"].(string)
+        w.Write([]byte("Hello, " + username))
+    })
+
+    // Apply middleware to the handler
+    http.Handle("/protected", jwtMiddleware(protectedHandler))
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+#### Custom Token Extraction
+
+```go
+// Create middleware that extracts tokens from a cookie
+cookieMiddleware := jwt.Middleware(jwt.MiddlewareConfig{
+    Service:    jwtService,
+    ContextKey: JWTContextKey,
+    Extractor:  jwt.CookieTokenExtractor("auth_token"),
+})
+
+// Create middleware that extracts tokens from a query parameter
+queryMiddleware := jwt.Middleware(jwt.MiddlewareConfig{
+    Service:    jwtService,
+    ContextKey: JWTContextKey,
+    Extractor:  jwt.QueryTokenExtractor("token"),
+})
+
+// Create middleware that extracts tokens from a custom header
+headerMiddleware := jwt.Middleware(jwt.MiddlewareConfig{
+    Service:    jwtService,
+    ContextKey: JWTContextKey,
+    Extractor:  jwt.HeaderTokenExtractor("X-API-Token"),
+})
+
+// Create middleware with a completely custom extractor
+customMiddleware := jwt.Middleware(jwt.MiddlewareConfig{
+    Service:    jwtService,
+    ContextKey: JWTContextKey,
+    Extractor: func(r *http.Request) (string, error) {
+        // Extract token from wherever you want
+        return r.Header.Get("X-Custom-Token"), nil
+    },
+})
+```
+
+#### Skip Middleware Conditionally
+
+```go
+// Create middleware that skips public endpoints
+publicPaths := map[string]bool{
+    "/api/public": true,
+    "/health":     true,
+    "/metrics":    true,
+}
+
+middleware := jwt.Middleware(jwt.MiddlewareConfig{
+    Service:    jwtService,
+    ContextKey: JWTContextKey,
+    Skip: func(r *http.Request) bool {
+        return publicPaths[r.URL.Path]
+    },
+})
+```
+
+#### Type-Safe Claims Access
+
+```go
+// Define custom claims type
+type UserClaims struct {
+    jwt.StandardClaims
+    Role string `json:"role"`
+}
+
+// In your handler
+func handler(w http.ResponseWriter, r *http.Request) {
+    var userClaims UserClaims
+    if err := jwt.GetClaimsAs(r.Context(), JWTContextKey, &userClaims); err != nil {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+    
+    // Use typed claims
+    if userClaims.Role != "admin" {
+        http.Error(w, "Forbidden", http.StatusForbidden)
+        return
+    }
+    
+    // Process the request
+    // ...
+}
+```
+
+#### Helper Functions
+
+The package provides helper functions for common middleware configurations:
+
+```go
+// Basic middleware with generic type parameter
+middleware := jwt.WithClaims[UserClaims](jwtService, JWTContextKey)
+
+// Middleware with custom extractor
+middleware := jwt.WithClaimsAndExtractor[UserClaims](
+    jwtService, 
+    JWTContextKey,
+    jwt.CookieTokenExtractor("auth"),
+)
+
+// Middleware with skip function
+middleware := jwt.WithClaimsAndSkip[UserClaims](
+    jwtService,
+    JWTContextKey,
+    func(r *http.Request) bool { return r.URL.Path == "/public" },
+)
