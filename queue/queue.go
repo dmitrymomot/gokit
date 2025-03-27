@@ -52,6 +52,7 @@ type SimpleQueue struct {
 	wg             sync.WaitGroup     // WaitGroup for worker goroutines
 	retryDelayFunc RetryDelayFunc     // Function to calculate retry delay
 	middleware     Middleware         // Middleware chain to apply to all handlers
+	cancel         context.CancelFunc // Function to cancel worker contexts
 }
 
 // RetryDelayFunc is a function that calculates the delay before retrying a failed job.
@@ -265,17 +266,22 @@ func (q *SimpleQueue) Run(ctx context.Context) error {
 		q.mu.Unlock()
 		return ErrQueueAlreadyRunning
 	}
+	
 	q.running = true
+	q.stopChan = make(chan struct{})
+	
+	// Create a cancellable context for the workers
+	ctx, cancel := context.WithCancel(ctx)
+	q.cancel = cancel
+	
 	q.mu.Unlock()
 
-	// Start worker goroutines
+	// Start the worker goroutines
 	q.startWorkers(ctx)
 
-	// Keep running until context is cancelled
+	// Wait for the context to be cancelled
 	<-ctx.Done()
-
-	// Stop the queue when context is cancelled
-	return q.Stop(context.Background())
+	return ctx.Err()
 }
 
 // Stop gracefully stops the queue.
@@ -287,8 +293,15 @@ func (q *SimpleQueue) Stop(ctx context.Context) error {
 		q.mu.Unlock()
 		return ErrQueueNotRunning
 	}
+	
 	q.running = false
 	close(q.stopChan)
+	
+	// Cancel the worker contexts if cancel function exists
+	if q.cancel != nil {
+		q.cancel()
+	}
+	
 	q.mu.Unlock()
 
 	// Wait for all workers to finish
@@ -322,21 +335,43 @@ func (q *SimpleQueue) worker(ctx context.Context) {
 	for {
 		select {
 		case <-q.stopChan:
+			// Queue has been explicitly stopped
 			return
 		case <-ctx.Done():
+			// Context has been cancelled (either by Stop or parent context)
 			return
 		default:
+			// Check if queue is still running
+			q.mu.RLock()
+			isRunning := q.running
+			q.mu.RUnlock()
+			
+			if !isRunning {
+				return
+			}
+
 			// Fetch jobs ready for processing
 			jobs, err := q.storage.FetchDue(ctx, 1)
 			if err != nil {
-				// Log error and continue
-				continue
+				// Check if context was cancelled during fetch
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					// Log error and continue
+					time.Sleep(100 * time.Millisecond)
+					continue
+				}
 			}
 
 			if len(jobs) == 0 {
 				// No jobs to process, sleep briefly to avoid CPU spinning
-				time.Sleep(100 * time.Millisecond)
-				continue
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(100 * time.Millisecond):
+					continue
+				}
 			}
 
 			// Process the job
