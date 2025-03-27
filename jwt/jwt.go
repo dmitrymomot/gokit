@@ -1,7 +1,6 @@
 package jwt
 
 import (
-	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -88,7 +87,7 @@ func NewFromString(signingKey string) (*Service, error) {
 }
 
 // Generate generates a JWT token with the given claims
-func (s *Service) Generate(ctx context.Context, claims any) (string, error) {
+func (s *Service) Generate(claims any) (string, error) {
 	if claims == nil {
 		return "", ErrMissingClaims
 	}
@@ -126,7 +125,7 @@ func (s *Service) Generate(ctx context.Context, claims any) (string, error) {
 }
 
 // Parse parses a JWT token and returns the claims
-func (s *Service) Parse(ctx context.Context, tokenString string, claims any) error {
+func (s *Service) Parse(tokenString string, claims any) error {
 	// Split the token
 	parts := strings.Split(tokenString, ".")
 	if len(parts) != 3 {

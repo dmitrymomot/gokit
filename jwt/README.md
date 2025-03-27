@@ -34,7 +34,6 @@ go get github.com/dmitrymomot/gokit/jwt
 package main
 
 import (
-    "context"
     "fmt"
     "time"
 
@@ -57,8 +56,7 @@ func main() {
     }
 
     // Generate a token
-    ctx := context.Background()
-    token, err := jwtService.Generate(ctx, claims)
+    token, err := jwtService.Generate(claims)
     if err != nil {
         panic(err)
     }
@@ -66,7 +64,7 @@ func main() {
 
     // Parse the token
     var parsedClaims jwt.StandardClaims
-    err = jwtService.Parse(ctx, token, &parsedClaims)
+    err = jwtService.Parse(token, &parsedClaims)
     if err != nil {
         panic(err)
     }
@@ -80,7 +78,6 @@ func main() {
 package main
 
 import (
-    "context"
     "fmt"
     "time"
 
@@ -115,15 +112,14 @@ func main() {
     }
 
     // Generate a token
-    ctx := context.Background()
-    token, err := jwtService.Generate(ctx, claims)
+    token, err := jwtService.Generate(claims)
     if err != nil {
         panic(err)
     }
 
     // Parse the token
     var parsedClaims UserClaims
-    err = jwtService.Parse(ctx, token, &parsedClaims)
+    err = jwtService.Parse(token, &parsedClaims)
     if err != nil {
         panic(err)
     }
@@ -138,7 +134,6 @@ func main() {
 package main
 
 import (
-    "context"
     "errors"
     "fmt"
     "time"
@@ -148,18 +143,17 @@ import (
 
 func main() {
     jwtService, _ := jwt.New([]byte("secret-key"))
-    ctx := context.Background()
 
     // Generate an expired token
     expiredClaims := jwt.StandardClaims{
         Subject:   "user123",
         ExpiresAt: time.Now().Add(-1 * time.Hour).Unix(), // Expired 1 hour ago
     }
-    expiredToken, _ := jwtService.Generate(ctx, expiredClaims)
+    expiredToken, _ := jwtService.Generate(expiredClaims)
 
     // Try to parse the expired token
     var claims jwt.StandardClaims
-    err := jwtService.Parse(ctx, expiredToken, &claims)
+    err := jwtService.Parse(expiredToken, &claims)
     
     if err != nil {
         if errors.Is(err, jwt.ErrExpiredToken) {
@@ -182,8 +176,8 @@ func main() {
 
 ### Token Management
 
-- `Generate(ctx context.Context, claims any) (string, error)` - Generate a JWT token with provided claims
-- `Parse(ctx context.Context, tokenString string, claims any) error` - Parse a JWT token into the provided claims struct
+- `Generate(claims any) (string, error)` - Generate a JWT token with provided claims
+- `Parse(tokenString string, claims any) error` - Parse a JWT token into the provided claims struct
 
 ### Standard Claims
 

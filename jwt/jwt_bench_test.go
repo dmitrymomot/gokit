@@ -1,7 +1,6 @@
 package jwt_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -16,8 +15,6 @@ func BenchmarkGenerate(b *testing.B) {
 	require.NoError(b, err)
 	require.NotNil(b, service)
 
-	ctx := context.Background()
-
 	b.Run("StandardClaims", func(b *testing.B) {
 		claims := jwt.StandardClaims{
 			Subject:   "user123",
@@ -30,7 +27,7 @@ func BenchmarkGenerate(b *testing.B) {
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			token, err := service.Generate(ctx, claims)
+			token, err := service.Generate(claims)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -78,7 +75,7 @@ func BenchmarkGenerate(b *testing.B) {
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			token, err := service.Generate(ctx, claims)
+			token, err := service.Generate(claims)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -95,8 +92,6 @@ func BenchmarkParse(b *testing.B) {
 	require.NoError(b, err)
 	require.NotNil(b, service)
 
-	ctx := context.Background()
-
 	b.Run("StandardClaims", func(b *testing.B) {
 		// Generate a token once for parsing benchmark
 		standardClaims := jwt.StandardClaims{
@@ -108,14 +103,14 @@ func BenchmarkParse(b *testing.B) {
 			Audience:  "api-users",
 		}
 
-		token, err := service.Generate(ctx, standardClaims)
+		token, err := service.Generate(standardClaims)
 		require.NoError(b, err)
 		require.NotEmpty(b, token)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var parsedClaims jwt.StandardClaims
-			err = service.Parse(ctx, token, &parsedClaims)
+			err = service.Parse(token, &parsedClaims)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -164,14 +159,14 @@ func BenchmarkParse(b *testing.B) {
 			},
 		}
 
-		token, err := service.Generate(ctx, originalClaims)
+		token, err := service.Generate(originalClaims)
 		require.NoError(b, err)
 		require.NotEmpty(b, token)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var parsedClaims BenchClaims
-			err = service.Parse(ctx, token, &parsedClaims)
+			err = service.Parse(token, &parsedClaims)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -189,8 +184,6 @@ func BenchmarkEnd2End(b *testing.B) {
 	require.NoError(b, err)
 	require.NotNil(b, service)
 
-	ctx := context.Background()
-
 	b.Run("StandardClaims", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -204,14 +197,14 @@ func BenchmarkEnd2End(b *testing.B) {
 			}
 
 			// Generate token
-			token, err := service.Generate(ctx, claims)
+			token, err := service.Generate(claims)
 			if err != nil {
 				b.Fatal(err)
 			}
 
 			// Parse token
 			var parsedClaims jwt.StandardClaims
-			err = service.Parse(ctx, token, &parsedClaims)
+			err = service.Parse(token, &parsedClaims)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -243,14 +236,14 @@ func BenchmarkEnd2End(b *testing.B) {
 			}
 
 			// Generate token
-			token, err := service.Generate(ctx, claims)
+			token, err := service.Generate(claims)
 			if err != nil {
 				b.Fatal(err)
 			}
 
 			// Parse token
 			var parsedClaims BenchClaims
-			err = service.Parse(ctx, token, &parsedClaims)
+			err = service.Parse(token, &parsedClaims)
 			if err != nil {
 				b.Fatal(err)
 			}

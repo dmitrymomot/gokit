@@ -1,7 +1,6 @@
 package jwt_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -52,8 +51,6 @@ func TestGenerate(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, service)
 
-	ctx := context.Background()
-
 	t.Run("with standard claims", func(t *testing.T) {
 		claims := jwt.StandardClaims{
 			Subject:   "user123",
@@ -61,7 +58,7 @@ func TestGenerate(t *testing.T) {
 			ExpiresAt: time.Now().Add(time.Hour).Unix(),
 		}
 
-		token, err := service.Generate(ctx, claims)
+		token, err := service.Generate(claims)
 		require.NoError(t, err)
 		require.NotEmpty(t, token)
 
@@ -81,13 +78,13 @@ func TestGenerate(t *testing.T) {
 			Admin: true,
 		}
 
-		token, err := service.Generate(ctx, claims)
+		token, err := service.Generate(claims)
 		require.NoError(t, err)
 		require.NotEmpty(t, token)
 	})
 
 	t.Run("with nil claims", func(t *testing.T) {
-		token, err := service.Generate(ctx, nil)
+		token, err := service.Generate(nil)
 		require.Error(t, err)
 		require.Equal(t, jwt.ErrMissingClaims, err)
 		require.Empty(t, token)
@@ -99,8 +96,6 @@ func TestParse(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, service)
 
-	ctx := context.Background()
-
 	t.Run("with standard claims", func(t *testing.T) {
 		// Generate a token
 		originalClaims := jwt.StandardClaims{
@@ -109,13 +104,13 @@ func TestParse(t *testing.T) {
 			ExpiresAt: time.Now().Add(time.Hour).Unix(),
 		}
 
-		token, err := service.Generate(ctx, originalClaims)
+		token, err := service.Generate(originalClaims)
 		require.NoError(t, err)
 		require.NotEmpty(t, token)
 
 		// Parse the token
 		var parsedClaims jwt.StandardClaims
-		err = service.Parse(ctx, token, &parsedClaims)
+		err = service.Parse(token, &parsedClaims)
 		require.NoError(t, err)
 
 		// Verify the claims
@@ -136,13 +131,13 @@ func TestParse(t *testing.T) {
 			Admin: true,
 		}
 
-		token, err := service.Generate(ctx, originalClaims)
+		token, err := service.Generate(originalClaims)
 		require.NoError(t, err)
 		require.NotEmpty(t, token)
 
 		// Parse the token
 		var parsedClaims TestClaims
-		err = service.Parse(ctx, token, &parsedClaims)
+		err = service.Parse(token, &parsedClaims)
 		require.NoError(t, err)
 
 		// Verify the claims
@@ -155,7 +150,7 @@ func TestParse(t *testing.T) {
 
 	t.Run("with invalid token format", func(t *testing.T) {
 		var claims jwt.StandardClaims
-		err := service.Parse(ctx, "invalid-token", &claims)
+		err := service.Parse("invalid-token", &claims)
 		require.Error(t, err)
 		require.Equal(t, jwt.ErrInvalidToken, err)
 	})
@@ -168,7 +163,7 @@ func TestParse(t *testing.T) {
 			ExpiresAt: time.Now().Add(time.Hour).Unix(),
 		}
 
-		token, err := service.Generate(ctx, originalClaims)
+		token, err := service.Generate(originalClaims)
 		require.NoError(t, err)
 		require.NotEmpty(t, token)
 
@@ -177,7 +172,7 @@ func TestParse(t *testing.T) {
 
 		// Parse the token
 		var parsedClaims jwt.StandardClaims
-		err = service.Parse(ctx, parts, &parsedClaims)
+		err = service.Parse(parts, &parsedClaims)
 		require.Error(t, err)
 	})
 
@@ -189,13 +184,13 @@ func TestParse(t *testing.T) {
 			ExpiresAt: time.Now().Add(-time.Hour).Unix(), // Expired
 		}
 
-		token, err := service.Generate(ctx, expiredClaims)
+		token, err := service.Generate(expiredClaims)
 		require.NoError(t, err)
 		require.NotEmpty(t, token)
 
 		// Parse the token
 		var parsedClaims jwt.StandardClaims
-		err = service.Parse(ctx, token, &parsedClaims)
+		err = service.Parse(token, &parsedClaims)
 		require.Error(t, err)
 		require.Equal(t, jwt.ErrExpiredToken, err)
 	})
@@ -209,13 +204,13 @@ func TestParse(t *testing.T) {
 			NotBefore: time.Now().Add(time.Hour).Unix(), // Not valid yet
 		}
 
-		token, err := service.Generate(ctx, futureClaims)
+		token, err := service.Generate(futureClaims)
 		require.NoError(t, err)
 		require.NotEmpty(t, token)
 
 		// Parse the token
 		var parsedClaims jwt.StandardClaims
-		err = service.Parse(ctx, token, &parsedClaims)
+		err = service.Parse(token, &parsedClaims)
 		require.Error(t, err)
 		require.Equal(t, jwt.ErrInvalidToken, err)
 	})
@@ -229,8 +224,6 @@ func TestSigningKeyDifference(t *testing.T) {
 	service2, err := jwt.New([]byte("secret2"))
 	require.NoError(t, err)
 
-	ctx := context.Background()
-
 	// Generate a token with service1
 	claims := jwt.StandardClaims{
 		Subject:   "user123",
@@ -238,13 +231,13 @@ func TestSigningKeyDifference(t *testing.T) {
 		ExpiresAt: time.Now().Add(time.Hour).Unix(),
 	}
 
-	token, err := service1.Generate(ctx, claims)
+	token, err := service1.Generate(claims)
 	require.NoError(t, err)
 	require.NotEmpty(t, token)
 
 	// Try to parse the token with service2 (should fail)
 	var parsedClaims jwt.StandardClaims
-	err = service2.Parse(ctx, token, &parsedClaims)
+	err = service2.Parse(token, &parsedClaims)
 	require.Error(t, err)
 	require.Equal(t, jwt.ErrInvalidSignature, err)
 }
