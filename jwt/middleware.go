@@ -30,7 +30,8 @@ type MiddlewareConfig struct {
 // The claims are stored in the request context using the default ContextKey.
 func Middleware(service *Service) func(next http.Handler) http.Handler {
 	return MiddlewareWithConfig(MiddlewareConfig{
-		Service: service,
+		Service:   service,
+		Extractor: BearerTokenExtractor,
 	})
 }
 
