@@ -592,20 +592,20 @@ func (s *MemoryStore) GetPermissionChildren(ctx context.Context, permissionID st
 func (s *MemoryStore) checkCyclicRoleInheritance(roleID string, parentIDs []string) error {
 	// Create a map of visited roles to detect cycles
 	visited := make(map[string]bool)
-	
+
 	// Helper function to check for cycles using DFS
 	var checkCycle func(currentID string) bool
 	checkCycle = func(currentID string) bool {
 		if currentID == roleID {
 			return true // Cycle detected
 		}
-		
+
 		if visited[currentID] {
 			return false // Already visited, no cycle detected in this path
 		}
-		
+
 		visited[currentID] = true
-		
+
 		// Check all parents of the current role
 		currentRole, exists := s.roles[currentID]
 		if exists {
@@ -615,20 +615,20 @@ func (s *MemoryStore) checkCyclicRoleInheritance(roleID string, parentIDs []stri
 				}
 			}
 		}
-		
+
 		return false
 	}
-	
+
 	// Check each parent for cycles
 	for _, pid := range parentIDs {
 		// Reset visited map for each parent
 		visited = make(map[string]bool)
-		
+
 		if checkCycle(pid) {
 			return ErrCyclicInheritance
 		}
 	}
-	
+
 	return nil
 }
 
@@ -636,20 +636,20 @@ func (s *MemoryStore) checkCyclicRoleInheritance(roleID string, parentIDs []stri
 func (s *MemoryStore) checkCyclicPermissionInheritance(permissionID string, parentIDs []string) error {
 	// Create a map of visited permissions to detect cycles
 	visited := make(map[string]bool)
-	
+
 	// Helper function to check for cycles using DFS
 	var checkCycle func(currentID string) bool
 	checkCycle = func(currentID string) bool {
 		if currentID == permissionID {
 			return true // Cycle detected
 		}
-		
+
 		if visited[currentID] {
 			return false // Already visited, no cycle detected in this path
 		}
-		
+
 		visited[currentID] = true
-		
+
 		// Check all parents of the current permission
 		currentPermission, exists := s.permissions[currentID]
 		if exists {
@@ -659,19 +659,19 @@ func (s *MemoryStore) checkCyclicPermissionInheritance(permissionID string, pare
 				}
 			}
 		}
-		
+
 		return false
 	}
-	
+
 	// Check each parent for cycles
 	for _, pid := range parentIDs {
 		// Reset visited map for each parent
 		visited = make(map[string]bool)
-		
+
 		if checkCycle(pid) {
 			return ErrCyclicInheritance
 		}
 	}
-	
+
 	return nil
 }

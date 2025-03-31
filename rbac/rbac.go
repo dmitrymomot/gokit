@@ -8,11 +8,11 @@ import (
 
 // Service implements the RBAC interface.
 type Service struct {
-	store          Store
-	permissionCache map[string][]string // Maps role ID to effective permission IDs
-	cacheMu        sync.RWMutex
-	cacheEnabled   bool
-	cacheTTL       time.Duration
+	store            Store
+	permissionCache  map[string][]string // Maps role ID to effective permission IDs
+	cacheMu          sync.RWMutex
+	cacheEnabled     bool
+	cacheTTL         time.Duration
 	cacheLastUpdated map[string]time.Time // Maps role ID to last cache update time
 }
 
@@ -30,11 +30,11 @@ func WithCaching(ttl time.Duration) ServiceOption {
 // NewService creates a new RBAC service with the provided store.
 func NewService(store Store, options ...ServiceOption) *Service {
 	s := &Service{
-		store:           store,
-		permissionCache: make(map[string][]string),
+		store:            store,
+		permissionCache:  make(map[string][]string),
 		cacheLastUpdated: make(map[string]time.Time),
-		cacheEnabled:    false,
-		cacheTTL:        5 * time.Minute, // Default TTL
+		cacheEnabled:     false,
+		cacheTTL:         5 * time.Minute, // Default TTL
 	}
 
 	// Apply options
@@ -223,13 +223,13 @@ func (s *Service) getEffectivePermissionIDs(ctx context.Context, roleID string) 
 	// Add direct permissions
 	for _, pID := range role.DirectPermissionIDs {
 		effectivePermissions[pID] = true
-		
+
 		// Add inherited permissions
 		inheritedPermIDs, err := s.getInheritedPermissionIDs(ctx, pID, make(map[string]bool))
 		if err != nil {
 			return nil, err
 		}
-		
+
 		for _, ipID := range inheritedPermIDs {
 			effectivePermissions[ipID] = true
 		}
@@ -240,7 +240,7 @@ func (s *Service) getEffectivePermissionIDs(ctx context.Context, roleID string) 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, ipID := range inheritedRolePermIDs {
 		effectivePermissions[ipID] = true
 	}
@@ -318,13 +318,13 @@ func (s *Service) getRoleInheritedPermissionIDs(ctx context.Context, roleID stri
 		// Add direct permissions from parent
 		for _, pID := range parentRole.DirectPermissionIDs {
 			result[pID] = true
-			
+
 			// Add inherited permissions from each direct permission
 			inheritedPermIDs, err := s.getInheritedPermissionIDs(ctx, pID, make(map[string]bool))
 			if err != nil {
 				return nil, err
 			}
-			
+
 			for _, ipID := range inheritedPermIDs {
 				result[ipID] = true
 			}
@@ -335,7 +335,7 @@ func (s *Service) getRoleInheritedPermissionIDs(ctx context.Context, roleID stri
 		if err != nil {
 			return nil, err
 		}
-		
+
 		for _, ipID := range parentInheritedPermIDs {
 			result[ipID] = true
 		}

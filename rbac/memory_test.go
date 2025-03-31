@@ -15,9 +15,9 @@ func TestMemoryStore_Role(t *testing.T) {
 
 	// Test role creation
 	err := store.CreateRole(ctx, rbac.Role{
-		ID:                 "role1",
-		Name:               "Role 1",
-		ParentIDs:          []string{},
+		ID:                  "role1",
+		Name:                "Role 1",
+		ParentIDs:           []string{},
 		DirectPermissionIDs: []string{},
 	})
 	require.NoError(t, err)
