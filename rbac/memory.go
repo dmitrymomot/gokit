@@ -2,12 +2,15 @@ package rbac
 
 import (
 	"context"
+	"fmt"
 	"sync"
 )
 
 // MemoryStore is an in-memory implementation of the Store interface.
 type MemoryStore struct {
+	// Maps workspaceID:roleID to Role
 	roles       map[string]Role
+	// Maps workspaceID:permissionID to Permission
 	permissions map[string]Permission
 	mu          sync.RWMutex
 }
@@ -20,10 +23,47 @@ func NewMemoryStore() *MemoryStore {
 	}
 }
 
+// keyFor creates a composite key from workspace ID and entity ID
+func (s *MemoryStore) keyFor(workspaceID, entityID string) string {
+	return fmt.Sprintf("%s:%s", workspaceID, entityID)
+}
+
+// workspaceRoleIDs returns all role IDs for a specific workspace
+func (s *MemoryStore) workspaceRoleIDs(workspaceID string) []string {
+	result := []string{}
+	prefix := workspaceID + ":"
+	
+	for key, role := range s.roles {
+		if len(key) > len(prefix) && key[:len(prefix)] == prefix && role.WorkspaceID == workspaceID {
+			result = append(result, role.ID)
+		}
+	}
+	
+	return result
+}
+
+// workspacePermissionIDs returns all permission IDs for a specific workspace
+func (s *MemoryStore) workspacePermissionIDs(workspaceID string) []string {
+	result := []string{}
+	prefix := workspaceID + ":"
+	
+	for key, permission := range s.permissions {
+		if len(key) > len(prefix) && key[:len(prefix)] == prefix && permission.WorkspaceID == workspaceID {
+			result = append(result, permission.ID)
+		}
+	}
+	
+	return result
+}
+
 // CreateRole creates a new role.
 func (s *MemoryStore) CreateRole(ctx context.Context, role Role) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if role.WorkspaceID == "" {
+		return ErrInvalidArgument
+	}
 
 	if role.ID == "" {
 		return ErrInvalidRoleID
@@ -33,40 +73,48 @@ func (s *MemoryStore) CreateRole(ctx context.Context, role Role) error {
 		return ErrInvalidRoleName
 	}
 
-	if _, exists := s.roles[role.ID]; exists {
+	key := s.keyFor(role.WorkspaceID, role.ID)
+	if _, exists := s.roles[key]; exists {
 		return ErrRoleAlreadyExists
 	}
 
 	// Validate parent roles exist
 	for _, parentID := range role.ParentIDs {
-		if _, exists := s.roles[parentID]; !exists {
+		parentKey := s.keyFor(role.WorkspaceID, parentID)
+		if _, exists := s.roles[parentKey]; !exists {
 			return ErrRoleNotFound
 		}
 	}
 
 	// Validate permissions exist
 	for _, permID := range role.DirectPermissionIDs {
-		if _, exists := s.permissions[permID]; !exists {
+		permKey := s.keyFor(role.WorkspaceID, permID)
+		if _, exists := s.permissions[permKey]; !exists {
 			return ErrPermissionNotFound
 		}
 	}
 
 	// Check for cyclic inheritance
-	if err := s.checkCyclicRoleInheritance(role.ID, role.ParentIDs); err != nil {
+	if err := s.checkCyclicRoleInheritance(role.WorkspaceID, role.ID, role.ParentIDs); err != nil {
 		return err
 	}
 
 	// Store the role
-	s.roles[role.ID] = role
+	s.roles[key] = role
 	return nil
 }
 
 // GetRole retrieves a role by its ID.
-func (s *MemoryStore) GetRole(ctx context.Context, roleID string) (Role, error) {
+func (s *MemoryStore) GetRole(ctx context.Context, workspaceID, roleID string) (Role, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	role, exists := s.roles[roleID]
+	if workspaceID == "" || roleID == "" {
+		return Role{}, ErrInvalidArgument
+	}
+
+	key := s.keyFor(workspaceID, roleID)
+	role, exists := s.roles[key]
 	if !exists {
 		return Role{}, ErrRoleNotFound
 	}
@@ -74,14 +122,22 @@ func (s *MemoryStore) GetRole(ctx context.Context, roleID string) (Role, error) 
 	return role, nil
 }
 
-// GetRoles retrieves all roles.
-func (s *MemoryStore) GetRoles(ctx context.Context) ([]Role, error) {
+// GetRoles retrieves all roles for a workspace.
+func (s *MemoryStore) GetRoles(ctx context.Context, workspaceID string) ([]Role, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	roles := make([]Role, 0, len(s.roles))
-	for _, role := range s.roles {
-		roles = append(roles, role)
+	if workspaceID == "" {
+		return nil, ErrInvalidArgument
+	}
+
+	roles := make([]Role, 0)
+	prefix := workspaceID + ":"
+	
+	for key, role := range s.roles {
+		if len(key) > len(prefix) && key[:len(prefix)] == prefix && role.WorkspaceID == workspaceID {
+			roles = append(roles, role)
+		}
 	}
 
 	return roles, nil
@@ -92,6 +148,10 @@ func (s *MemoryStore) UpdateRole(ctx context.Context, role Role) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if role.WorkspaceID == "" {
+		return ErrInvalidArgument
+	}
+
 	if role.ID == "" {
 		return ErrInvalidRoleID
 	}
@@ -100,75 +160,92 @@ func (s *MemoryStore) UpdateRole(ctx context.Context, role Role) error {
 		return ErrInvalidRoleName
 	}
 
-	if _, exists := s.roles[role.ID]; !exists {
+	key := s.keyFor(role.WorkspaceID, role.ID)
+	if _, exists := s.roles[key]; !exists {
 		return ErrRoleNotFound
 	}
 
 	// Validate parent roles exist
 	for _, parentID := range role.ParentIDs {
-		if _, exists := s.roles[parentID]; !exists {
+		parentKey := s.keyFor(role.WorkspaceID, parentID)
+		if _, exists := s.roles[parentKey]; !exists {
 			return ErrRoleNotFound
 		}
 	}
 
 	// Validate permissions exist
 	for _, permID := range role.DirectPermissionIDs {
-		if _, exists := s.permissions[permID]; !exists {
+		permKey := s.keyFor(role.WorkspaceID, permID)
+		if _, exists := s.permissions[permKey]; !exists {
 			return ErrPermissionNotFound
 		}
 	}
 
 	// Check for cyclic inheritance
-	if err := s.checkCyclicRoleInheritance(role.ID, role.ParentIDs); err != nil {
+	if err := s.checkCyclicRoleInheritance(role.WorkspaceID, role.ID, role.ParentIDs); err != nil {
 		return err
 	}
 
 	// Update the role
-	s.roles[role.ID] = role
+	s.roles[key] = role
 	return nil
 }
 
 // DeleteRole deletes a role by its ID.
-func (s *MemoryStore) DeleteRole(ctx context.Context, roleID string) error {
+func (s *MemoryStore) DeleteRole(ctx context.Context, workspaceID, roleID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, exists := s.roles[roleID]; !exists {
+	if workspaceID == "" || roleID == "" {
+		return ErrInvalidArgument
+	}
+
+	key := s.keyFor(workspaceID, roleID)
+	if _, exists := s.roles[key]; !exists {
 		return ErrRoleNotFound
 	}
 
 	// Check if any role has this role as parent
-	for _, role := range s.roles {
-		for _, parentID := range role.ParentIDs {
-			if parentID == roleID {
-				// Remove this parent from the role
-				newParents := make([]string, 0, len(role.ParentIDs)-1)
-				for _, pid := range role.ParentIDs {
-					if pid != roleID {
-						newParents = append(newParents, pid)
+	prefix := workspaceID + ":"
+	for k, role := range s.roles {
+		if len(k) > len(prefix) && k[:len(prefix)] == prefix && role.WorkspaceID == workspaceID {
+			for _, parentID := range role.ParentIDs {
+				if parentID == roleID {
+					// Remove this parent from the role
+					newParents := make([]string, 0, len(role.ParentIDs)-1)
+					for _, pid := range role.ParentIDs {
+						if pid != roleID {
+							newParents = append(newParents, pid)
+						}
 					}
+					role.ParentIDs = newParents
+					s.roles[k] = role
 				}
-				role.ParentIDs = newParents
-				s.roles[role.ID] = role
 			}
 		}
 	}
 
-	delete(s.roles, roleID)
+	delete(s.roles, key)
 	return nil
 }
 
 // AddRoleParent adds a parent role to a role.
-func (s *MemoryStore) AddRoleParent(ctx context.Context, roleID, parentRoleID string) error {
+func (s *MemoryStore) AddRoleParent(ctx context.Context, workspaceID, roleID, parentRoleID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	role, exists := s.roles[roleID]
+	if workspaceID == "" || roleID == "" || parentRoleID == "" {
+		return ErrInvalidArgument
+	}
+
+	roleKey := s.keyFor(workspaceID, roleID)
+	role, exists := s.roles[roleKey]
 	if !exists {
 		return ErrRoleNotFound
 	}
 
-	if _, exists := s.roles[parentRoleID]; !exists {
+	parentKey := s.keyFor(workspaceID, parentRoleID)
+	if _, exists := s.roles[parentKey]; !exists {
 		return ErrRoleNotFound
 	}
 
@@ -182,59 +259,77 @@ func (s *MemoryStore) AddRoleParent(ctx context.Context, roleID, parentRoleID st
 	// Check for cyclic inheritance
 	tempParents := append([]string{}, role.ParentIDs...)
 	tempParents = append(tempParents, parentRoleID)
-	if err := s.checkCyclicRoleInheritance(roleID, tempParents); err != nil {
+	if err := s.checkCyclicRoleInheritance(workspaceID, roleID, tempParents); err != nil {
 		return err
 	}
 
 	// Add the parent
 	role.ParentIDs = append(role.ParentIDs, parentRoleID)
-	s.roles[roleID] = role
+	s.roles[roleKey] = role
 	return nil
 }
 
 // RemoveRoleParent removes a parent role from a role.
-func (s *MemoryStore) RemoveRoleParent(ctx context.Context, roleID, parentRoleID string) error {
+func (s *MemoryStore) RemoveRoleParent(ctx context.Context, workspaceID, roleID, parentRoleID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	role, exists := s.roles[roleID]
+	if workspaceID == "" || roleID == "" || parentRoleID == "" {
+		return ErrInvalidArgument
+	}
+
+	roleKey := s.keyFor(workspaceID, roleID)
+	role, exists := s.roles[roleKey]
 	if !exists {
 		return ErrRoleNotFound
 	}
 
-	// Remove the parent if it exists
-	found := false
-	newParents := make([]string, 0, len(role.ParentIDs))
+	// Check if parent exists
+	parentFound := false
 	for _, pid := range role.ParentIDs {
-		if pid != parentRoleID {
-			newParents = append(newParents, pid)
-		} else {
-			found = true
+		if pid == parentRoleID {
+			parentFound = true
+			break
 		}
 	}
 
-	if !found {
-		return ErrRoleNotFound
+	if !parentFound {
+		return nil // Parent not found, nothing to remove
+	}
+
+	// Remove the parent
+	newParents := make([]string, 0, len(role.ParentIDs)-1)
+	for _, pid := range role.ParentIDs {
+		if pid != parentRoleID {
+			newParents = append(newParents, pid)
+		}
 	}
 
 	role.ParentIDs = newParents
-	s.roles[roleID] = role
+	s.roles[roleKey] = role
 	return nil
 }
 
 // GetRoleParents retrieves all parent roles of a role.
-func (s *MemoryStore) GetRoleParents(ctx context.Context, roleID string) ([]Role, error) {
+func (s *MemoryStore) GetRoleParents(ctx context.Context, workspaceID, roleID string) ([]Role, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	role, exists := s.roles[roleID]
+	if workspaceID == "" || roleID == "" {
+		return nil, ErrInvalidArgument
+	}
+
+	roleKey := s.keyFor(workspaceID, roleID)
+	role, exists := s.roles[roleKey]
 	if !exists {
 		return nil, ErrRoleNotFound
 	}
 
 	parents := make([]Role, 0, len(role.ParentIDs))
-	for _, pid := range role.ParentIDs {
-		if parent, exists := s.roles[pid]; exists {
+	for _, parentID := range role.ParentIDs {
+		parentKey := s.keyFor(workspaceID, parentID)
+		parent, exists := s.roles[parentKey]
+		if exists {
 			parents = append(parents, parent)
 		}
 	}
@@ -243,20 +338,29 @@ func (s *MemoryStore) GetRoleParents(ctx context.Context, roleID string) ([]Role
 }
 
 // GetRoleChildren retrieves all roles that inherit from a role.
-func (s *MemoryStore) GetRoleChildren(ctx context.Context, roleID string) ([]Role, error) {
+func (s *MemoryStore) GetRoleChildren(ctx context.Context, workspaceID, roleID string) ([]Role, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if _, exists := s.roles[roleID]; !exists {
+	if workspaceID == "" || roleID == "" {
+		return nil, ErrInvalidArgument
+	}
+
+	roleKey := s.keyFor(workspaceID, roleID)
+	if _, exists := s.roles[roleKey]; !exists {
 		return nil, ErrRoleNotFound
 	}
 
-	children := []Role{}
-	for _, role := range s.roles {
-		for _, pid := range role.ParentIDs {
-			if pid == roleID {
-				children = append(children, role)
-				break
+	children := make([]Role, 0)
+	prefix := workspaceID + ":"
+	
+	for key, role := range s.roles {
+		if len(key) > len(prefix) && key[:len(prefix)] == prefix && role.WorkspaceID == workspaceID {
+			for _, parentID := range role.ParentIDs {
+				if parentID == roleID {
+					children = append(children, role)
+					break
+				}
 			}
 		}
 	}
@@ -265,16 +369,18 @@ func (s *MemoryStore) GetRoleChildren(ctx context.Context, roleID string) ([]Rol
 }
 
 // AddPermissionToRole adds a permission to a role.
-func (s *MemoryStore) AddPermissionToRole(ctx context.Context, roleID, permissionID string) error {
+func (s *MemoryStore) AddPermissionToRole(ctx context.Context, workspaceID, roleID, permissionID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	role, exists := s.roles[roleID]
+	roleKey := s.keyFor(workspaceID, roleID)
+	role, exists := s.roles[roleKey]
 	if !exists {
 		return ErrRoleNotFound
 	}
 
-	if _, exists := s.permissions[permissionID]; !exists {
+	permissionKey := s.keyFor(workspaceID, permissionID)
+	if _, exists := s.permissions[permissionKey]; !exists {
 		return ErrPermissionNotFound
 	}
 
@@ -287,16 +393,17 @@ func (s *MemoryStore) AddPermissionToRole(ctx context.Context, roleID, permissio
 
 	// Add the permission
 	role.DirectPermissionIDs = append(role.DirectPermissionIDs, permissionID)
-	s.roles[roleID] = role
+	s.roles[roleKey] = role
 	return nil
 }
 
 // RemovePermissionFromRole removes a permission from a role.
-func (s *MemoryStore) RemovePermissionFromRole(ctx context.Context, roleID, permissionID string) error {
+func (s *MemoryStore) RemovePermissionFromRole(ctx context.Context, workspaceID, roleID, permissionID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	role, exists := s.roles[roleID]
+	roleKey := s.keyFor(workspaceID, roleID)
+	role, exists := s.roles[roleKey]
 	if !exists {
 		return ErrRoleNotFound
 	}
@@ -317,24 +424,27 @@ func (s *MemoryStore) RemovePermissionFromRole(ctx context.Context, roleID, perm
 	}
 
 	role.DirectPermissionIDs = newPermissions
-	s.roles[roleID] = role
+	s.roles[roleKey] = role
 	return nil
 }
 
 // GetRolePermissions retrieves all permissions directly assigned to a role.
-func (s *MemoryStore) GetRolePermissions(ctx context.Context, roleID string) ([]Permission, error) {
+func (s *MemoryStore) GetRolePermissions(ctx context.Context, workspaceID, roleID string) ([]Permission, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	role, exists := s.roles[roleID]
+	roleKey := s.keyFor(workspaceID, roleID)
+	role, exists := s.roles[roleKey]
 	if !exists {
 		return nil, ErrRoleNotFound
 	}
 
 	permissions := make([]Permission, 0, len(role.DirectPermissionIDs))
 	for _, pid := range role.DirectPermissionIDs {
-		if perm, exists := s.permissions[pid]; exists {
-			permissions = append(permissions, perm)
+		permissionKey := s.keyFor(workspaceID, pid)
+		permission, exists := s.permissions[permissionKey]
+		if exists {
+			permissions = append(permissions, permission)
 		}
 	}
 
@@ -346,6 +456,10 @@ func (s *MemoryStore) CreatePermission(ctx context.Context, permission Permissio
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if permission.WorkspaceID == "" {
+		return ErrInvalidArgument
+	}
+
 	if permission.ID == "" {
 		return ErrInvalidPermissionID
 	}
@@ -354,33 +468,40 @@ func (s *MemoryStore) CreatePermission(ctx context.Context, permission Permissio
 		return ErrInvalidPermissionName
 	}
 
-	if _, exists := s.permissions[permission.ID]; exists {
+	key := s.keyFor(permission.WorkspaceID, permission.ID)
+	if _, exists := s.permissions[key]; exists {
 		return ErrPermissionAlreadyExists
 	}
 
 	// Validate parent permissions exist
 	for _, parentID := range permission.ParentIDs {
-		if _, exists := s.permissions[parentID]; !exists {
+		parentKey := s.keyFor(permission.WorkspaceID, parentID)
+		if _, exists := s.permissions[parentKey]; !exists {
 			return ErrPermissionNotFound
 		}
 	}
 
 	// Check for cyclic inheritance
-	if err := s.checkCyclicPermissionInheritance(permission.ID, permission.ParentIDs); err != nil {
+	if err := s.checkCyclicPermissionInheritance(permission.WorkspaceID, permission.ID, permission.ParentIDs); err != nil {
 		return err
 	}
 
 	// Store the permission
-	s.permissions[permission.ID] = permission
+	s.permissions[key] = permission
 	return nil
 }
 
 // GetPermission retrieves a permission by its ID.
-func (s *MemoryStore) GetPermission(ctx context.Context, permissionID string) (Permission, error) {
+func (s *MemoryStore) GetPermission(ctx context.Context, workspaceID, permissionID string) (Permission, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	permission, exists := s.permissions[permissionID]
+	if workspaceID == "" || permissionID == "" {
+		return Permission{}, ErrInvalidArgument
+	}
+
+	key := s.keyFor(workspaceID, permissionID)
+	permission, exists := s.permissions[key]
 	if !exists {
 		return Permission{}, ErrPermissionNotFound
 	}
@@ -388,14 +509,22 @@ func (s *MemoryStore) GetPermission(ctx context.Context, permissionID string) (P
 	return permission, nil
 }
 
-// GetPermissions retrieves all permissions.
-func (s *MemoryStore) GetPermissions(ctx context.Context) ([]Permission, error) {
+// GetPermissions retrieves all permissions for a workspace.
+func (s *MemoryStore) GetPermissions(ctx context.Context, workspaceID string) ([]Permission, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	permissions := make([]Permission, 0, len(s.permissions))
-	for _, permission := range s.permissions {
-		permissions = append(permissions, permission)
+	if workspaceID == "" {
+		return nil, ErrInvalidArgument
+	}
+
+	permissions := make([]Permission, 0)
+	prefix := workspaceID + ":"
+	
+	for key, permission := range s.permissions {
+		if len(key) > len(prefix) && key[:len(prefix)] == prefix && permission.WorkspaceID == workspaceID {
+			permissions = append(permissions, permission)
+		}
 	}
 
 	return permissions, nil
@@ -406,6 +535,10 @@ func (s *MemoryStore) UpdatePermission(ctx context.Context, permission Permissio
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if permission.WorkspaceID == "" {
+		return ErrInvalidArgument
+	}
+
 	if permission.ID == "" {
 		return ErrInvalidPermissionID
 	}
@@ -414,49 +547,59 @@ func (s *MemoryStore) UpdatePermission(ctx context.Context, permission Permissio
 		return ErrInvalidPermissionName
 	}
 
-	if _, exists := s.permissions[permission.ID]; !exists {
+	key := s.keyFor(permission.WorkspaceID, permission.ID)
+	if _, exists := s.permissions[key]; !exists {
 		return ErrPermissionNotFound
 	}
 
 	// Validate parent permissions exist
 	for _, parentID := range permission.ParentIDs {
-		if _, exists := s.permissions[parentID]; !exists {
+		parentKey := s.keyFor(permission.WorkspaceID, parentID)
+		if _, exists := s.permissions[parentKey]; !exists {
 			return ErrPermissionNotFound
 		}
 	}
 
 	// Check for cyclic inheritance
-	if err := s.checkCyclicPermissionInheritance(permission.ID, permission.ParentIDs); err != nil {
+	if err := s.checkCyclicPermissionInheritance(permission.WorkspaceID, permission.ID, permission.ParentIDs); err != nil {
 		return err
 	}
 
 	// Update the permission
-	s.permissions[permission.ID] = permission
+	s.permissions[key] = permission
 	return nil
 }
 
 // DeletePermission deletes a permission by its ID.
-func (s *MemoryStore) DeletePermission(ctx context.Context, permissionID string) error {
+func (s *MemoryStore) DeletePermission(ctx context.Context, workspaceID, permissionID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, exists := s.permissions[permissionID]; !exists {
+	if workspaceID == "" || permissionID == "" {
+		return ErrInvalidArgument
+	}
+
+	key := s.keyFor(workspaceID, permissionID)
+	if _, exists := s.permissions[key]; !exists {
 		return ErrPermissionNotFound
 	}
 
 	// Check if any permission has this permission as parent
-	for _, perm := range s.permissions {
-		for _, parentID := range perm.ParentIDs {
-			if parentID == permissionID {
-				// Remove this parent from the permission
-				newParents := make([]string, 0, len(perm.ParentIDs)-1)
-				for _, pid := range perm.ParentIDs {
-					if pid != permissionID {
-						newParents = append(newParents, pid)
+	prefix := workspaceID + ":"
+	for k, perm := range s.permissions {
+		if len(k) > len(prefix) && k[:len(prefix)] == prefix && perm.WorkspaceID == workspaceID {
+			for _, parentID := range perm.ParentIDs {
+				if parentID == permissionID {
+					// Remove this parent from the permission
+					newParents := make([]string, 0, len(perm.ParentIDs)-1)
+					for _, pid := range perm.ParentIDs {
+						if pid != permissionID {
+							newParents = append(newParents, pid)
+						}
 					}
+					perm.ParentIDs = newParents
+					s.permissions[k] = perm
 				}
-				perm.ParentIDs = newParents
-				s.permissions[perm.ID] = perm
 			}
 		}
 	}
@@ -473,26 +616,32 @@ func (s *MemoryStore) DeletePermission(ctx context.Context, permissionID string)
 					}
 				}
 				role.DirectPermissionIDs = newPermissions
-				s.roles[role.ID] = role
+				s.roles[s.keyFor(role.WorkspaceID, role.ID)] = role
 			}
 		}
 	}
 
-	delete(s.permissions, permissionID)
+	delete(s.permissions, key)
 	return nil
 }
 
 // AddPermissionParent adds a parent permission to a permission.
-func (s *MemoryStore) AddPermissionParent(ctx context.Context, permissionID, parentPermissionID string) error {
+func (s *MemoryStore) AddPermissionParent(ctx context.Context, workspaceID, permissionID, parentPermissionID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	permission, exists := s.permissions[permissionID]
+	if workspaceID == "" || permissionID == "" || parentPermissionID == "" {
+		return ErrInvalidArgument
+	}
+
+	permissionKey := s.keyFor(workspaceID, permissionID)
+	permission, exists := s.permissions[permissionKey]
 	if !exists {
 		return ErrPermissionNotFound
 	}
 
-	if _, exists := s.permissions[parentPermissionID]; !exists {
+	parentKey := s.keyFor(workspaceID, parentPermissionID)
+	if _, exists := s.permissions[parentKey]; !exists {
 		return ErrPermissionNotFound
 	}
 
@@ -506,22 +655,27 @@ func (s *MemoryStore) AddPermissionParent(ctx context.Context, permissionID, par
 	// Check for cyclic inheritance
 	tempParents := append([]string{}, permission.ParentIDs...)
 	tempParents = append(tempParents, parentPermissionID)
-	if err := s.checkCyclicPermissionInheritance(permissionID, tempParents); err != nil {
+	if err := s.checkCyclicPermissionInheritance(workspaceID, permissionID, tempParents); err != nil {
 		return err
 	}
 
 	// Add the parent
 	permission.ParentIDs = append(permission.ParentIDs, parentPermissionID)
-	s.permissions[permissionID] = permission
+	s.permissions[permissionKey] = permission
 	return nil
 }
 
 // RemovePermissionParent removes a parent permission from a permission.
-func (s *MemoryStore) RemovePermissionParent(ctx context.Context, permissionID, parentPermissionID string) error {
+func (s *MemoryStore) RemovePermissionParent(ctx context.Context, workspaceID, permissionID, parentPermissionID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	permission, exists := s.permissions[permissionID]
+	if workspaceID == "" || permissionID == "" || parentPermissionID == "" {
+		return ErrInvalidArgument
+	}
+
+	permissionKey := s.keyFor(workspaceID, permissionID)
+	permission, exists := s.permissions[permissionKey]
 	if !exists {
 		return ErrPermissionNotFound
 	}
@@ -542,23 +696,30 @@ func (s *MemoryStore) RemovePermissionParent(ctx context.Context, permissionID, 
 	}
 
 	permission.ParentIDs = newParents
-	s.permissions[permissionID] = permission
+	s.permissions[permissionKey] = permission
 	return nil
 }
 
 // GetPermissionParents retrieves all parent permissions of a permission.
-func (s *MemoryStore) GetPermissionParents(ctx context.Context, permissionID string) ([]Permission, error) {
+func (s *MemoryStore) GetPermissionParents(ctx context.Context, workspaceID, permissionID string) ([]Permission, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	permission, exists := s.permissions[permissionID]
+	if workspaceID == "" || permissionID == "" {
+		return nil, ErrInvalidArgument
+	}
+
+	permissionKey := s.keyFor(workspaceID, permissionID)
+	permission, exists := s.permissions[permissionKey]
 	if !exists {
 		return nil, ErrPermissionNotFound
 	}
 
 	parents := make([]Permission, 0, len(permission.ParentIDs))
-	for _, pid := range permission.ParentIDs {
-		if parent, exists := s.permissions[pid]; exists {
+	for _, parentID := range permission.ParentIDs {
+		parentKey := s.keyFor(workspaceID, parentID)
+		parent, exists := s.permissions[parentKey]
+		if exists {
 			parents = append(parents, parent)
 		}
 	}
@@ -567,20 +728,29 @@ func (s *MemoryStore) GetPermissionParents(ctx context.Context, permissionID str
 }
 
 // GetPermissionChildren retrieves all permissions that inherit from a permission.
-func (s *MemoryStore) GetPermissionChildren(ctx context.Context, permissionID string) ([]Permission, error) {
+func (s *MemoryStore) GetPermissionChildren(ctx context.Context, workspaceID, permissionID string) ([]Permission, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if _, exists := s.permissions[permissionID]; !exists {
+	if workspaceID == "" || permissionID == "" {
+		return nil, ErrInvalidArgument
+	}
+
+	permissionKey := s.keyFor(workspaceID, permissionID)
+	if _, exists := s.permissions[permissionKey]; !exists {
 		return nil, ErrPermissionNotFound
 	}
 
-	children := []Permission{}
-	for _, perm := range s.permissions {
-		for _, pid := range perm.ParentIDs {
-			if pid == permissionID {
-				children = append(children, perm)
-				break
+	children := make([]Permission, 0)
+	prefix := workspaceID + ":"
+	
+	for key, perm := range s.permissions {
+		if len(key) > len(prefix) && key[:len(prefix)] == prefix && perm.WorkspaceID == workspaceID {
+			for _, parentID := range perm.ParentIDs {
+				if parentID == permissionID {
+					children = append(children, perm)
+					break
+				}
 			}
 		}
 	}
@@ -589,7 +759,7 @@ func (s *MemoryStore) GetPermissionChildren(ctx context.Context, permissionID st
 }
 
 // checkCyclicRoleInheritance checks if adding the given parents to the role would create a cyclic inheritance.
-func (s *MemoryStore) checkCyclicRoleInheritance(roleID string, parentIDs []string) error {
+func (s *MemoryStore) checkCyclicRoleInheritance(workspaceID, roleID string, parentIDs []string) error {
 	// Create a map of visited roles to detect cycles
 	visited := make(map[string]bool)
 
@@ -607,7 +777,8 @@ func (s *MemoryStore) checkCyclicRoleInheritance(roleID string, parentIDs []stri
 		visited[currentID] = true
 
 		// Check all parents of the current role
-		currentRole, exists := s.roles[currentID]
+		currentRoleKey := s.keyFor(workspaceID, currentID)
+		currentRole, exists := s.roles[currentRoleKey]
 		if exists {
 			for _, pid := range currentRole.ParentIDs {
 				if checkCycle(pid) {
@@ -633,7 +804,7 @@ func (s *MemoryStore) checkCyclicRoleInheritance(roleID string, parentIDs []stri
 }
 
 // checkCyclicPermissionInheritance checks if adding the given parents to the permission would create a cyclic inheritance.
-func (s *MemoryStore) checkCyclicPermissionInheritance(permissionID string, parentIDs []string) error {
+func (s *MemoryStore) checkCyclicPermissionInheritance(workspaceID, permissionID string, parentIDs []string) error {
 	// Create a map of visited permissions to detect cycles
 	visited := make(map[string]bool)
 
@@ -651,7 +822,8 @@ func (s *MemoryStore) checkCyclicPermissionInheritance(permissionID string, pare
 		visited[currentID] = true
 
 		// Check all parents of the current permission
-		currentPermission, exists := s.permissions[currentID]
+		currentPermissionKey := s.keyFor(workspaceID, currentID)
+		currentPermission, exists := s.permissions[currentPermissionKey]
 		if exists {
 			for _, pid := range currentPermission.ParentIDs {
 				if checkCycle(pid) {

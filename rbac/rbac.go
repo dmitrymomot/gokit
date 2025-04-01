@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -9,11 +10,11 @@ import (
 // Service implements the RBAC interface.
 type Service struct {
 	store            Store
-	permissionCache  map[string][]string // Maps role ID to effective permission IDs
+	permissionCache  map[string][]string // Maps "workspaceID:roleID" to effective permission IDs
 	cacheMu          sync.RWMutex
 	cacheEnabled     bool
 	cacheTTL         time.Duration
-	cacheLastUpdated map[string]time.Time // Maps role ID to last cache update time
+	cacheLastUpdated map[string]time.Time // Maps "workspaceID:roleID" to last cache update time
 }
 
 // ServiceOption is a function that configures a Service.
@@ -45,14 +46,19 @@ func NewService(store Store, options ...ServiceOption) *Service {
 	return s
 }
 
+// cacheKey creates a composite key for caching by combining workspace ID and role ID
+func (s *Service) cacheKey(workspaceID, roleID string) string {
+	return fmt.Sprintf("%s:%s", workspaceID, roleID)
+}
+
 // HasPermission checks if a role has a specific permission.
-func (s *Service) HasPermission(ctx context.Context, roleID, permissionID string) (bool, error) {
-	if roleID == "" || permissionID == "" {
+func (s *Service) HasPermission(ctx context.Context, workspaceID, roleID, permissionID string) (bool, error) {
+	if workspaceID == "" || roleID == "" || permissionID == "" {
 		return false, ErrInvalidArgument
 	}
 
 	// Get effective permissions for the role
-	effectivePermissionIDs, err := s.getEffectivePermissionIDs(ctx, roleID)
+	effectivePermissionIDs, err := s.getEffectivePermissionIDs(ctx, workspaceID, roleID)
 	if err != nil {
 		return false, err
 	}
@@ -68,13 +74,13 @@ func (s *Service) HasPermission(ctx context.Context, roleID, permissionID string
 }
 
 // HasAnyPermission checks if a role has at least one of the specified permissions.
-func (s *Service) HasAnyPermission(ctx context.Context, roleID string, permissionIDs ...string) (bool, error) {
-	if roleID == "" || len(permissionIDs) == 0 {
+func (s *Service) HasAnyPermission(ctx context.Context, workspaceID, roleID string, permissionIDs ...string) (bool, error) {
+	if workspaceID == "" || roleID == "" || len(permissionIDs) == 0 {
 		return false, ErrInvalidArgument
 	}
 
 	// Get effective permissions for the role
-	effectivePermissionIDs, err := s.getEffectivePermissionIDs(ctx, roleID)
+	effectivePermissionIDs, err := s.getEffectivePermissionIDs(ctx, workspaceID, roleID)
 	if err != nil {
 		return false, err
 	}
@@ -96,13 +102,13 @@ func (s *Service) HasAnyPermission(ctx context.Context, roleID string, permissio
 }
 
 // HasAllPermissions checks if a role has all of the specified permissions.
-func (s *Service) HasAllPermissions(ctx context.Context, roleID string, permissionIDs ...string) (bool, error) {
-	if roleID == "" || len(permissionIDs) == 0 {
+func (s *Service) HasAllPermissions(ctx context.Context, workspaceID, roleID string, permissionIDs ...string) (bool, error) {
+	if workspaceID == "" || roleID == "" || len(permissionIDs) == 0 {
 		return false, ErrInvalidArgument
 	}
 
 	// Get effective permissions for the role
-	effectivePermissionIDs, err := s.getEffectivePermissionIDs(ctx, roleID)
+	effectivePermissionIDs, err := s.getEffectivePermissionIDs(ctx, workspaceID, roleID)
 	if err != nil {
 		return false, err
 	}
@@ -124,13 +130,13 @@ func (s *Service) HasAllPermissions(ctx context.Context, roleID string, permissi
 }
 
 // GetEffectivePermissions retrieves all permissions a role has, including inherited permissions.
-func (s *Service) GetEffectivePermissions(ctx context.Context, roleID string) ([]Permission, error) {
-	if roleID == "" {
+func (s *Service) GetEffectivePermissions(ctx context.Context, workspaceID, roleID string) ([]Permission, error) {
+	if workspaceID == "" || roleID == "" {
 		return nil, ErrInvalidArgument
 	}
 
 	// Get the effective permission IDs
-	effectivePermissionIDs, err := s.getEffectivePermissionIDs(ctx, roleID)
+	effectivePermissionIDs, err := s.getEffectivePermissionIDs(ctx, workspaceID, roleID)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +144,7 @@ func (s *Service) GetEffectivePermissions(ctx context.Context, roleID string) ([
 	// Get the actual permission objects
 	permissions := make([]Permission, 0, len(effectivePermissionIDs))
 	for _, pID := range effectivePermissionIDs {
-		permission, err := s.store.GetPermission(ctx, pID)
+		permission, err := s.store.GetPermission(ctx, workspaceID, pID)
 		if err != nil {
 			return nil, err
 		}
@@ -153,8 +159,23 @@ func (s *Service) Store() Store {
 	return s.store
 }
 
-// InvalidateCache invalidates the permission cache for a specific role.
-func (s *Service) InvalidateCache(roleID string) {
+// InvalidateCache invalidates the permission cache for a specific role in a specific workspace.
+func (s *Service) InvalidateCache(workspaceID, roleID string) {
+	if !s.cacheEnabled {
+		return
+	}
+
+	key := s.cacheKey(workspaceID, roleID)
+
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+
+	delete(s.permissionCache, key)
+	delete(s.cacheLastUpdated, key)
+}
+
+// InvalidateWorkspaceCache invalidates the entire permission cache for a specific workspace.
+func (s *Service) InvalidateWorkspaceCache(workspaceID string) {
 	if !s.cacheEnabled {
 		return
 	}
@@ -162,8 +183,14 @@ func (s *Service) InvalidateCache(roleID string) {
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
 
-	delete(s.permissionCache, roleID)
-	delete(s.cacheLastUpdated, roleID)
+	prefix := workspaceID + ":"
+	for key := range s.permissionCache {
+		// Check if the key starts with workspaceID:
+		if len(key) >= len(prefix) && key[:len(prefix)] == prefix {
+			delete(s.permissionCache, key)
+			delete(s.cacheLastUpdated, key)
+		}
+	}
 }
 
 // InvalidateAllCache invalidates the entire permission cache.
@@ -180,30 +207,54 @@ func (s *Service) InvalidateAllCache() {
 }
 
 // AddPermissionToRole adds a permission to a role and updates the cache.
-func (s *Service) AddPermissionToRole(ctx context.Context, roleID, permissionID string) error {
-	if roleID == "" || permissionID == "" {
+func (s *Service) AddPermissionToRole(ctx context.Context, workspaceID, roleID, permissionID string) error {
+	if workspaceID == "" || roleID == "" || permissionID == "" {
 		return ErrInvalidArgument
 	}
 
 	// Add permission to role
-	err := s.store.AddPermissionToRole(ctx, roleID, permissionID)
+	err := s.store.AddPermissionToRole(ctx, workspaceID, roleID, permissionID)
 	if err != nil {
 		return err
 	}
 
 	// Invalidate cache for role
-	s.InvalidateCache(roleID)
+	s.InvalidateCache(workspaceID, roleID)
+
+	return nil
+}
+
+// UpdateRole updates a role in the store and invalidates the cache.
+func (s *Service) UpdateRole(ctx context.Context, role Role) error {
+	if role.WorkspaceID == "" || role.ID == "" {
+		return ErrInvalidArgument
+	}
+
+	// Update role in store
+	err := s.store.UpdateRole(ctx, role)
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cache for role
+	s.InvalidateCache(role.WorkspaceID, role.ID)
 
 	return nil
 }
 
 // getEffectivePermissionIDs retrieves all permission IDs a role has, including inherited permissions.
-func (s *Service) getEffectivePermissionIDs(ctx context.Context, roleID string) ([]string, error) {
+func (s *Service) getEffectivePermissionIDs(ctx context.Context, workspaceID, roleID string) ([]string, error) {
+	if workspaceID == "" || roleID == "" {
+		return nil, ErrInvalidArgument
+	}
+
+	key := s.cacheKey(workspaceID, roleID)
+
 	// Check cache if enabled
 	if s.cacheEnabled {
 		s.cacheMu.RLock()
-		cachedPermissions, exists := s.permissionCache[roleID]
-		lastUpdated := s.cacheLastUpdated[roleID]
+		cachedPermissions, exists := s.permissionCache[key]
+		lastUpdated := s.cacheLastUpdated[key]
 		s.cacheMu.RUnlock()
 
 		if exists && time.Since(lastUpdated) < s.cacheTTL {
@@ -212,7 +263,7 @@ func (s *Service) getEffectivePermissionIDs(ctx context.Context, roleID string) 
 	}
 
 	// Get the role
-	role, err := s.store.GetRole(ctx, roleID)
+	role, err := s.store.GetRole(ctx, workspaceID, roleID)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +276,7 @@ func (s *Service) getEffectivePermissionIDs(ctx context.Context, roleID string) 
 		effectivePermissions[pID] = true
 
 		// Add inherited permissions
-		inheritedPermIDs, err := s.getInheritedPermissionIDs(ctx, pID, make(map[string]bool))
+		inheritedPermIDs, err := s.getInheritedPermissionIDs(ctx, workspaceID, pID, make(map[string]bool))
 		if err != nil {
 			return nil, err
 		}
@@ -236,7 +287,7 @@ func (s *Service) getEffectivePermissionIDs(ctx context.Context, roleID string) 
 	}
 
 	// Add permissions from parent roles
-	inheritedRolePermIDs, err := s.getRoleInheritedPermissionIDs(ctx, roleID, make(map[string]bool))
+	inheritedRolePermIDs, err := s.getRoleInheritedPermissionIDs(ctx, workspaceID, roleID, make(map[string]bool))
 	if err != nil {
 		return nil, err
 	}
@@ -254,8 +305,8 @@ func (s *Service) getEffectivePermissionIDs(ctx context.Context, roleID string) 
 	// Update cache if enabled
 	if s.cacheEnabled {
 		s.cacheMu.Lock()
-		s.permissionCache[roleID] = result
-		s.cacheLastUpdated[roleID] = time.Now()
+		s.permissionCache[key] = result
+		s.cacheLastUpdated[key] = time.Now()
 		s.cacheMu.Unlock()
 	}
 
@@ -264,13 +315,13 @@ func (s *Service) getEffectivePermissionIDs(ctx context.Context, roleID string) 
 
 // getInheritedPermissionIDs recursively retrieves all permission IDs that a permission inherits,
 // using a visited map to avoid cycles.
-func (s *Service) getInheritedPermissionIDs(ctx context.Context, permissionID string, visited map[string]bool) ([]string, error) {
+func (s *Service) getInheritedPermissionIDs(ctx context.Context, workspaceID, permissionID string, visited map[string]bool) ([]string, error) {
 	if visited[permissionID] {
 		return []string{}, nil
 	}
 	visited[permissionID] = true
 
-	permission, err := s.store.GetPermission(ctx, permissionID)
+	permission, err := s.store.GetPermission(ctx, workspaceID, permissionID)
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +333,7 @@ func (s *Service) getInheritedPermissionIDs(ctx context.Context, permissionID st
 		result = append(result, parentID)
 
 		// Recursively add parents of parents
-		parentInheritedPermIDs, err := s.getInheritedPermissionIDs(ctx, parentID, visited)
+		parentInheritedPermIDs, err := s.getInheritedPermissionIDs(ctx, workspaceID, parentID, visited)
 		if err != nil {
 			return nil, err
 		}
@@ -294,13 +345,13 @@ func (s *Service) getInheritedPermissionIDs(ctx context.Context, permissionID st
 
 // getRoleInheritedPermissionIDs recursively retrieves all permission IDs from parent roles,
 // using a visited map to avoid cycles.
-func (s *Service) getRoleInheritedPermissionIDs(ctx context.Context, roleID string, visited map[string]bool) ([]string, error) {
+func (s *Service) getRoleInheritedPermissionIDs(ctx context.Context, workspaceID, roleID string, visited map[string]bool) ([]string, error) {
 	if visited[roleID] {
 		return []string{}, nil
 	}
 	visited[roleID] = true
 
-	role, err := s.store.GetRole(ctx, roleID)
+	role, err := s.store.GetRole(ctx, workspaceID, roleID)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +361,7 @@ func (s *Service) getRoleInheritedPermissionIDs(ctx context.Context, roleID stri
 	// Process parent roles
 	for _, parentID := range role.ParentIDs {
 		// Get parent role
-		parentRole, err := s.store.GetRole(ctx, parentID)
+		parentRole, err := s.store.GetRole(ctx, workspaceID, parentID)
 		if err != nil {
 			return nil, err
 		}
@@ -320,7 +371,7 @@ func (s *Service) getRoleInheritedPermissionIDs(ctx context.Context, roleID stri
 			result[pID] = true
 
 			// Add inherited permissions from each direct permission
-			inheritedPermIDs, err := s.getInheritedPermissionIDs(ctx, pID, make(map[string]bool))
+			inheritedPermIDs, err := s.getInheritedPermissionIDs(ctx, workspaceID, pID, make(map[string]bool))
 			if err != nil {
 				return nil, err
 			}
@@ -331,7 +382,7 @@ func (s *Service) getRoleInheritedPermissionIDs(ctx context.Context, roleID stri
 		}
 
 		// Recursively process parent's parents
-		parentInheritedPermIDs, err := s.getRoleInheritedPermissionIDs(ctx, parentID, visited)
+		parentInheritedPermIDs, err := s.getRoleInheritedPermissionIDs(ctx, workspaceID, parentID, visited)
 		if err != nil {
 			return nil, err
 		}

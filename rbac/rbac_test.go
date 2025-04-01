@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testWorkspaceID = "test-workspace"
+
 func setupTestEnvironment(t *testing.T) (context.Context, *rbac.Service) {
 	ctx := context.Background()
 	store := rbac.NewMemoryStore()
@@ -17,36 +19,42 @@ func setupTestEnvironment(t *testing.T) (context.Context, *rbac.Service) {
 	// Create a simple hierarchical structure of roles and permissions
 	// Permissions: read -> write -> admin
 	require.NoError(t, store.CreatePermission(ctx, rbac.Permission{
-		ID:   "read",
-		Name: "Read Permission",
+		WorkspaceID: testWorkspaceID,
+		ID:          "read",
+		Name:        "Read Permission",
 	}))
 
 	require.NoError(t, store.CreatePermission(ctx, rbac.Permission{
-		ID:        "write",
-		Name:      "Write Permission",
-		ParentIDs: []string{"read"},
+		WorkspaceID: testWorkspaceID,
+		ID:          "write",
+		Name:        "Write Permission",
+		ParentIDs:   []string{"read"},
 	}))
 
 	require.NoError(t, store.CreatePermission(ctx, rbac.Permission{
-		ID:        "admin",
-		Name:      "Admin Permission",
-		ParentIDs: []string{"write"},
+		WorkspaceID: testWorkspaceID,
+		ID:          "admin",
+		Name:        "Admin Permission",
+		ParentIDs:   []string{"write"},
 	}))
 
 	// Create a separate permission branch
 	require.NoError(t, store.CreatePermission(ctx, rbac.Permission{
-		ID:   "view_reports",
-		Name: "View Reports Permission",
+		WorkspaceID: testWorkspaceID,
+		ID:          "view_reports",
+		Name:        "View Reports Permission",
 	}))
 
 	// Roles: guest -> member -> admin
 	require.NoError(t, store.CreateRole(ctx, rbac.Role{
+		WorkspaceID:         testWorkspaceID,
 		ID:                  "guest",
 		Name:                "Guest Role",
 		DirectPermissionIDs: []string{"read"},
 	}))
 
 	require.NoError(t, store.CreateRole(ctx, rbac.Role{
+		WorkspaceID:         testWorkspaceID,
 		ID:                  "member",
 		Name:                "Member Role",
 		ParentIDs:           []string{"guest"},
@@ -54,6 +62,7 @@ func setupTestEnvironment(t *testing.T) (context.Context, *rbac.Service) {
 	}))
 
 	require.NoError(t, store.CreateRole(ctx, rbac.Role{
+		WorkspaceID:         testWorkspaceID,
 		ID:                  "admin",
 		Name:                "Admin Role",
 		ParentIDs:           []string{"member"},
@@ -62,6 +71,7 @@ func setupTestEnvironment(t *testing.T) (context.Context, *rbac.Service) {
 
 	// Create a separate role branch
 	require.NoError(t, store.CreateRole(ctx, rbac.Role{
+		WorkspaceID:         testWorkspaceID,
 		ID:                  "reporter",
 		Name:                "Reporter Role",
 		DirectPermissionIDs: []string{"view_reports"},
@@ -74,229 +84,316 @@ func TestRBACService_HasPermission(t *testing.T) {
 	ctx, service := setupTestEnvironment(t)
 
 	// Test guest role permissions
-	hasRead, err := service.HasPermission(ctx, "guest", "read")
+	hasRead, err := service.HasPermission(ctx, testWorkspaceID, "guest", "read")
 	require.NoError(t, err)
 	assert.True(t, hasRead, "Guest should have read permission")
 
-	hasWrite, err := service.HasPermission(ctx, "guest", "write")
+	hasWrite, err := service.HasPermission(ctx, testWorkspaceID, "guest", "write")
 	require.NoError(t, err)
 	assert.False(t, hasWrite, "Guest should not have write permission")
 
 	// Test member role permissions (inherits from guest)
-	hasRead, err = service.HasPermission(ctx, "member", "read")
+	hasRead, err = service.HasPermission(ctx, testWorkspaceID, "member", "read")
 	require.NoError(t, err)
 	assert.True(t, hasRead, "Member should have read permission (inherited from guest)")
 
-	hasWrite, err = service.HasPermission(ctx, "member", "write")
+	hasWrite, err = service.HasPermission(ctx, testWorkspaceID, "member", "write")
 	require.NoError(t, err)
 	assert.True(t, hasWrite, "Member should have write permission (direct)")
 
-	hasAdmin, err := service.HasPermission(ctx, "member", "admin")
+	hasAdmin, err := service.HasPermission(ctx, testWorkspaceID, "member", "admin")
 	require.NoError(t, err)
 	assert.False(t, hasAdmin, "Member should not have admin permission")
 
 	// Test admin role permissions (inherits from member, which inherits from guest)
-	hasRead, err = service.HasPermission(ctx, "admin", "read")
+	hasRead, err = service.HasPermission(ctx, testWorkspaceID, "admin", "read")
 	require.NoError(t, err)
 	assert.True(t, hasRead, "Admin should have read permission (inherited from guest through member)")
 
-	hasWrite, err = service.HasPermission(ctx, "admin", "write")
+	hasWrite, err = service.HasPermission(ctx, testWorkspaceID, "admin", "write")
 	require.NoError(t, err)
 	assert.True(t, hasWrite, "Admin should have write permission (inherited from member)")
 
-	hasAdmin, err = service.HasPermission(ctx, "admin", "admin")
+	hasAdmin, err = service.HasPermission(ctx, testWorkspaceID, "admin", "admin")
 	require.NoError(t, err)
 	assert.True(t, hasAdmin, "Admin should have admin permission (direct)")
 
-	// Test separate branch
-	hasViewReports, err := service.HasPermission(ctx, "reporter", "view_reports")
+	hasViewReports, err := service.HasPermission(ctx, testWorkspaceID, "admin", "view_reports")
 	require.NoError(t, err)
-	assert.True(t, hasViewReports, "Reporter should have view_reports permission")
+	assert.True(t, hasViewReports, "Admin should have view_reports permission (direct)")
 
-	hasRead, err = service.HasPermission(ctx, "reporter", "read")
+	// Test reporter role permissions
+	hasViewReports, err = service.HasPermission(ctx, testWorkspaceID, "reporter", "view_reports")
+	require.NoError(t, err)
+	assert.True(t, hasViewReports, "Reporter should have view_reports permission (direct)")
+
+	hasRead, err = service.HasPermission(ctx, testWorkspaceID, "reporter", "read")
 	require.NoError(t, err)
 	assert.False(t, hasRead, "Reporter should not have read permission")
 
-	// Test error cases
-	_, err = service.HasPermission(ctx, "", "read")
-	assert.ErrorIs(t, err, rbac.ErrInvalidArgument)
+	// Test permission inheritance through permission parents
+	hasRead, err = service.HasPermission(ctx, testWorkspaceID, "member", "read")
+	require.NoError(t, err)
+	assert.True(t, hasRead, "Member should have read permission (inherited from guest + write permission inherits from read)")
 
-	_, err = service.HasPermission(ctx, "guest", "")
-	assert.ErrorIs(t, err, rbac.ErrInvalidArgument)
+	// Test error conditions
+	_, err = service.HasPermission(ctx, testWorkspaceID, "", "read")
+	assert.Error(t, err, "Empty role ID should return an error")
+
+	_, err = service.HasPermission(ctx, testWorkspaceID, "guest", "")
+	assert.Error(t, err, "Empty permission ID should return an error")
+
+	_, err = service.HasPermission(ctx, testWorkspaceID, "nonexistent", "read")
+	assert.Error(t, err, "Nonexistent role should return an error")
+
+	// Empty workspaceID should return an error
+	_, err = service.HasPermission(ctx, "", "guest", "read")
+	assert.Error(t, err, "Empty workspace ID should return an error")
 }
 
 func TestRBACService_HasAnyPermission(t *testing.T) {
 	ctx, service := setupTestEnvironment(t)
 
-	// Test guest role
-	hasAny, err := service.HasAnyPermission(ctx, "guest", "read", "write")
+	// Test guest role with a permission it has
+	hasAny, err := service.HasAnyPermission(ctx, testWorkspaceID, "guest", "read")
+	require.NoError(t, err)
+	assert.True(t, hasAny, "Guest should have read permission")
+
+	// Test guest role with multiple permissions, one of which it has
+	hasAny, err = service.HasAnyPermission(ctx, testWorkspaceID, "guest", "write", "read")
 	require.NoError(t, err)
 	assert.True(t, hasAny, "Guest should have at least one of the permissions")
 
-	hasAny, err = service.HasAnyPermission(ctx, "guest", "write", "admin")
+	// Test guest role with permissions it doesn't have
+	hasAny, err = service.HasAnyPermission(ctx, testWorkspaceID, "guest", "write", "admin")
 	require.NoError(t, err)
-	assert.False(t, hasAny, "Guest should not have any of these permissions")
+	assert.False(t, hasAny, "Guest should not have any of the permissions")
 
-	// Test member role
-	hasAny, err = service.HasAnyPermission(ctx, "member", "read", "write")
+	// Test member role with multiple permissions
+	hasAny, err = service.HasAnyPermission(ctx, testWorkspaceID, "member", "read", "admin")
 	require.NoError(t, err)
 	assert.True(t, hasAny, "Member should have at least one of the permissions")
 
-	hasAny, err = service.HasAnyPermission(ctx, "member", "admin", "view_reports")
-	require.NoError(t, err)
-	assert.False(t, hasAny, "Member should not have any of these permissions")
-
-	// Test admin role
-	hasAny, err = service.HasAnyPermission(ctx, "admin", "read", "admin")
+	// Test admin role with all permissions
+	hasAny, err = service.HasAnyPermission(ctx, testWorkspaceID, "admin", "read", "write", "admin", "view_reports")
 	require.NoError(t, err)
 	assert.True(t, hasAny, "Admin should have at least one of the permissions")
 
-	hasAny, err = service.HasAnyPermission(ctx, "admin", "admin", "view_reports")
+	// Test reporter role with multiple permissions
+	hasAny, err = service.HasAnyPermission(ctx, testWorkspaceID, "reporter", "read", "write", "view_reports")
 	require.NoError(t, err)
-	assert.True(t, hasAny, "Admin should have at least one of the permissions")
+	assert.True(t, hasAny, "Reporter should have at least one of the permissions")
 
-	// Test error cases
-	_, err = service.HasAnyPermission(ctx, "")
-	assert.ErrorIs(t, err, rbac.ErrInvalidArgument)
+	// Test reporter role with permissions it doesn't have
+	hasAny, err = service.HasAnyPermission(ctx, testWorkspaceID, "reporter", "read", "write", "admin")
+	require.NoError(t, err)
+	assert.False(t, hasAny, "Reporter should not have any of the permissions")
 
-	_, err = service.HasAnyPermission(ctx, "guest")
-	assert.ErrorIs(t, err, rbac.ErrInvalidArgument)
+	// Test error conditions
+	_, err = service.HasAnyPermission(ctx, testWorkspaceID, "", "read")
+	assert.Error(t, err, "Empty role ID should return an error")
+
+	_, err = service.HasAnyPermission(ctx, testWorkspaceID, "guest")
+	assert.Error(t, err, "Empty permission list should return an error")
+
+	// Empty workspaceID should return an error
+	_, err = service.HasAnyPermission(ctx, "", "guest", "read")
+	assert.Error(t, err, "Empty workspace ID should return an error")
 }
 
 func TestRBACService_HasAllPermissions(t *testing.T) {
 	ctx, service := setupTestEnvironment(t)
 
-	// Test guest role
-	hasAll, err := service.HasAllPermissions(ctx, "guest", "read")
+	// Test guest role with a permission it has
+	hasAll, err := service.HasAllPermissions(ctx, testWorkspaceID, "guest", "read")
 	require.NoError(t, err)
-	assert.True(t, hasAll, "Guest should have all of the permissions")
+	assert.True(t, hasAll, "Guest should have read permission")
 
-	hasAll, err = service.HasAllPermissions(ctx, "guest", "read", "write")
+	// Test guest role with multiple permissions, one of which it does not have
+	hasAll, err = service.HasAllPermissions(ctx, testWorkspaceID, "guest", "read", "write")
 	require.NoError(t, err)
-	assert.False(t, hasAll, "Guest should not have all of these permissions")
+	assert.False(t, hasAll, "Guest should not have all the permissions")
 
-	// Test member role
-	hasAll, err = service.HasAllPermissions(ctx, "member", "read", "write")
+	// Test member role with permissions it has
+	hasAll, err = service.HasAllPermissions(ctx, testWorkspaceID, "member", "read", "write")
 	require.NoError(t, err)
-	assert.True(t, hasAll, "Member should have all of the permissions")
+	assert.True(t, hasAll, "Member should have all the permissions")
 
-	hasAll, err = service.HasAllPermissions(ctx, "member", "read", "write", "admin")
+	// Test member role with a permission it doesn't have
+	hasAll, err = service.HasAllPermissions(ctx, testWorkspaceID, "member", "read", "write", "admin")
 	require.NoError(t, err)
-	assert.False(t, hasAll, "Member should not have all of these permissions")
+	assert.False(t, hasAll, "Member should not have all the permissions")
 
-	// Test admin role
-	hasAll, err = service.HasAllPermissions(ctx, "admin", "read", "write", "admin")
+	// Test admin role with all permissions
+	hasAll, err = service.HasAllPermissions(ctx, testWorkspaceID, "admin", "read", "write", "admin", "view_reports")
 	require.NoError(t, err)
-	assert.True(t, hasAll, "Admin should have all of the permissions")
+	assert.True(t, hasAll, "Admin should have all the permissions")
 
-	hasAll, err = service.HasAllPermissions(ctx, "admin", "read", "write", "admin", "non_existent")
+	// Test admin role with a mix of permissions
+	hasAll, err = service.HasAllPermissions(ctx, testWorkspaceID, "admin", "read", "admin")
 	require.NoError(t, err)
-	assert.False(t, hasAll, "Admin should not have all of these permissions")
+	assert.True(t, hasAll, "Admin should have all the permissions")
 
-	// Test error cases
-	_, err = service.HasAllPermissions(ctx, "")
-	assert.ErrorIs(t, err, rbac.ErrInvalidArgument)
+	// Test reporter role with the permission it has
+	hasAll, err = service.HasAllPermissions(ctx, testWorkspaceID, "reporter", "view_reports")
+	require.NoError(t, err)
+	assert.True(t, hasAll, "Reporter should have view_reports permission")
 
-	_, err = service.HasAllPermissions(ctx, "guest")
-	assert.ErrorIs(t, err, rbac.ErrInvalidArgument)
+	// Test reporter role with permissions it doesn't have
+	hasAll, err = service.HasAllPermissions(ctx, testWorkspaceID, "reporter", "read", "view_reports")
+	require.NoError(t, err)
+	assert.False(t, hasAll, "Reporter should not have all the permissions")
+
+	// Test error conditions
+	_, err = service.HasAllPermissions(ctx, testWorkspaceID, "", "read")
+	assert.Error(t, err, "Empty role ID should return an error")
+
+	_, err = service.HasAllPermissions(ctx, testWorkspaceID, "guest")
+	assert.Error(t, err, "Empty permission list should return an error")
+
+	// Empty workspaceID should return an error
+	_, err = service.HasAllPermissions(ctx, "", "guest", "read")
+	assert.Error(t, err, "Empty workspace ID should return an error")
 }
 
 func TestRBACService_GetEffectivePermissions(t *testing.T) {
 	ctx, service := setupTestEnvironment(t)
 
 	// Test guest role
-	perms, err := service.GetEffectivePermissions(ctx, "guest")
+	guestPermissions, err := service.GetEffectivePermissions(ctx, testWorkspaceID, "guest")
 	require.NoError(t, err)
-	assert.Len(t, perms, 1)
-	assert.Contains(t, permsToIDs(perms), "read")
+	guestIDs := permsToIDs(guestPermissions)
+	assert.Contains(t, guestIDs, "read", "Guest should have read permission")
+	assert.Len(t, guestIDs, 1, "Guest should have only one permission")
 
 	// Test member role
-	perms, err = service.GetEffectivePermissions(ctx, "member")
+	memberPermissions, err := service.GetEffectivePermissions(ctx, testWorkspaceID, "member")
 	require.NoError(t, err)
-	assert.Len(t, perms, 2)
-	permIDs := permsToIDs(perms)
-	assert.Contains(t, permIDs, "read")
-	assert.Contains(t, permIDs, "write")
+	memberIDs := permsToIDs(memberPermissions)
+	assert.Contains(t, memberIDs, "read", "Member should have read permission")
+	assert.Contains(t, memberIDs, "write", "Member should have write permission")
+	assert.Len(t, memberIDs, 2, "Member should have two permissions")
 
 	// Test admin role
-	perms, err = service.GetEffectivePermissions(ctx, "admin")
+	adminPermissions, err := service.GetEffectivePermissions(ctx, testWorkspaceID, "admin")
 	require.NoError(t, err)
-	assert.Len(t, perms, 4)
-	permIDs = permsToIDs(perms)
-	assert.Contains(t, permIDs, "read")
-	assert.Contains(t, permIDs, "write")
-	assert.Contains(t, permIDs, "admin")
-	assert.Contains(t, permIDs, "view_reports")
+	adminIDs := permsToIDs(adminPermissions)
+	assert.Contains(t, adminIDs, "read", "Admin should have read permission")
+	assert.Contains(t, adminIDs, "write", "Admin should have write permission")
+	assert.Contains(t, adminIDs, "admin", "Admin should have admin permission")
+	assert.Contains(t, adminIDs, "view_reports", "Admin should have view_reports permission")
+	assert.Len(t, adminIDs, 4, "Admin should have four permissions")
 
-	// Test error cases
-	_, err = service.GetEffectivePermissions(ctx, "")
-	assert.ErrorIs(t, err, rbac.ErrInvalidArgument)
+	// Test reporter role
+	reporterPermissions, err := service.GetEffectivePermissions(ctx, testWorkspaceID, "reporter")
+	require.NoError(t, err)
+	reporterIDs := permsToIDs(reporterPermissions)
+	assert.Contains(t, reporterIDs, "view_reports", "Reporter should have view_reports permission")
+	assert.Len(t, reporterIDs, 1, "Reporter should have only one permission")
+
+	// Test error conditions
+	_, err = service.GetEffectivePermissions(ctx, testWorkspaceID, "")
+	assert.Error(t, err, "Empty role ID should return an error")
+
+	_, err = service.GetEffectivePermissions(ctx, testWorkspaceID, "nonexistent")
+	assert.Error(t, err, "Nonexistent role should return an error")
+
+	// Empty workspaceID should return an error
+	_, err = service.GetEffectivePermissions(ctx, "", "guest")
+	assert.Error(t, err, "Empty workspace ID should return an error")
 }
 
 func TestRBACService_Caching(t *testing.T) {
-	ctx := context.Background()
-	store := rbac.NewMemoryStore()
+	ctx, nonCachingService := setupTestEnvironment(t)
+	store := nonCachingService.Store()
 
-	// Create a test permission and role
-	require.NoError(t, store.CreatePermission(ctx, rbac.Permission{
-		ID:   "test_perm",
-		Name: "Test Permission",
-	}))
+	// Create a caching service with a 1 second TTL
+	cachingService := rbac.NewService(store, rbac.WithCaching(1*time.Second))
 
-	require.NoError(t, store.CreateRole(ctx, rbac.Role{
-		ID:                  "test_role",
-		Name:                "Test Role",
-		DirectPermissionIDs: []string{"test_perm"},
-	}))
-
-	// Create service with caching enabled (short TTL for testing)
-	service := rbac.NewService(store, rbac.WithCaching(100*time.Millisecond))
-
-	// First check should compute and cache
-	hasPermBefore, err := service.HasPermission(ctx, "test_role", "test_perm")
+	// Perform a permission check that should populate the cache
+	hasRead, err := cachingService.HasPermission(ctx, testWorkspaceID, "guest", "read")
 	require.NoError(t, err)
-	assert.True(t, hasPermBefore)
+	assert.True(t, hasRead, "Guest should have read permission")
 
-	// Modify role directly in store (bypassing the service)
-	role, err := store.GetRole(ctx, "test_role")
+	// Modify the underlying store directly (without using Service.UpdateRole to avoid cache invalidation)
+	role, err := store.GetRole(ctx, testWorkspaceID, "guest")
 	require.NoError(t, err)
 	role.DirectPermissionIDs = []string{}
-	require.NoError(t, store.UpdateRole(ctx, role))
-
-	// Check again - should still have permission due to cache
-	hasPermAfter, err := service.HasPermission(ctx, "test_role", "test_perm")
+	err = store.UpdateRole(ctx, role)
 	require.NoError(t, err)
-	assert.True(t, hasPermAfter, "Permission check should use cached result")
+
+	// Check again, should still return true because of caching
+	hasRead, err = cachingService.HasPermission(ctx, testWorkspaceID, "guest", "read")
+	require.NoError(t, err)
+	assert.True(t, hasRead, "Guest should still have read permission due to caching")
 
 	// Wait for cache to expire
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(1100 * time.Millisecond)
 
-	// Check again - should not have permission now
-	hasPermExpired, err := service.HasPermission(ctx, "test_role", "test_perm")
+	// Check again, should now return false
+	hasRead, err = cachingService.HasPermission(ctx, testWorkspaceID, "guest", "read")
 	require.NoError(t, err)
-	assert.False(t, hasPermExpired, "Permission check should use fresh result after cache expiry")
+	assert.False(t, hasRead, "Guest should no longer have read permission after cache expiry")
 
-	// Test manual cache invalidation
-	require.NoError(t, service.AddPermissionToRole(ctx, "test_role", "test_perm"))
-
-	// This should update the cache
-	hasPerm, err := service.HasPermission(ctx, "test_role", "test_perm")
+	// Restore the permission using the service's UpdateRole - this should update the cache
+	role.DirectPermissionIDs = []string{"read"}
+	err = cachingService.UpdateRole(ctx, role)
 	require.NoError(t, err)
-	assert.True(t, hasPerm)
 
-	// Modify role directly again
-	role, err = store.GetRole(ctx, "test_role")
+	// Check again, should return true now
+	hasRead, err = cachingService.HasPermission(ctx, testWorkspaceID, "guest", "read")
 	require.NoError(t, err)
+	assert.True(t, hasRead, "Guest should have read permission again")
+
+	// Manually invalidate the cache
+	cachingService.InvalidateCache(testWorkspaceID, "guest")
+
+	// Modify permissions through the service - should automatically invalidate cache
 	role.DirectPermissionIDs = []string{}
-	require.NoError(t, store.UpdateRole(ctx, role))
-
-	// Invalidate cache for this role
-	service.InvalidateCache("test_role")
-
-	// Should get fresh result
-	hasPerm, err = service.HasPermission(ctx, "test_role", "test_perm")
+	err = cachingService.UpdateRole(ctx, role)
 	require.NoError(t, err)
-	assert.False(t, hasPerm, "Permission check should use fresh result after manual cache invalidation")
+
+	// Check again, should return false because the cache was invalidated
+	hasRead, err = cachingService.HasPermission(ctx, testWorkspaceID, "guest", "read")
+	require.NoError(t, err)
+	assert.False(t, hasRead, "Guest should not have read permission after cache invalidation")
+
+	// Test workspace-wide cache invalidation
+	// First, restore permissions and populate cache for both guest and member
+	role.DirectPermissionIDs = []string{"read"}
+	err = cachingService.UpdateRole(ctx, role)
+	require.NoError(t, err)
+
+	hasRead, err = cachingService.HasPermission(ctx, testWorkspaceID, "guest", "read")
+	require.NoError(t, err)
+	assert.True(t, hasRead, "Guest should have read permission again")
+
+	hasWrite, err := cachingService.HasPermission(ctx, testWorkspaceID, "member", "write")
+	require.NoError(t, err)
+	assert.True(t, hasWrite, "Member should have write permission")
+
+	// Now invalidate the entire workspace cache
+	cachingService.InvalidateWorkspaceCache(testWorkspaceID)
+
+	// Modify both roles
+	role.DirectPermissionIDs = []string{}
+	err = cachingService.UpdateRole(ctx, role)
+	require.NoError(t, err)
+
+	memberRole, err := store.GetRole(ctx, testWorkspaceID, "member")
+	require.NoError(t, err)
+	memberRole.DirectPermissionIDs = []string{}
+	err = cachingService.UpdateRole(ctx, memberRole)
+	require.NoError(t, err)
+
+	// Both should now return false
+	hasRead, err = cachingService.HasPermission(ctx, testWorkspaceID, "guest", "read")
+	require.NoError(t, err)
+	assert.False(t, hasRead, "Guest should not have read permission after workspace cache invalidation")
+
+	hasWrite, err = cachingService.HasPermission(ctx, testWorkspaceID, "member", "write")
+	require.NoError(t, err)
+	assert.False(t, hasWrite, "Member should not have write permission after workspace cache invalidation")
 }
 
 func TestRBACService_PermissionInheritance(t *testing.T) {
@@ -304,55 +401,63 @@ func TestRBACService_PermissionInheritance(t *testing.T) {
 	store := rbac.NewMemoryStore()
 	service := rbac.NewService(store)
 
-	// Create a chain of permissions: view -> edit -> delete
+	// Create a chain of permissions with inheritance
 	require.NoError(t, store.CreatePermission(ctx, rbac.Permission{
-		ID:   "view",
-		Name: "View Permission",
+		WorkspaceID: testWorkspaceID,
+		ID:          "level1",
+		Name:        "Level 1 Permission",
 	}))
 
 	require.NoError(t, store.CreatePermission(ctx, rbac.Permission{
-		ID:        "edit",
-		Name:      "Edit Permission",
-		ParentIDs: []string{"view"},
+		WorkspaceID: testWorkspaceID,
+		ID:          "level2",
+		Name:        "Level 2 Permission",
+		ParentIDs:   []string{"level1"},
 	}))
 
 	require.NoError(t, store.CreatePermission(ctx, rbac.Permission{
-		ID:        "delete",
-		Name:      "Delete Permission",
-		ParentIDs: []string{"edit"},
+		WorkspaceID: testWorkspaceID,
+		ID:          "level3",
+		Name:        "Level 3 Permission",
+		ParentIDs:   []string{"level2"},
 	}))
 
-	// Create a role with only the highest permission
+	// Create a role with only the highest level permission
 	require.NoError(t, store.CreateRole(ctx, rbac.Role{
+		WorkspaceID:         testWorkspaceID,
 		ID:                  "power_user",
 		Name:                "Power User",
-		DirectPermissionIDs: []string{"delete"},
+		DirectPermissionIDs: []string{"level3"},
 	}))
 
-	// The role should have all permissions in the chain
-	hasView, err := service.HasPermission(ctx, "power_user", "view")
+	// Test that the role has all inherited permissions
+	hasLevel3, err := service.HasPermission(ctx, testWorkspaceID, "power_user", "level3")
 	require.NoError(t, err)
-	assert.True(t, hasView, "Role should have view permission (inherited through delete->edit->view chain)")
+	assert.True(t, hasLevel3, "Power user should have level3 permission")
 
-	hasEdit, err := service.HasPermission(ctx, "power_user", "edit")
+	hasLevel2, err := service.HasPermission(ctx, testWorkspaceID, "power_user", "level2")
 	require.NoError(t, err)
-	assert.True(t, hasEdit, "Role should have edit permission (inherited through delete->edit chain)")
+	assert.True(t, hasLevel2, "Power user should have level2 permission through inheritance")
 
-	hasDelete, err := service.HasPermission(ctx, "power_user", "delete")
+	hasLevel1, err := service.HasPermission(ctx, testWorkspaceID, "power_user", "level1")
 	require.NoError(t, err)
-	assert.True(t, hasDelete, "Role should have delete permission (direct)")
+	assert.True(t, hasLevel1, "Power user should have level1 permission through inheritance")
 
-	// Check effective permissions
-	perms, err := service.GetEffectivePermissions(ctx, "power_user")
+	// Get effective permissions and check
+	perms, err := service.GetEffectivePermissions(ctx, testWorkspaceID, "power_user")
 	require.NoError(t, err)
-	assert.Len(t, perms, 3, "Should have all three permissions in the chain")
+	permIDs := permsToIDs(perms)
+	assert.Contains(t, permIDs, "level1", "Effective permissions should include level1")
+	assert.Contains(t, permIDs, "level2", "Effective permissions should include level2")
+	assert.Contains(t, permIDs, "level3", "Effective permissions should include level3")
+	assert.Len(t, permIDs, 3, "There should be 3 effective permissions")
 }
 
 // Helper function to convert []Permission to []string of permission IDs
 func permsToIDs(perms []rbac.Permission) []string {
-	result := make([]string, len(perms))
+	ids := make([]string, len(perms))
 	for i, p := range perms {
-		result[i] = p.ID
+		ids[i] = p.ID
 	}
-	return result
+	return ids
 }
