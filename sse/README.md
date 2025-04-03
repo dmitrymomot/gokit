@@ -205,3 +205,106 @@ All operations in the SSE package are thread-safe and can be used concurrently f
 ## Scalability
 
 The broker-centric design allows for horizontal scaling across multiple server instances. By implementing a distributed broker (e.g., using Redis, NATS, Kafka), messages can be propagated to all connected clients regardless of which server instance they're connected to.
+
+## Broker Implementations
+
+### Memory Broker
+
+The memory broker is ideal for single-server deployments or for development and testing. It's simple to set up and use, but doesn't support horizontal scaling.
+
+```go
+import "github.com/dmitrymomot/gokit/sse/brokers/memory"
+
+broker, err := memory.NewBroker()
+if err != nil {
+    // Handle error
+}
+```
+
+### Redis Broker
+
+The Redis broker enables horizontal scaling by using Redis pub/sub for message distribution. This allows multiple server instances to work together, with all messages being propagated to all connected clients.
+
+```go
+import (
+    "github.com/dmitrymomot/gokit/sse/brokers/redis"
+    redisClient "github.com/redis/go-redis/v9"
+)
+
+// Create Redis client
+client := redisClient.NewClient(&redisClient.Options{
+    Addr: "localhost:6379",
+})
+
+// Create broker with default options
+broker, err := redis.NewBroker(client)
+if err != nil {
+    // Handle error
+}
+
+// Or with custom options (optional)
+broker, err := redis.NewBroker(client, redis.Options{
+    Channel: "custom_sse_channel",
+})
+```
+
+### Redis Streams Broker
+
+The Redis Streams broker provides enhanced reliability and automatic message expiration using Redis Streams instead of pub/sub. This is the recommended broker for production deployments with high message volumes or when message accumulation is a concern.
+
+```go
+import (
+    "github.com/dmitrymomot/gokit/sse/brokers/redis"
+    redisClient "github.com/redis/go-redis/v9"
+)
+
+// Create Redis client
+client := redisClient.NewClient(&redisClient.Options{
+    Addr: "localhost:6379",
+})
+
+// Create broker with default options
+broker, err := redis.NewStreamsBroker(client)
+if err != nil {
+    // Handle error
+}
+
+// Or with custom options (for more control)
+broker, err := redis.NewStreamsBroker(client, redis.StreamsOptions{
+    StreamName:       "sse_messages",         // Redis stream name
+    MaxStreamLength:  1000,                   // Maximum number of messages to keep
+    MessageRetention: 24 * time.Hour,         // How long to keep messages
+    GroupName:        "sse_consumer_group",   // Consumer group name
+    ConsumerName:     "instance-1",           // Consumer name (unique per instance)
+    BlockDuration:    100 * time.Millisecond, // Polling interval
+})
+```
+
+Key benefits of the Streams broker:
+
+- **Automatic message expiration**: Old messages are automatically removed based on the configured `MaxStreamLength` and `MessageRetention`
+- **Reliable message delivery**: Uses Redis Streams consumer groups for reliable message processing
+- **No message accumulation**: Messages are capped to the specified maximum stream length
+- **Efficient retrieval**: Only gets new messages, with automatic acknowledgment
+- **Manual cleanup**: Additional `CleanupStream` method available for explicit stream maintenance
+
+For periodic cleanup of the stream (optional):
+
+```go
+// Set up periodic cleanup if needed
+ticker := time.NewTicker(1 * time.Hour)
+go func() {
+    for {
+        select {
+        case <-ticker.C:
+            if streamsBroker, ok := broker.(*redis.StreamsBroker); ok {
+                ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+                _ = streamsBroker.CleanupStream(ctx)
+                cancel()
+            }
+        case <-ctx.Done():
+            ticker.Stop()
+            return
+        }
+    }
+}()
