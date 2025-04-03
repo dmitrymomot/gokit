@@ -40,6 +40,11 @@ func (b *Broker) Publish(ctx context.Context, message sse.Message) error {
 		return err
 	}
 
+	// Skip expired messages
+	if message.IsExpired() {
+		return nil
+	}
+
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 

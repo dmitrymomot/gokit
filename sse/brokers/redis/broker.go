@@ -124,6 +124,11 @@ func (b *Broker) receiveMessages() {
 				continue
 			}
 
+			// Skip expired messages
+			if message.IsExpired() {
+				continue
+			}
+
 			// Distribute to all subscribers
 			b.distributeMessage(message)
 		}
@@ -150,6 +155,11 @@ func (b *Broker) Publish(ctx context.Context, message sse.Message) error {
 	// Validate message
 	if err := message.Validate(); err != nil {
 		return err
+	}
+
+	// Skip expired messages
+	if message.IsExpired() {
+		return nil
 	}
 
 	// Check if broker is closed

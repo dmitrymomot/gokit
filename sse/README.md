@@ -29,7 +29,7 @@ The `Broker` interface defines the contract for message distribution. All messag
 
 ### Message
 
-The `Message` struct represents an SSE event with fields for ID, event type, data payload, and targeting information.
+The `Message` struct represents an SSE event with fields for ID, event type, data payload, and targeting information. Messages can also have a TTL (Time-To-Live) to control their expiration.
 
 ## Usage Examples
 
@@ -103,6 +103,22 @@ func broadcastToAll(ctx context.Context, broker sse.Broker) error {
 	})
 	
 	return broker.Publish(ctx, msg)
+}
+
+// Send a message with TTL (Time-To-Live)
+func sendWithTTL(ctx context.Context, broker sse.Broker) error {
+	// Create a message that expires after 30 seconds
+	msg := sse.NewMessage("time-sensitive", map[string]string{
+		"message": "This message will expire!",
+	}).WithTTL(30 * time.Second)
+	
+	return broker.Publish(ctx, msg)
+}
+
+// Create message with TTL directly in constructor
+func createExpiringMessage(data any) sse.Message {
+	// Alternative way to set TTL directly in constructor
+	return sse.NewMessage("expiring-event", data, 5 * time.Minute)
 }
 ```
 
