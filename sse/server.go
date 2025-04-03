@@ -227,6 +227,11 @@ func (s *Server) listenToBroker() {
 
 // dispatchMessage sends a message to targeted clients
 func (s *Server) dispatchMessage(msg Message) {
+	// Skip expired messages
+	if msg.IsExpired() {
+		return
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
