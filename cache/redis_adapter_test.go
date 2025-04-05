@@ -15,7 +15,7 @@ import (
 )
 
 // setupMiniredis starts a miniredis instance and returns a redis client connected to it.
-func setupMiniredis(t *testing.T) (*miniredis.Miniredis, *redis.Client) {
+func setupMiniredis(t *testing.T) (*miniredis.Miniredis, redis.UniversalClient) {
 	s := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{
 		Addr: s.Addr(),
