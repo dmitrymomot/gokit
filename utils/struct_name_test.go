@@ -68,7 +68,7 @@ func (p NamedPerson) Name() string {
 
 func TestGetNameFromStruct(t *testing.T) {
 	// Define a fallback function
-	fallback := func(v interface{}) string {
+	fallback := func(v any) string {
 		return "fallback"
 	}
 
@@ -100,14 +100,14 @@ func TestGetNameFromStruct(t *testing.T) {
 // Test deprecated function for backward compatibility
 func TestNamedStruct(t *testing.T) {
 	// Define a fallback function
-	fallback := func(v interface{}) string {
+	fallback := func(v any) string {
 		return "fallback"
 	}
 
 	// Test with struct implementing NamedEntity interface
 	p := NamedPerson{}
 	expected1 := "NamedPerson"
-	actual1 := utils.NamedStruct(fallback)(p)
+	actual1 := utils.GetNameFromStruct(p, fallback)
 	if actual1 != expected1 {
 		t.Errorf("Expected %q but got %q", expected1, actual1)
 	}
@@ -115,7 +115,7 @@ func TestNamedStruct(t *testing.T) {
 	// Test with type not implementing NamedEntity interface
 	i := 42
 	expected2 := "fallback"
-	actual2 := utils.NamedStruct(fallback)(i)
+	actual2 := utils.GetNameFromStruct(i, fallback)
 	if actual2 != expected2 {
 		t.Errorf("Expected %q but got %q", expected2, actual2)
 	}
