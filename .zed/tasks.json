@@ -1,0 +1,24 @@
+// Static tasks configuration.
+[
+  {
+    "label": "update dependencies",
+    "command": "go get -u ./... && go mod tidy",
+    "reveal": "always",
+    "reveal_target": "dock",
+    "hide": "on_success"
+  },
+  {
+    "label": "sqlc",
+    "command": "task sqlc",
+    "reveal": "always",
+    "reveal_target": "dock",
+    "hide": "on_success"
+  },
+  {
+    "label": "go mod tidy",
+    "command": "go mod tidy",
+    "reveal": "always",
+    "reveal_target": "dock",
+    "hide": "on_success"
+  }
+]
