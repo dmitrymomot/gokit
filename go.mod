@@ -3,6 +3,7 @@ module github.com/dmitrymomot/gokit
 go 1.24
 
 require (
+	github.com/IBM/sarama v1.45.1
 	github.com/ThreeDotsLabs/watermill v1.4.6
 	github.com/ThreeDotsLabs/watermill-kafka/v3 v3.0.6
 	github.com/ThreeDotsLabs/watermill-redisstream v1.4.2
@@ -33,7 +34,6 @@ require (
 
 require (
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
-	github.com/IBM/sarama v1.45.1 // indirect
 	github.com/Rican7/retry v0.3.1 // indirect
 	github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.10 // indirect
