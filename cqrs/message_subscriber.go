@@ -127,12 +127,14 @@ func NewKafkaSubscriberWithConfig(
 			return nil, fmt.Errorf("consumer group cannot be empty")
 		}
 		config.ConsumerGroup = consumerGroup
+
 		if config.Unmarshaler == nil {
 			config.Unmarshaler = kafka.DefaultMarshaler{}
 		}
 		if config.OverwriteSaramaConfig == nil {
 			config.OverwriteSaramaConfig = kafka.DefaultSaramaSubscriberConfig()
 		}
+
 		return kafka.NewSubscriber(config, watermill.NewSlogLogger(log))
 	}
 }

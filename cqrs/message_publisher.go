@@ -25,9 +25,7 @@ func NewRedisPublisher(redisConn redis.UniversalClient, log *slog.Logger) (messa
 	publisher, err := redisstream.NewPublisher(redisstream.PublisherConfig{
 		Client:     redisConn,
 		Marshaller: redisstream.DefaultMarshallerUnmarshaller{},
-	},
-		watermill.NewSlogLogger(log),
-	)
+	}, watermill.NewSlogLogger(log))
 	if err != nil {
 		return nil, err
 	}
@@ -66,13 +64,10 @@ func NewRedisPublisherWithConfig(redisConn redis.UniversalClient, config redisst
 //   - message.Publisher: A Watermill message publisher interface
 //   - error: Any error encountered during publisher creation
 func NewKafkaPublisher(brokers []string, log *slog.Logger) (message.Publisher, error) {
-	publisher, err := kafka.NewPublisher(
-		kafka.PublisherConfig{
-			Brokers:   brokers,
-			Marshaler: kafka.DefaultMarshaler{},
-		},
-		watermill.NewSlogLogger(log),
-	)
+	publisher, err := kafka.NewPublisher(kafka.PublisherConfig{
+		Brokers:   brokers,
+		Marshaler: kafka.DefaultMarshaler{},
+	}, watermill.NewSlogLogger(log))
 	if err != nil {
 		return nil, err
 	}
@@ -109,14 +104,11 @@ func NewKafkaPublisherWithConfig(brokers []string, config kafka.PublisherConfig,
 // Returns:
 //   - message.Publisher: A Watermill message publisher interface
 func NewGoChannelPublisher(log *slog.Logger) message.Publisher {
-	return gochannel.NewGoChannel(
-		gochannel.Config{
-			OutputChannelBuffer:            1000,
-			Persistent:                     true,
-			BlockPublishUntilSubscriberAck: false,
-		},
-		watermill.NewSlogLogger(log),
-	)
+	return gochannel.NewGoChannel(gochannel.Config{
+		OutputChannelBuffer:            1000,
+		Persistent:                     true,
+		BlockPublishUntilSubscriberAck: false,
+	}, watermill.NewSlogLogger(log))
 }
 
 // NewGoChannelPublisherWithConfig creates a new in-memory publisher using Go channels with custom configuration.
@@ -129,8 +121,5 @@ func NewGoChannelPublisher(log *slog.Logger) message.Publisher {
 // Returns:
 //   - message.Publisher: A Watermill message publisher interface
 func NewGoChannelPublisherWithConfig(config gochannel.Config, log *slog.Logger) message.Publisher {
-	return gochannel.NewGoChannel(
-		config,
-		watermill.NewSlogLogger(log),
-	)
+	return gochannel.NewGoChannel(config, watermill.NewSlogLogger(log))
 }
