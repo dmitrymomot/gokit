@@ -6,12 +6,10 @@ import (
 	"time"
 
 	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 	"github.com/dmitrymomot/gokit/utils"
-	"github.com/redis/go-redis/v9"
 	"github.com/sony/gobreaker"
 )
 
@@ -33,7 +31,7 @@ func NewCommandHandler[Command any](
 // The command processor generates a subscribe topic for each command handler.
 func CommandProcessor(
 	ctx context.Context,
-	redisClient redis.UniversalClient,
+	subscriber SubscriberConstructor,
 	errorHandler func(context.Context, error) error,
 	cmds ...CommandHandler,
 ) error {
@@ -101,7 +99,7 @@ func CommandProcessor(
 
 	processor, err := cqrs.NewCommandProcessorWithConfig(router, cqrs.CommandProcessorConfig{
 		GenerateSubscribeTopic:   genCommandSubscriberTopic,
-		SubscriberConstructor:    commandSubscriberConstructor(redisClient),
+		SubscriberConstructor:    commandSubscriberConstructor(subscriber),
 		Marshaler:                marshaler,
 		Logger:                   logger,
 		OnHandle:                 commandProcessorOnHandle(errorHandler),
@@ -122,13 +120,13 @@ func CommandProcessor(
 // It returns a function that can be used in the error group.
 func CommandProcessorFunc(
 	ctx context.Context,
-	redisClient redis.UniversalClient,
+	subscriber SubscriberConstructor,
 	errorHandler func(context.Context, error) error,
 	cmds ...CommandHandler,
 ) func() error {
 	return func() error {
 		defer slog.InfoContext(ctx, "Command processor stopped", "component", "command-processor")
-		return CommandProcessor(ctx, redisClient, errorHandler, cmds...)
+		return CommandProcessor(ctx, subscriber, errorHandler, cmds...)
 	}
 }
 
@@ -139,16 +137,9 @@ func genCommandSubscriberTopic(params cqrs.CommandProcessorGenerateSubscribeTopi
 }
 
 // subscriberConstructor is a function that creates a new subscriber for the command processor.
-func commandSubscriberConstructor(redisClient redis.UniversalClient) cqrs.CommandProcessorSubscriberConstructorFn {
+func commandSubscriberConstructor(subscriber SubscriberConstructor) cqrs.CommandProcessorSubscriberConstructorFn {
 	return func(params cqrs.CommandProcessorSubscriberConstructorParams) (message.Subscriber, error) {
-		return redisstream.NewSubscriber(
-			redisstream.SubscriberConfig{
-				Client:        redisClient,
-				Unmarshaller:  redisstream.DefaultMarshallerUnmarshaller{},
-				ConsumerGroup: params.HandlerName,
-			},
-			watermill.NewSlogLogger(slog.With(slog.String("component", "command_subscriber"))),
-		)
+		return subscriber(params.Handler.HandlerName())
 	}
 }
 

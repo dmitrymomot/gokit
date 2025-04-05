@@ -6,12 +6,10 @@ import (
 	"time"
 
 	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 	"github.com/dmitrymomot/gokit/utils"
-	"github.com/redis/go-redis/v9"
 	"github.com/sony/gobreaker"
 )
 
@@ -35,7 +33,7 @@ func NewEventHandler[Event any](
 // The event processor uses the provided consumer group for the subscribe topics.
 func EventProcessor(
 	ctx context.Context,
-	redisClient redis.UniversalClient,
+	subscriber SubscriberConstructor,
 	errorHandler func(context.Context, error) error,
 	events ...EventHandler,
 ) error {
@@ -103,7 +101,7 @@ func EventProcessor(
 
 	processor, err := cqrs.NewEventProcessorWithConfig(router, cqrs.EventProcessorConfig{
 		GenerateSubscribeTopic: genEventSubscribeTopic,
-		SubscriberConstructor:  eventSubscriberConstructor(redisClient),
+		SubscriberConstructor:  eventSubscriberConstructor(subscriber),
 		Marshaler:              marshaler,
 		Logger:                 logger,
 		OnHandle:               onHandleEvent(errorHandler),
@@ -123,13 +121,13 @@ func EventProcessor(
 // EventProcessorFunc is a function that wraps the EventProcessor function to use it in the error group.
 func EventProcessorFunc(
 	ctx context.Context,
-	redisClient redis.UniversalClient,
+	subscriber SubscriberConstructor,
 	errorHandler func(context.Context, error) error,
 	events ...EventHandler,
 ) func() error {
 	return func() error {
 		defer slog.InfoContext(ctx, "Event processor stopped", "component", "event-processor")
-		return EventProcessor(ctx, redisClient, errorHandler, events...)
+		return EventProcessor(ctx, subscriber, errorHandler, events...)
 	}
 }
 
@@ -140,17 +138,9 @@ func genEventSubscribeTopic(params cqrs.EventProcessorGenerateSubscribeTopicPara
 }
 
 // eventSubscriberConstructor creates a new event subscriber.
-// It uses the provided redis client and consumer group.
-func eventSubscriberConstructor(redisClient redis.UniversalClient) cqrs.EventProcessorSubscriberConstructorFn {
+func eventSubscriberConstructor(subscriber SubscriberConstructor) cqrs.EventProcessorSubscriberConstructorFn {
 	return func(params cqrs.EventProcessorSubscriberConstructorParams) (message.Subscriber, error) {
-		return redisstream.NewSubscriber(
-			redisstream.SubscriberConfig{
-				Client:        redisClient,
-				Unmarshaller:  redisstream.DefaultMarshallerUnmarshaller{},
-				ConsumerGroup: params.EventHandler.HandlerName(),
-			},
-			watermill.NewSlogLogger(slog.With(slog.String("component", "event-subscriber"))),
-		)
+		return subscriber(params.HandlerName)
 	}
 }
 

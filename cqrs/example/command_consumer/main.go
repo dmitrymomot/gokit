@@ -50,8 +50,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Init Redis publisher
+	publisher, err := cqrs.NewRedisPublisher(redisClient, log)
+	if err != nil {
+		log.ErrorContext(ctx, "Failed to create Redis publisher", "error", err)
+		os.Exit(1)
+	}
+
 	// Create an event bus to publish events
-	eventBus, err := cqrs.NewEventBus(redisClient, log)
+	eventBus, err := cqrs.NewEventBus(publisher, log)
 	if err != nil {
 		log.ErrorContext(ctx, "Failed to create event bus", "error", err)
 		os.Exit(1)
@@ -86,7 +93,7 @@ func main() {
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(cqrs.CommandProcessorFunc(ctx, redisClient,
+	eg.Go(cqrs.CommandProcessorFunc(ctx, cqrs.NewRedisSubscriber(redisClient, log),
 		func(ctx context.Context, err error) error {
 			log.ErrorContext(ctx, "Command processing error", "error", err)
 			return nil

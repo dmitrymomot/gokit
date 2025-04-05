@@ -5,10 +5,9 @@ import (
 	"log/slog"
 
 	"github.com/ThreeDotsLabs/watermill"
-	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
+	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/dmitrymomot/gokit/utils"
-	"github.com/redis/go-redis/v9"
 )
 
 // EventBus is an interface for publishing events.
@@ -19,17 +18,9 @@ type EventBus interface {
 
 // NewEventBus creates a new EventBus.
 // Use this event bus to publish events.
-func NewEventBus(redisConn redis.UniversalClient, log *slog.Logger) (EventBus, error) {
-	eventPublisher, err := redisstream.NewPublisher(redisstream.PublisherConfig{
-		Client:     redisConn,
-		Marshaller: redisstream.DefaultMarshallerUnmarshaller{},
-	}, nil)
-	if err != nil {
-		return nil, err
-	}
-
+func NewEventBus(publisher message.Publisher, log *slog.Logger) (EventBus, error) {
 	eventBus, err := cqrs.NewEventBusWithConfig(
-		eventPublisher,
+		publisher,
 		cqrs.EventBusConfig{
 			GeneratePublishTopic: generateEventBusPublishTopic,
 			Marshaler:            marshaler,

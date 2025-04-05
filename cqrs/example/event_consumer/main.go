@@ -44,7 +44,7 @@ func main() {
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(cqrs.EventProcessorFunc(ctx, redisClient,
+	eg.Go(cqrs.EventProcessorFunc(ctx, cqrs.NewRedisSubscriber(redisClient, log),
 		func(ctx context.Context, err error) error {
 			log.ErrorContext(ctx, "Event processing error", "error", err)
 			return nil

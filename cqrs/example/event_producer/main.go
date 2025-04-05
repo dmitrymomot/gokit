@@ -44,7 +44,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	eventBus, err := cqrs.NewEventBus(redisClient, log)
+	// Init Redis publisher
+	publisher, err := cqrs.NewRedisPublisher(redisClient, log)
+	if err != nil {
+		log.ErrorContext(ctx, "Failed to create Redis publisher", "error", err)
+		os.Exit(1)
+	}
+
+	eventBus, err := cqrs.NewEventBus(publisher, log)
 	if err != nil {
 		log.ErrorContext(ctx, "Failed to create event bus", "error", err)
 		os.Exit(1)

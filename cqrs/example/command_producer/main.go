@@ -44,8 +44,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Init Redis publisher
+	publisher, err := cqrs.NewRedisPublisher(redisClient, log)
+	if err != nil {
+		log.ErrorContext(ctx, "Failed to create Redis publisher", "error", err)
+		os.Exit(1)
+	}
+
 	// Create a command bus to send commands
-	commandBus, err := cqrs.NewCommandBus(redisClient, log)
+	commandBus, err := cqrs.NewCommandBus(publisher, log)
 	if err != nil {
 		log.ErrorContext(ctx, "Failed to create command bus", "error", err)
 		os.Exit(1)
@@ -64,13 +71,13 @@ func main() {
 			case <-ticker.C:
 				// Generate a random workspace name
 				name := randomname.Generate(nil)
-				
+
 				// Create the command
 				cmd := WorkspaceCreate{
 					Name:        name,
 					Description: "Workspace created at " + time.Now().Format(time.RFC3339),
 				}
-				
+
 				// Send the command
 				if err := commandBus.Send(ctx, cmd); err != nil {
 					log.ErrorContext(ctx, "Failed to send command", "error", err)

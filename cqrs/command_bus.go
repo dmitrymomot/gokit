@@ -4,11 +4,10 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
+	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/dmitrymomot/gokit/utils"
-	"github.com/redis/go-redis/v9"
 )
 
 // CommandBus is an interface for sending commands.
@@ -20,21 +19,13 @@ type CommandBus interface {
 
 // NewCommandBus creates a new CommandBus.
 // Use this command bus to send commands to the service.
-func NewCommandBus(redisConn redis.UniversalClient, log *slog.Logger) (CommandBus, error) {
-	commandPublisher, err := redisstream.NewPublisher(redisstream.PublisherConfig{
-		Client:     redisConn,
-		Marshaller: redisstream.DefaultMarshallerUnmarshaller{},
-	}, nil)
-	if err != nil {
-		return nil, err
-	}
-
+func NewCommandBus(publisher message.Publisher, log *slog.Logger) (CommandBus, error) {
 	commandBus, err := cqrs.NewCommandBusWithConfig(
-		commandPublisher,
+		publisher,
 		cqrs.CommandBusConfig{
 			GeneratePublishTopic: generateCommandBusPublishTopic,
 			Marshaler:            marshaler,
-			Logger:               NewSlogAdapter(log),
+			Logger:               watermill.NewSlogLogger(log),
 		},
 	)
 	if err != nil {
