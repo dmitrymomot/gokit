@@ -6,8 +6,11 @@ import (
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill-kafka/v3/pkg/kafka"
 	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
+	"github.com/ThreeDotsLabs/watermill-sql/v4/pkg/sql"
+	"github.com/ThreeDotsLabs/watermill/components/delay"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -122,4 +125,55 @@ func NewGoChannelPublisher(log *slog.Logger) message.Publisher {
 //   - message.Publisher: A Watermill message publisher interface
 func NewGoChannelPublisherWithConfig(config gochannel.Config, log *slog.Logger) message.Publisher {
 	return gochannel.NewGoChannel(config, watermill.NewSlogLogger(log))
+}
+
+// NewPostgresPublisher creates a new PostgreSQL publisher with default configuration.
+// It uses the provided pgx connection pool and automatically initializes the message tables schema.
+// Table names for messages will be prefixed with "msg_queue_" followed by the topic name.
+//
+// Parameters:
+//   - db: A PostgreSQL connection pool from pgxpool
+//   - log: A structured logger from the slog package
+//
+// Returns:
+//   - message.Publisher: A Watermill message publisher interface
+//   - error: Any error encountered during publisher creation
+func NewPostgresPublisher(db *pgxpool.Pool, log *slog.Logger) (message.Publisher, error) {
+	publisher, err := sql.NewPublisher(sql.PgxBeginner{Conn: db}, sql.PublisherConfig{
+		SchemaAdapter: sql.DefaultPostgreSQLSchema{
+			GenerateMessagesTableName: generateMessagesTableName,
+		},
+		AutoInitializeSchema: true,
+	}, watermill.NewSlogLogger(log))
+	if err != nil {
+		return nil, err
+	}
+
+	return publisher, nil
+}
+
+// NewDelayedPostgresPublisher creates a new delayed PostgreSQL publisher.
+// This publisher allows messages to be published with a specified delay, as well as immediately if configured.
+//
+// Parameters:
+//   - db: A PostgreSQL connection pool from pgxpool
+//   - log: A structured logger from the slog package
+//
+// Returns:
+//   - message.Publisher: A Watermill message publisher interface with delay capability
+//   - error: Any error encountered during publisher creation
+func NewDelayedPostgresPublisher(db *pgxpool.Pool, log *slog.Logger) (message.Publisher, error) {
+	publisher, err := sql.NewDelayedPostgreSQLPublisher(
+		sql.PgxBeginner{Conn: db},
+		sql.DelayedPostgreSQLPublisherConfig{
+			DelayPublisherConfig: delay.PublisherConfig{
+				AllowNoDelay: true, // allow publish without delay
+			},
+			Logger: watermill.NewSlogLogger(log),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return publisher, nil
 }

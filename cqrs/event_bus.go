@@ -3,9 +3,11 @@ package cqrs
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
+	"github.com/ThreeDotsLabs/watermill/components/delay"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/dmitrymomot/gokit/utils"
 )
@@ -14,6 +16,7 @@ import (
 // Implementations should be safe for concurrent use by multiple goroutines.
 type EventBus interface {
 	Publish(ctx context.Context, event any) error
+	PublishWithDelay(ctx context.Context, event any, delay time.Duration) error
 }
 
 // NewEventBus creates a new EventBus.
@@ -31,9 +34,22 @@ func NewEventBus(publisher message.Publisher, log *slog.Logger) (EventBus, error
 		return nil, err
 	}
 
-	return eventBus, nil
+	return &eventBusWithDelay{eb: eventBus}, nil
 }
 
 func generateEventBusPublishTopic(params cqrs.GenerateEventPublishTopicParams) (string, error) {
 	return utils.GetNameFromStruct(params.Event, utils.StructName), nil
+}
+
+type eventBusWithDelay struct {
+	eb *cqrs.EventBus
+}
+
+func (e *eventBusWithDelay) Publish(ctx context.Context, event any) error {
+	return e.eb.Publish(ctx, event)
+}
+
+func (e *eventBusWithDelay) PublishWithDelay(ctx context.Context, event any, d time.Duration) error {
+	ctx = delay.WithContext(ctx, delay.For(d))
+	return e.eb.Publish(ctx, event)
 }

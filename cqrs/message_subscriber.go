@@ -4,13 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/IBM/sarama"
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill-kafka/v3/pkg/kafka"
 	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
+	"github.com/ThreeDotsLabs/watermill-sql/v4/pkg/sql"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
+	"github.com/dmitrymomot/gokit/utils"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -136,5 +140,77 @@ func NewKafkaSubscriberWithConfig(
 		}
 
 		return kafka.NewSubscriber(config, watermill.NewSlogLogger(log))
+	}
+}
+
+// NewPostgresSubscriber creates a PostgreSQL-backed message subscriber constructor with default configuration.
+// It configures the subscriber with a 30-second acknowledgment deadline and initializes the necessary database schema.
+//
+// Parameters:
+//   - db: PostgreSQL connection pool
+//   - log: Logger for subscriber operations
+//
+// Returns a function that creates a PostgreSQL subscriber for a specific consumer group.
+// The function ensures that consumer group is non-empty and sets up the appropriate schema
+// and offsets adapters for PostgreSQL.
+func NewPostgresSubscriber(db *pgxpool.Pool, log *slog.Logger) SubscriberConstructor {
+	return func(consumerGroup string) (message.Subscriber, error) {
+		if consumerGroup == "" {
+			return nil, fmt.Errorf("consumer group cannot be empty")
+		}
+
+		subscriber, err := sql.NewSubscriber(
+			sql.PgxBeginner{Conn: db},
+			sql.SubscriberConfig{
+				ConsumerGroup: consumerGroup,
+				AckDeadline:   utils.Ptr(time.Second * 30),
+				SchemaAdapter: sql.DefaultPostgreSQLSchema{
+					GenerateMessagesTableName: generateMessagesTableName,
+				},
+				OffsetsAdapter: sql.DefaultPostgreSQLOffsetsAdapter{
+					GenerateMessagesOffsetsTableName: generateMessagesOffsetsTableName,
+				},
+				InitializeSchema: true,
+			},
+			watermill.NewSlogLogger(log),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create subscriber: %w", err)
+		}
+
+		// Return the PostgreSQL subscriber
+		return subscriber, nil
+	}
+}
+
+// NewDelayedPostgresSubscriber creates a PostgreSQL-backed message subscriber constructor that supports delayed message processing.
+// It configures the subscriber to delete messages on acknowledgment and allows messages with no delay to be processed immediately.
+//
+// Parameters:
+//   - db: PostgreSQL connection pool
+//   - log: Logger for subscriber operations
+//
+// Returns a function that creates a delayed PostgreSQL subscriber for a specific consumer group.
+// The function ensures that consumer group is non-empty and sets up the appropriate configuration
+// for delayed message processing.
+func NewDelayedPostgresSubscriber(db *pgxpool.Pool, log *slog.Logger) SubscriberConstructor {
+	return func(consumerGroup string) (message.Subscriber, error) {
+		if consumerGroup == "" {
+			return nil, fmt.Errorf("consumer group cannot be empty")
+		}
+
+		subscriber, err := sql.NewDelayedPostgreSQLSubscriber(
+			sql.PgxBeginner{Conn: db},
+			sql.DelayedPostgreSQLSubscriberConfig{
+				DeleteOnAck:  true,
+				AllowNoDelay: true,
+				Logger:       watermill.NewSlogLogger(log),
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create subscriber: %w", err)
+		}
+
+		return subscriber, nil
 	}
 }

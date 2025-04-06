@@ -31,21 +31,25 @@ func NewCommandHandler[Command any](
 // The command processor generates a subscribe topic for each command handler.
 func CommandProcessor(
 	ctx context.Context,
+	log *slog.Logger,
 	subscriber SubscriberConstructor,
 	errorHandler func(context.Context, error) error,
 	cmds ...CommandHandler,
 ) error {
-	logger := watermill.NewSlogLogger(slog.With(slog.String("component", "command-processor")))
+	// Check if context is already cancelled before proceeding
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// Wrap the slog logger with a custom watermill logger
+	logger := watermill.NewSlogLogger(log)
+
+	// Create a new Redis publisher
 	router, err := message.NewRouter(message.RouterConfig{}, logger)
 	if err != nil {
 		return err
 	}
 	defer router.Close()
-
-	// Check if context is already cancelled before proceeding
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 
 	// Launch goroutine to handle graceful shutdown
 	go func() {
@@ -97,6 +101,7 @@ func CommandProcessor(
 		errorHandler = func(ctx context.Context, err error) error { return nil }
 	}
 
+	// Create a new command processor with the specified configuration
 	processor, err := cqrs.NewCommandProcessorWithConfig(router, cqrs.CommandProcessorConfig{
 		GenerateSubscribeTopic:   genCommandSubscriberTopic,
 		SubscriberConstructor:    commandSubscriberConstructor(subscriber),
@@ -120,13 +125,13 @@ func CommandProcessor(
 // It returns a function that can be used in the error group.
 func CommandProcessorFunc(
 	ctx context.Context,
+	log *slog.Logger,
 	subscriber SubscriberConstructor,
 	errorHandler func(context.Context, error) error,
 	cmds ...CommandHandler,
 ) func() error {
 	return func() error {
-		defer slog.InfoContext(ctx, "Command processor stopped", "component", "command-processor")
-		return CommandProcessor(ctx, subscriber, errorHandler, cmds...)
+		return CommandProcessor(ctx, log, subscriber, errorHandler, cmds...)
 	}
 }
 

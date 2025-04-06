@@ -33,21 +33,25 @@ func NewEventHandler[Event any](
 // The event processor uses the provided consumer group for the subscribe topics.
 func EventProcessor(
 	ctx context.Context,
+	log *slog.Logger,
 	subscriber SubscriberConstructor,
 	errorHandler func(context.Context, error) error,
 	events ...EventHandler,
 ) error {
-	logger := watermill.NewSlogLogger(slog.With(slog.String("component", "event-processor")))
+	// Check if context is already cancelled before proceeding
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// Wrap the slog logger with a custom watermill logger
+	logger := watermill.NewSlogLogger(log)
+
+	// Create a new message router
 	router, err := message.NewRouter(message.RouterConfig{}, logger)
 	if err != nil {
 		return err
 	}
 	defer router.Close()
-
-	// Check if context is already cancelled before proceeding
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 
 	// Launch goroutine to handle graceful shutdown
 	go func() {
@@ -121,13 +125,13 @@ func EventProcessor(
 // EventProcessorFunc is a function that wraps the EventProcessor function to use it in the error group.
 func EventProcessorFunc(
 	ctx context.Context,
+	log *slog.Logger,
 	subscriber SubscriberConstructor,
 	errorHandler func(context.Context, error) error,
 	events ...EventHandler,
 ) func() error {
 	return func() error {
-		defer slog.InfoContext(ctx, "Event processor stopped", "component", "event-processor")
-		return EventProcessor(ctx, subscriber, errorHandler, events...)
+		return EventProcessor(ctx, log, subscriber, errorHandler, events...)
 	}
 }
 
