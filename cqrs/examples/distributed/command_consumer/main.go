@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ThreeDotsLabs/watermill/components/delay"
 	"github.com/dmitrymomot/gokit/cqrs"
 	"github.com/dmitrymomot/gokit/redis"
 	"github.com/google/uuid"
@@ -79,6 +80,9 @@ func main() {
 			CreatedAt:     time.Now().Format(time.RFC3339),
 		}
 
+		// Add a delay to the command
+		ctx = delay.WithContext(ctx, delay.For(5*time.Second))
+
 		// Publish the event
 		if err := eventBus.Publish(ctx, event); err != nil {
 			log.ErrorContext(ctx, "Failed to publish WorkspaceCreatedEvent", "error", err)
@@ -93,7 +97,9 @@ func main() {
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(cqrs.CommandProcessorFunc(ctx, cqrs.NewRedisSubscriber(redisClient, log),
+	eg.Go(cqrs.CommandProcessorFunc(ctx,
+		log.With(slog.String("component", "command-processor")),
+		cqrs.NewRedisSubscriber(redisClient, log),
 		func(ctx context.Context, err error) error {
 			log.ErrorContext(ctx, "Command processing error", "error", err)
 			return nil

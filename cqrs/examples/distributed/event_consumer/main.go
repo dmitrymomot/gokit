@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dmitrymomot/gokit/cqrs"
-	"github.com/dmitrymomot/gokit/randomname"
 	"github.com/dmitrymomot/gokit/redis"
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
@@ -25,7 +24,7 @@ func main() {
 	appName := os.Getenv("APP_NAME")
 	if appName == "" {
 		uuidStr := uuid.New().String()
-		appName = "event-producer-" + uuidStr[len(uuidStr)-6:]
+		appName = "event-consumer-" + uuidStr[len(uuidStr)-6:]
 	}
 
 	log := slog.With(slog.String("app", appName))
@@ -44,41 +43,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Init Redis publisher
-	publisher, err := cqrs.NewRedisPublisher(redisClient, log)
-	if err != nil {
-		log.ErrorContext(ctx, "Failed to create Redis publisher", "error", err)
-		os.Exit(1)
-	}
-
-	eventBus, err := cqrs.NewEventBus(publisher, log)
-	if err != nil {
-		log.ErrorContext(ctx, "Failed to create event bus", "error", err)
-		os.Exit(1)
-	}
-
 	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		ticker := time.NewTicker(3 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				log.InfoContext(ctx, "Shutting down event producer")
+	eg.Go(cqrs.EventProcessorFunc(ctx,
+		log.With(slog.String("component", "event-processor")),
+		cqrs.NewRedisSubscriber(redisClient, log),
+		func(ctx context.Context, err error) error {
+			log.ErrorContext(ctx, "Event processing error", "error", err)
+			return nil
+		},
+		cqrs.NewEventHandler(
+			func(ctx context.Context, event *WorkspaceCreatedEvent) error {
+				log.InfoContext(ctx, "Received event by handler 1", "event", event.WorkspaceName)
 				return nil
-			case <-ticker.C:
-				// Simulate event publishing
-				event := WorkspaceCreatedEvent{
-					WorkspaceID:   uuid.New().String(),
-					WorkspaceName: randomname.Generate(nil),
-				}
-				if err := eventBus.Publish(ctx, event); err != nil {
-					log.ErrorContext(ctx, "Failed to publish event", "error", err)
-				}
-			}
-		}
-	})
+			},
+		),
+		cqrs.NewEventHandler(
+			func(ctx context.Context, event *WorkspaceCreatedEvent) error {
+				log.InfoContext(ctx, "Received event by handler 2", "event", event.WorkspaceName)
+				return nil
+			},
+		),
+	))
 
 	// Wait for the application to stop
 	// This will block until the context is done

@@ -1,0 +1,16 @@
+services:
+  pg:
+    image: postgres:alpine
+    container_name: gokit_cqrs_example_pg
+    environment:
+      POSTGRES_PASSWORD: pgpass
+      POSTGRES_USER: pguser
+      POSTGRES_DB: pgdb
+    ports:
+      - "5432:5432"
+    networks:
+      - gokit_cqrs_example_pg_default
+    restart: unless-stopped
+
+networks:
+  gokit_cqrs_example_pg_default:

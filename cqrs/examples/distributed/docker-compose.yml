@@ -4,8 +4,6 @@ services:
     container_name: gokit_cqrs_example_app_redis
     ports:
       - "6379:6379"
-    volumes:
-      - gokit_cqrs_example_app_redis_data:/data
     networks:
       - gokit_cqrs_example_app_redis_default
     healthcheck:
@@ -14,9 +12,6 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-
-volumes:
-  gokit_cqrs_example_app_redis_data:
 
 networks:
   gokit_cqrs_example_app_redis_default:
