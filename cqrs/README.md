@@ -11,6 +11,7 @@ The CQRS package provides a Command Query Responsibility Segregation (CQRS) impl
 - Redis Stream Integration
 - Middleware Support (Retry, Circuit Breaker, Timeout)
 - Type-safe handler implementations using generics
+- PostgreSQL-based message transport (for delayed message processing and pub/sub)
 
 ## Installation
 
@@ -90,7 +91,15 @@ errorHandler := func(ctx context.Context, err error) error {
 }
 
 // Start command processor in an error group
-eg.Go(cqrs.CommandProcessorFunc(ctx, redisClient, errorHandler, handler))
+eg.Go(cqrs.CommandProcessorFunc(
+    ctx,
+    cqrs.CommandProcessorConfig{
+        Logger:                log.With(slog.String("component", "command-processor")),
+        SubscriberConstructor: cqrs.NewRedisSubscriber(redisClient, log),
+        ErrorHandler:          errorHandler,
+    },
+    handler,
+))
 
 // Send a command
 err = commandBus.Send(ctx, &CreateUserCommand{
@@ -115,7 +124,7 @@ err = commandBus.SendWithModifiedMessage(ctx, &CreateUserCommand{
 
 ```go
 // Create a new event bus
-bus, err := cqrs.NewEventBus(redisClient, log)
+bus, err := cqrs.NewEventBus(publisher, log)
 if err != nil {
     log.Fatal(err)
 }
@@ -138,26 +147,51 @@ errorHandler := func(ctx context.Context, err error) error {
 }
 
 // Start event processor in an error group
-eg.Go(cqrs.EventProcessorFunc(ctx, redisClient, errorHandler, handler))
+eg.Go(cqrs.EventProcessorFunc(
+    ctx,
+    cqrs.EventProcessorConfig{
+        Logger:                log.With(slog.String("component", "event-processor")),
+        SubscriberConstructor: cqrs.NewRedisSubscriber(redisClient, log),
+        ErrorHandler:          errorHandler,
+    },
+    handler,
+))
 ```
 
 ### Running Example Applications
 
 The package includes fully functional example applications that demonstrate CQRS principles:
 
-#### Event Examples
+#### Distributed Examples
 - **event_producer**: Publishes events to the event bus
 - **event_consumer**: Subscribes to and processes events
-
-#### Command Examples
 - **command_producer**: Sends commands to the command bus
 - **command_consumer**: Processes commands and emits events
 
-To run the examples:
+The command examples demonstrate:
+- Creating WorkspaceID using UUID
+- Emitting WorkspaceCreatedEvent after successful command processing
+- Using Redis for messaging infrastructure
+- Proper error handling and logging
+- Generating commands with random workspace names
+- Sending a new command every 3 seconds
+- Proper context handling for graceful shutdown
+
+The command_consumer example demonstrates:
+- Processing commands from the command bus
+- Emitting events after successful command processing
+- Using Redis for messaging infrastructure
+- Proper error handling and logging
+
+#### PostgreSQL Examples
+- **delayed**: Demonstrates delayed message processing using PostgreSQL
+- **pubsub**: Shows how to use PostgreSQL for pub/sub messaging
+
+To run the distributed examples:
 
 ```bash
 # Navigate to the example directory
-cd cqrs/example
+cd cqrs/examples/distributed
 
 # Start Redis using Docker
 make docker
@@ -225,14 +259,21 @@ func main() {
         os.Exit(1)
     }
 
+    // Create Redis publisher
+    publisher, err := cqrs.NewRedisPublisher(redisClient, log)
+    if err != nil {
+        log.ErrorContext(ctx, "Failed to create Redis publisher", "error", err)
+        os.Exit(1)
+    }
+
     // Create command and event buses
-    commandBus, err := cqrs.NewCommandBus(redisClient, log)
+    commandBus, err := cqrs.NewCommandBus(publisher, log)
     if err != nil {
         log.ErrorContext(ctx, "Failed to create command bus", "error", err)
         os.Exit(1)
     }
 
-    eventBus, err := cqrs.NewEventBus(redisClient, log)
+    eventBus, err := cqrs.NewEventBus(publisher, log)
     if err != nil {
         log.ErrorContext(ctx, "Failed to create event bus", "error", err)
         os.Exit(1)
@@ -250,8 +291,11 @@ func main() {
     // Run command processor
     eg.Go(cqrs.CommandProcessorFunc(
         ctx,
-        redisClient,
-        errorHandler,
+        cqrs.CommandProcessorConfig{
+            Logger:                log.With(slog.String("component", "command-processor")),
+            SubscriberConstructor: cqrs.NewRedisSubscriber(redisClient, log),
+            ErrorHandler:          errorHandler,
+        },
         cqrs.NewCommandHandler(func(ctx context.Context, cmd *CreateUserCommand) error {
             userID := uuid.New().String()
             log.InfoContext(ctx, "Processing command", "user", cmd.Name)
@@ -267,8 +311,11 @@ func main() {
     // Run event processor
     eg.Go(cqrs.EventProcessorFunc(
         ctx,
-        redisClient,
-        errorHandler,
+        cqrs.EventProcessorConfig{
+            Logger:                log.With(slog.String("component", "event-processor")),
+            SubscriberConstructor: cqrs.NewRedisSubscriber(redisClient, log),
+            ErrorHandler:          errorHandler,
+        },
         cqrs.NewEventHandler(func(ctx context.Context, event *UserCreatedEvent) error {
             log.InfoContext(ctx, "Event processed", "user_id", event.UserID, "name", event.Name)
             return nil
@@ -313,5 +360,6 @@ func main() {
 - Thread-safe implementation for concurrent use
 - Context-based cancellation for graceful shutdowns
 - Example applications demonstrate working implementations
+- Support for PostgreSQL-based message transport for advanced use cases
 
 For more detailed information about specific components, please refer to the example applications and source code documentation.
