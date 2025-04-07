@@ -45,14 +45,13 @@ run-command-consumer:
 	@echo "Running command consumer..."
 	@APP_NAME="command_consumer_1" go run ./command_consumer/main.go
 	@echo "Command consumer 1 finished."
-	
+
 run-command-consumer-2:
 	@echo "Running command consumer 2..."
 	@APP_NAME="command_consumer_2" go run ./command_consumer/main.go
 	@echo "Command consumer 2 finished."
-	
+
 run-command-consumer-3:
 	@echo "Running command consumer 3..."
 	@APP_NAME="command_consumer_3" go run ./command_consumer/main.go
 	@echo "Command consumer 3 finished."
-	

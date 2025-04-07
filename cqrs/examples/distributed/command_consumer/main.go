@@ -8,7 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ThreeDotsLabs/watermill/components/delay"
 	"github.com/dmitrymomot/gokit/cqrs"
 	"github.com/dmitrymomot/gokit/redis"
 	"github.com/google/uuid"
@@ -79,9 +78,6 @@ func main() {
 			WorkspaceName: cmd.Name,
 			CreatedAt:     time.Now().Format(time.RFC3339),
 		}
-
-		// Add a delay to the command
-		ctx = delay.WithContext(ctx, delay.For(5*time.Second))
 
 		// Publish the event
 		if err := eventBus.Publish(ctx, event); err != nil {
