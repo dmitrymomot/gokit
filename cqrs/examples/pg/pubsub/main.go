@@ -64,12 +64,15 @@ func main() {
 	eg, ctx := errgroup.WithContext(ctx)
 
 	// Start the event consumer
-	eg.Go(cqrs.EventProcessorFunc(ctx,
-		log.With(slog.String("component", "event-processor")),
-		cqrs.NewPostgresSubscriber(db, log),
-		func(ctx context.Context, err error) error {
-			log.ErrorContext(ctx, "Event processing error", "error", err)
-			return nil
+	eg.Go(cqrs.EventProcessorFunc(
+		ctx,
+		cqrs.EventProcessorConfig{
+			Logger:                log.With(slog.String("component", "event-processor")),
+			SubscriberConstructor: cqrs.NewPostgresSubscriber(db, log),
+			ErrorHandler: func(ctx context.Context, err error) error {
+				log.ErrorContext(ctx, "Event processing error", "error", err)
+				return nil
+			},
 		},
 		cqrs.NewEventHandler(
 			func(ctx context.Context, event *WorkspaceCreatedEvent) error {

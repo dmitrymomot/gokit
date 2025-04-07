@@ -44,12 +44,15 @@ func main() {
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(cqrs.EventProcessorFunc(ctx,
-		log.With(slog.String("component", "event-processor")),
-		cqrs.NewRedisSubscriber(redisClient, log),
-		func(ctx context.Context, err error) error {
-			log.ErrorContext(ctx, "Event processing error", "error", err)
-			return nil
+	eg.Go(cqrs.EventProcessorFunc(
+		ctx,
+		cqrs.EventProcessorConfig{
+			Logger:                log.With(slog.String("component", "event-processor")),
+			SubscriberConstructor: cqrs.NewRedisSubscriber(redisClient, log),
+			ErrorHandler: func(ctx context.Context, err error) error {
+				log.ErrorContext(ctx, "Event processing error", "error", err)
+				return nil
+			},
 		},
 		cqrs.NewEventHandler(
 			func(ctx context.Context, event *WorkspaceCreatedEvent) error {

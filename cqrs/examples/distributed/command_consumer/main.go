@@ -93,12 +93,15 @@ func main() {
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(cqrs.CommandProcessorFunc(ctx,
-		log.With(slog.String("component", "command-processor")),
-		cqrs.NewRedisSubscriber(redisClient, log),
-		func(ctx context.Context, err error) error {
-			log.ErrorContext(ctx, "Command processing error", "error", err)
-			return nil
+	eg.Go(cqrs.CommandProcessorFunc(
+		ctx,
+		cqrs.CommandProcessorConfig{
+			Logger:                log.With(slog.String("component", "command-processor")),
+			SubscriberConstructor: cqrs.NewRedisSubscriber(redisClient, log),
+			ErrorHandler: func(ctx context.Context, err error) error {
+				log.ErrorContext(ctx, "Command processing error", "error", err)
+				return nil
+			},
 		},
 		cqrs.NewCommandHandler(workspaceCreateHandler),
 	))
