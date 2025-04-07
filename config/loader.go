@@ -51,18 +51,20 @@ func Load[T any]() (T, error) {
 	var config T
 	typeName := getTypeName[T]()
 
-	// Get or create the once instance for this type under a single lock
+	// Single lock section to check cache and set up once
 	globalCache.mu.Lock()
-	once, exists := globalCache.onces[typeName]
-	if !exists {
-		once = new(sync.Once)
-		globalCache.onces[typeName] = once
-	}
-	
+
 	// Try to retrieve from cache immediately if already loaded
 	if cached, ok := globalCache.values[typeName]; ok {
 		globalCache.mu.Unlock()
 		return cached.(T), nil
+	}
+
+	// Get or create the once instance for this type
+	once, exists := globalCache.onces[typeName]
+	if !exists {
+		once = new(sync.Once)
+		globalCache.onces[typeName] = once
 	}
 	globalCache.mu.Unlock()
 
@@ -87,16 +89,26 @@ func Load[T any]() (T, error) {
 		return config, err
 	}
 
-	// Double-check that the config is in the cache
+	// If there's no error, the config should be in the cache
 	globalCache.mu.Lock()
-	if cached, ok := globalCache.values[typeName]; ok {
-		config = cached.(T)
-	} else {
-		err = ErrConfigNotLoaded
-	}
+	cached, ok := globalCache.values[typeName]
 	globalCache.mu.Unlock()
 
-	return config, err
+	if ok {
+		return cached.(T), nil
+	}
+
+	return config, ErrConfigNotLoaded
+}
+
+// MustLoad works like Load but panics if configuration loading fails.
+// This is useful for configurations that are required for the application to start.
+func MustLoad[T any]() T {
+	config, err := Load[T]()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to load required configuration: %v", err))
+	}
+	return config
 }
 
 // getTypeName returns a string identifier for the generic type T
