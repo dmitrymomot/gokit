@@ -9,6 +9,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill/components/cqrs"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
+	"github.com/ThreeDotsLabs/watermill/message/router/plugin"
 	"github.com/dmitrymomot/gokit/utils"
 	"github.com/sony/gobreaker"
 )
@@ -95,6 +96,9 @@ func CommandProcessor(
 			Timeout:     time.Second * 10,
 		}).Middleware,
 	)
+
+	// Add signal handler to gracefully shutdown the router
+	router.AddPlugin(plugin.SignalsHandler)
 
 	// If error handler is not provided, use a default one that does nothing.
 	if errorHandler == nil {
