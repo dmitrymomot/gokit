@@ -32,7 +32,7 @@ func TestMiddleware(t *testing.T) {
 	// Create a test handler that checks for claims in the context
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Get claims from context using the GetClaims helper
-		claims, ok := jwt.GetClaims(r.Context())
+		claims, ok := jwt.GetClaims[map[string]any](r.Context())
 		if !ok {
 			http.Error(w, "Claims not found in context", http.StatusInternalServerError)
 			return

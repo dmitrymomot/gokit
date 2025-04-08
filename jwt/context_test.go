@@ -58,30 +58,56 @@ func TestGetToken(t *testing.T) {
 }
 
 func TestSetClaims(t *testing.T) {
-	// Arrange
-	ctx := context.Background()
-	claims := map[string]any{
-		"sub":   "1234567890",
-		"name":  "John Doe",
-		"admin": true,
-	}
+	// Test with map claims
+	t.Run("MapClaims", func(t *testing.T) {
+		// Arrange
+		ctx := context.Background()
+		claims := map[string]any{
+			"sub":   "1234567890",
+			"name":  "John Doe",
+			"admin": true,
+		}
 
-	// Act
-	newCtx := jwt.SetClaims(ctx, claims)
+		// Act
+		newCtx := jwt.SetClaims(ctx, claims)
 
-	// Assert
-	require.NotNil(t, newCtx, "Context should not be nil")
-	assert.NotEqual(t, ctx, newCtx, "New context should be different from original")
+		// Assert
+		require.NotNil(t, newCtx, "Context should not be nil")
+		assert.NotEqual(t, ctx, newCtx, "New context should be different from original")
 
-	// Verify claims can be retrieved
-	retrievedClaims, ok := jwt.GetClaims(newCtx)
-	assert.True(t, ok, "Should be able to retrieve claims")
-	assert.Equal(t, claims, retrievedClaims, "Retrieved claims should match original")
+		// Verify claims can be retrieved
+		retrievedClaims, ok := jwt.GetClaims[map[string]any](newCtx)
+		assert.True(t, ok, "Should be able to retrieve claims")
+		assert.Equal(t, claims, retrievedClaims, "Retrieved claims should match original")
+	})
+
+	// Test with struct claims
+	t.Run("StructClaims", func(t *testing.T) {
+		// Arrange
+		ctx := context.Background()
+		claims := CtxTestClaims{
+			Sub:   "1234567890",
+			Name:  "John Doe",
+			Admin: true,
+		}
+
+		// Act
+		newCtx := jwt.SetClaims(ctx, claims)
+
+		// Assert
+		require.NotNil(t, newCtx, "Context should not be nil")
+		assert.NotEqual(t, ctx, newCtx, "New context should be different from original")
+
+		// Verify claims can be retrieved directly as struct
+		retrievedClaims, ok := jwt.GetClaims[CtxTestClaims](newCtx)
+		assert.True(t, ok, "Should be able to retrieve claims as struct")
+		assert.Equal(t, claims, retrievedClaims, "Retrieved claims should match original")
+	})
 }
 
 func TestGetClaims(t *testing.T) {
-	// Test successful retrieval
-	t.Run("ClaimsExist", func(t *testing.T) {
+	// Test successful retrieval with map
+	t.Run("MapClaimsExist", func(t *testing.T) {
 		// Arrange
 		ctx := context.Background()
 		claims := map[string]any{
@@ -92,7 +118,26 @@ func TestGetClaims(t *testing.T) {
 		ctx = jwt.SetClaims(ctx, claims)
 
 		// Act
-		retrievedClaims, ok := jwt.GetClaims(ctx)
+		retrievedClaims, ok := jwt.GetClaims[map[string]any](ctx)
+
+		// Assert
+		assert.True(t, ok, "Should return true when claims exist")
+		assert.Equal(t, claims, retrievedClaims, "Retrieved claims should match original")
+	})
+
+	// Test successful retrieval with struct
+	t.Run("StructClaimsExist", func(t *testing.T) {
+		// Arrange
+		ctx := context.Background()
+		claims := CtxTestClaims{
+			Sub:   "1234567890",
+			Name:  "John Doe",
+			Admin: true,
+		}
+		ctx = jwt.SetClaims(ctx, claims)
+
+		// Act
+		retrievedClaims, ok := jwt.GetClaims[CtxTestClaims](ctx)
 
 		// Assert
 		assert.True(t, ok, "Should return true when claims exist")
@@ -105,11 +150,31 @@ func TestGetClaims(t *testing.T) {
 		ctx := context.Background()
 
 		// Act
-		retrievedClaims, ok := jwt.GetClaims(ctx)
+		retrievedClaims, ok := jwt.GetClaims[map[string]any](ctx)
 
 		// Assert
 		assert.False(t, ok, "Should return false when claims don't exist")
-		assert.Nil(t, retrievedClaims, "Retrieved claims should be nil")
+		assert.Empty(t, retrievedClaims, "Retrieved claims should be empty")
+	})
+
+	// Test wrong type assertion
+	t.Run("WrongTypeAssertion", func(t *testing.T) {
+		// Arrange
+		ctx := context.Background()
+		// Store struct claims
+		claims := CtxTestClaims{
+			Sub:   "1234567890",
+			Name:  "John Doe",
+			Admin: true,
+		}
+		ctx = jwt.SetClaims(ctx, claims)
+
+		// Act - try to get as different type
+		retrievedClaims, ok := jwt.GetClaims[map[string]any](ctx)
+
+		// Assert
+		assert.False(t, ok, "Should return false when claims are of a different type")
+		assert.Empty(t, retrievedClaims, "Retrieved claims should be empty")
 	})
 }
 
@@ -121,8 +186,8 @@ type CtxTestClaims struct {
 }
 
 func TestGetClaimsAs(t *testing.T) {
-	// Test successful parsing
-	t.Run("SuccessfulParsing", func(t *testing.T) {
+	// Test successful parsing from map
+	t.Run("SuccessfulParsingFromMap", func(t *testing.T) {
 		// Arrange
 		ctx := context.Background()
 		claims := map[string]any{
@@ -141,6 +206,26 @@ func TestGetClaimsAs(t *testing.T) {
 		assert.Equal(t, "1234567890", testClaims.Sub, "Sub claim should match")
 		assert.Equal(t, "John Doe", testClaims.Name, "Name claim should match")
 		assert.True(t, testClaims.Admin, "Admin claim should match")
+	})
+
+	// Test successful parsing from struct
+	t.Run("SuccessfulParsingFromStruct", func(t *testing.T) {
+		// Arrange
+		ctx := context.Background()
+		originalClaims := CtxTestClaims{
+			Sub:   "1234567890",
+			Name:  "John Doe",
+			Admin: true,
+		}
+		ctx = jwt.SetClaims(ctx, originalClaims)
+		var testClaims CtxTestClaims
+
+		// Act
+		err := jwt.GetClaimsAs(ctx, &testClaims)
+
+		// Assert
+		require.NoError(t, err, "Should parse claims without error")
+		assert.Equal(t, originalClaims, testClaims, "Retrieved claims should match original")
 	})
 
 	// Test claims not found
@@ -215,7 +300,7 @@ func TestTokenAndClaimsTogether(t *testing.T) {
 
 	// Assert
 	retrievedToken, tokenOk := jwt.GetToken(ctx)
-	retrievedClaims, claimsOk := jwt.GetClaims(ctx)
+	retrievedClaims, claimsOk := jwt.GetClaims[map[string]any](ctx)
 
 	assert.True(t, tokenOk, "Should be able to retrieve token")
 	assert.Equal(t, token, retrievedToken, "Retrieved token should match original")
