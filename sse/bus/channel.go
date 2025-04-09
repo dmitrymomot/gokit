@@ -3,21 +3,28 @@ package bus
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/dmitrymomot/gokit/sse"
 )
 
+// channelEntry represents a channel subscription with active state
+type channelEntry struct {
+	ch     chan sse.Event
+	active atomic.Bool
+}
+
 // ChannelBus implements the MessageBus interface using Go channels
 type ChannelBus struct {
 	mu          sync.RWMutex
-	subscribers map[string]map[chan sse.Event]struct{}
+	subscribers map[string][]*channelEntry
 	closed      bool
 }
 
 // NewChannelBus creates a new ChannelBus
 func NewChannelBus() *ChannelBus {
 	return &ChannelBus{
-		subscribers: make(map[string]map[chan sse.Event]struct{}),
+		subscribers: make(map[string][]*channelEntry),
 	}
 }
 
@@ -28,29 +35,40 @@ func (b *ChannelBus) Publish(ctx context.Context, topic string, event sse.Event)
 	}
 
 	b.mu.RLock()
-	defer b.mu.RUnlock()
+	subs, exists := b.subscribers[topic]
+	closed := b.closed
+	b.mu.RUnlock()
 
-	if b.closed {
+	if closed {
 		return sse.ErrMessageBusClosed
 	}
 
-	subs, exists := b.subscribers[topic]
 	if !exists || len(subs) == 0 {
 		return nil // No subscribers for this topic
 	}
 
-	// Use a goroutine to avoid blocking and handle slow subscribers
-	for ch := range subs {
-		ch := ch // Capture variable for the goroutine
+	// Create a goroutine for each active subscriber
+	for _, entry := range subs {
+		if !entry.active.Load() {
+			// Skip inactive subscriptions
+			continue
+		}
+
+		entry := entry // Capture variable for goroutine
 		go func() {
-			// Use a non-blocking send to avoid deadlocks
+			// Check again if subscription is active
+			if !entry.active.Load() {
+				return
+			}
+
+			// Use non-blocking send to avoid deadlocks
 			select {
-			case ch <- event:
-				// Successfully sent
+			case entry.ch <- event:
+				// Message sent successfully
 			case <-ctx.Done():
 				// Context canceled
 			default:
-				// Channel is full or closed, will be cleaned up on future Subscribe/Unsubscribe
+				// Channel is full, skip this message
 			}
 		}()
 	}
@@ -74,13 +92,12 @@ func (b *ChannelBus) Subscribe(ctx context.Context, topic string) (<-chan sse.Ev
 	// Create a buffered channel to avoid blocking publishers
 	ch := make(chan sse.Event, 100)
 
-	// Create the topic if it doesn't exist
-	if _, exists := b.subscribers[topic]; !exists {
-		b.subscribers[topic] = make(map[chan sse.Event]struct{})
-	}
+	// Create a new subscription entry
+	entry := &channelEntry{ch: ch}
+	entry.active.Store(true)
 
-	// Add the channel to the subscribers for this topic
-	b.subscribers[topic][ch] = struct{}{}
+	// Create the topic if it doesn't exist
+	b.subscribers[topic] = append(b.subscribers[topic], entry)
 
 	// Clean up when context is done
 	go func() {
@@ -106,25 +123,46 @@ func (b *ChannelBus) Unsubscribe(ctx context.Context, topic string, ch <-chan ss
 
 	// Check if the topic exists
 	subs, exists := b.subscribers[topic]
-	if !exists {
+	if !exists || len(subs) == 0 {
 		return nil // Topic doesn't exist, nothing to unsubscribe
 	}
 
-	// Find and remove the channel
-	for subCh := range subs {
-		if ch == subCh {
-			delete(subs, subCh)
-			close(subCh) // Close the channel
+	// Find and deactivate the channel but DO NOT close it
+	for _, entry := range subs {
+		if entry.ch == ch {
+			// Deactivate the subscription to prevent future messages
+			entry.active.Store(false)
 			break
 		}
 	}
 
-	// Remove the topic if there are no more subscribers
-	if len(subs) == 0 {
-		delete(b.subscribers, topic)
-	}
+	// Clean up the subscribers list (only removes entries, doesn't close channels)
+	b.cleanupInactiveSubscriptions(topic)
 
 	return nil
+}
+
+// cleanupInactiveSubscriptions removes inactive subscriptions from the subscribers list
+func (b *ChannelBus) cleanupInactiveSubscriptions(topic string) {
+	subs, exists := b.subscribers[topic]
+	if !exists || len(subs) == 0 {
+		return
+	}
+
+	active := make([]*channelEntry, 0, len(subs))
+	for _, entry := range subs {
+		if entry.active.Load() {
+			active = append(active, entry)
+		}
+	}
+
+	if len(active) == 0 {
+		// No active subscriptions, remove the topic
+		delete(b.subscribers, topic)
+	} else {
+		// Update with only active subscriptions
+		b.subscribers[topic] = active
+	}
 }
 
 // Close shuts down the message bus
@@ -140,8 +178,9 @@ func (b *ChannelBus) Close() error {
 
 	// Close all subscriber channels
 	for _, subs := range b.subscribers {
-		for ch := range subs {
-			close(ch)
+		for _, entry := range subs {
+			entry.active.Store(false)
+			close(entry.ch)
 		}
 	}
 
