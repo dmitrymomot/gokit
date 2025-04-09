@@ -2,6 +2,7 @@ package sse
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -15,8 +16,8 @@ type Event struct {
 	// Event is the event type
 	Event string
 
-	// Data is the event data
-	Data string
+	// Data is the event data (can be any type)
+	Data any
 
 	// Retry is the reconnection time in milliseconds
 	Retry int
@@ -36,10 +37,13 @@ func (e Event) String() string {
 		fmt.Fprintf(&buf, "event: %s\n", e.Event)
 	}
 
-	// Add Data field, handling multiline data
-	if e.Data != "" {
-		for line := range strings.SplitSeq(e.Data, "\n") {
-			fmt.Fprintf(&buf, "data: %s\n", line)
+	// Add Data field, handling different data types
+	if e.Data != nil {
+		strData, err := convertDataToString(e.Data)
+		if err == nil && strData != "" {
+			for line := range strings.SplitSeq(strData, "\n") {
+				fmt.Fprintf(&buf, "data: %s\n", line)
+			}
 		}
 	}
 
@@ -58,4 +62,25 @@ func (e Event) String() string {
 func (e Event) Write(w io.Writer) error {
 	_, err := fmt.Fprint(w, e.String())
 	return err
+}
+
+// convertDataToString converts the event data to a string representation
+func convertDataToString(data any) (string, error) {
+	switch v := data.(type) {
+	case string:
+		return v, nil
+	case []byte:
+		return string(v), nil
+	case error:
+		return v.Error(), nil
+	case fmt.Stringer:
+		return v.String(), nil
+	default:
+		// For all other types, use JSON marshaling
+		jsonData, err := json.Marshal(v)
+		if err != nil {
+			return "", err
+		}
+		return string(jsonData), nil
+	}
 }
