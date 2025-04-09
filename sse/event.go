@@ -38,7 +38,7 @@ func (e Event) String() string {
 
 	// Add Data field, handling multiline data
 	if e.Data != "" {
-		for _, line := range strings.Split(e.Data, "\n") {
+		for line := range strings.SplitSeq(e.Data, "\n") {
 			fmt.Fprintf(&buf, "data: %s\n", line)
 		}
 	}
