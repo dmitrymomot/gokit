@@ -133,10 +133,10 @@ func (s *Server) Handler(topicExtractor func(r *http.Request) string) http.Handl
 				}
 
 			case <-ticker.C:
-				// Send heartbeat
-				err := client.Send(Event{Event: "heartbeat", Data: "ping"})
+				// Send keep-alive to maintain the connection
+				err := client.SendKeepAlive()
 				if err != nil {
-					// Error sending heartbeat, client likely disconnected
+					// Error sending keep-alive, client likely disconnected
 					return
 				}
 			}
