@@ -91,7 +91,12 @@ func (s *Server) Handler(topicExtractor func(r *http.Request) string) http.Handl
 		defer cancel()
 
 		// Create a new client
-		client := NewClient(w, s.hostname)
+		client, err := NewClient(w, s.hostname)
+		if err != nil {
+			// If ResponseWriter doesn't implement http.Flusher
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
 		// Register the client
 		s.registerClient(client)

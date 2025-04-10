@@ -20,4 +20,7 @@ var (
 
 	// ErrMessageBusClosed is returned when the message bus is closed
 	ErrMessageBusClosed = errors.New("message bus is closed")
+
+	// ErrNoFlusher is returned when the ResponseWriter does not implement http.Flusher
+	ErrNoFlusher = errors.New("response writer does not implement http.Flusher")
 )

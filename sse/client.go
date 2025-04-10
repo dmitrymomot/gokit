@@ -17,12 +17,18 @@ type Client struct {
 }
 
 // NewClient creates a new SSE client
-func NewClient(w http.ResponseWriter, hostname string) *Client {
+// Returns a new client or an error if the ResponseWriter does not implement http.Flusher
+func NewClient(w http.ResponseWriter, hostname string) (*Client, error) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		return nil, ErrNoFlusher
+	}
+
 	return &Client{
 		writer:   w,
-		flusher:  w.(http.Flusher),
+		flusher:  flusher,
 		hostname: hostname,
-	}
+	}, nil
 }
 
 // Send sends an event to the client
