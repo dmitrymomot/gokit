@@ -36,7 +36,11 @@ func WithHostname(hostname string) ServerOption {
 }
 
 // NewServer creates a new SSE server with the provided message bus
+// Panics if the bus parameter is nil
 func NewServer(bus MessageBus, opts ...ServerOption) *Server {
+	if bus == nil {
+		panic("sse: message bus cannot be nil")
+	}
 	s := &Server{
 		bus:       bus,
 		clients:   make(map[*Client]struct{}),

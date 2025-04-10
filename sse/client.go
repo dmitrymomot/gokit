@@ -52,6 +52,28 @@ func (c *Client) Send(event Event) error {
 	return nil
 }
 
+// SendKeepAlive sends a keep-alive event to the client
+func (c *Client) SendKeepAlive() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.closed {
+		return ErrClientClosed
+	}
+
+	// Write a comment to keep the connection alive
+	_, err := c.writer.Write([]byte(":\n"))
+	if err != nil {
+		c.closed = true
+		return err
+	}
+
+	// Flush the response writer
+	c.flusher.Flush()
+
+	return nil
+}
+
 // Close marks the client as closed
 func (c *Client) Close() {
 	c.mu.Lock()
