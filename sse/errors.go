@@ -3,21 +3,24 @@ package sse
 import "errors"
 
 var (
-	// ErrNoBrokerProvided is returned when attempting to create a server without a broker
-	ErrNoBrokerProvided = errors.New("no broker provided")
+	// ErrClientClosed is returned when trying to send to a closed client
+	ErrClientClosed = errors.New("client is closed")
 
-	// ErrClientNotConnected is returned when attempting to send to a non-existent client
-	ErrClientNotConnected = errors.New("client not connected")
+	// ErrServerClosed is returned when trying to use a closed server
+	ErrServerClosed = errors.New("server is closed")
 
-	// ErrServerClosed is returned when attempting to use a closed server
-	ErrServerClosed = errors.New("server closed")
+	// ErrTopicEmpty is returned when the topic is empty
+	ErrTopicEmpty = errors.New("topic cannot be empty")
 
-	// ErrInvalidMessage is returned when a message is invalid
-	ErrInvalidMessage = errors.New("invalid message")
+	// ErrMessageEmpty is returned when the message is empty
+	ErrMessageEmpty = errors.New("message cannot be empty")
 
-	// ErrBrokerClosed is returned when the broker is closed
-	ErrBrokerClosed = errors.New("broker closed")
+	// ErrInvalidEventID is returned when the event ID is invalid
+	ErrInvalidEventID = errors.New("invalid event ID")
 
-	// ErrClientAlreadyExists is returned when a client with the same ID already exists
-	ErrClientAlreadyExists = errors.New("client already exists")
+	// ErrMessageBusClosed is returned when the message bus is closed
+	ErrMessageBusClosed = errors.New("message bus is closed")
+
+	// ErrNoFlusher is returned when the ResponseWriter does not implement http.Flusher
+	ErrNoFlusher = errors.New("response writer does not implement http.Flusher")
 )
