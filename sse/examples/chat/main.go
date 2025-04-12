@@ -11,10 +11,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/dmitrymomot/gokit/sse"
 	"github.com/dmitrymomot/gokit/sse/bus"
 	"github.com/dmitrymomot/templatex"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -30,8 +32,28 @@ func main() {
 		panic(err)
 	}
 
+	// Start a miniredis server
+	miniRedis, err := miniredis.Run()
+	if err != nil {
+		log.Fatalf("Failed to start miniredis server: %v", err)
+		os.Exit(1)
+	}
+
+	// Create a Redis client connected to the miniredis server
+	client := redis.NewClient(&redis.Options{
+		Addr: miniRedis.Addr(),
+		DB:   0,
+	})
+
+	// Create the Redis message bus
+	msgBus, err := bus.NewRedisBus(client)
+	if err != nil {
+		log.Fatalf("Failed to create Redis message bus: %v", err)
+		os.Exit(1)
+	}
+
 	// Create a channel-based message bus
-	msgBus := bus.NewChannelBus()
+	// msgBus := bus.NewChannelBus()
 
 	// Create an SSE server with custom heartbeat
 	sseServer := sse.NewServer(msgBus, sse.WithHeartbeat(15*time.Second))
