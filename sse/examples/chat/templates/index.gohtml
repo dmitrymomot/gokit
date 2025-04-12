@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en" class="h-full bg-white antialiased">
+  <head>
+    <title>Chat Demo - SSE Package</title>
+    <meta name="description" content="SSE package chat example" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <meta name="htmx-config" content='{"useTemplateFragments":true}'>
+    <script src="https://unpkg.com/htmx.org@2.0.4" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/htmx-ext-sse@2.2.2" crossorigin="anonymous"></script>
+    <script>
+      // Function to scroll to bottom
+      function scrollToBottom() {
+        const container = document.getElementById('chat-container');
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+        }
+      }
+      
+      // Listen for SSE messages and new content
+      document.addEventListener('DOMContentLoaded', function() {
+        // Add event listener for when new content is added via SSE
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+          if (event.detail.target && event.detail.target.id === 'chat-container') {
+            scrollToBottom();
+          }
+        });
+        
+        // Add event listener for SSE messages
+        document.body.addEventListener('htmx:sseMessage', function() {
+          scrollToBottom();
+        });
+        
+        // Initial scroll to bottom
+        scrollToBottom();
+        
+        // Focus on message input
+        document.getElementById('message-input').focus();
+      });
+    </script>
+  </head>
+  <body class="h-full min-h-screen bg-gray-50">
+    <div class="container mx-auto px-4 py-12">
+      <div class="mx-auto max-w-2xl">
+        <h1 class="mb-8 text-center text-3xl font-bold text-gray-900">Chat Room: {{ .Room }}</h1>
+
+        <div class="overflow-hidden rounded-lg bg-white shadow">
+          <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-xl font-semibold text-gray-800">Messages</h2>
+              <span class="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-800">
+                User: {{ .User }}
+              </span>
+            </div>
+
+            <!-- Message container with SSE connection -->
+            <div id="chat-container" class="max-h-[400px] min-h-[200px] space-y-3 overflow-y-auto rounded-md bg-gray-50 p-4" 
+                 hx-ext="sse" 
+                 sse-connect="/events?room={{ .Room }}" 
+                 sse-swap="chat-message" 
+                 hx-swap="beforeend">
+              {{ .InitMessage }}
+            </div>
+
+            <!-- Message input form with HTMX -->
+            <div id="form-container">
+              {{ template "form" . }}
+            </div>
+
+            <div class="mt-4 text-sm text-gray-500">
+              <p>Messages will appear in real-time. New users will only see new messages.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
