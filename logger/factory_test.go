@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"testing"
 
+	"log/slog"
+
 	"github.com/dmitrymomot/gokit/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"log/slog"
 )
 
 func TestNewLogger(t *testing.T) {
@@ -19,20 +20,20 @@ func TestNewLogger(t *testing.T) {
 			Output: buf,
 			Level:  slog.LevelInfo,
 		}
-		
+
 		log := logger.NewLogger(cfg)
 		require.NotNil(t, log)
-		
+
 		log.Info("test message")
-		
-		var logEntry map[string]interface{}
+
+		var logEntry map[string]any
 		err := json.Unmarshal(buf.Bytes(), &logEntry)
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, "INFO", logEntry["level"])
 		assert.Equal(t, "test message", logEntry["msg"])
 	})
-	
+
 	t.Run("creates Text logger", func(t *testing.T) {
 		buf := &bytes.Buffer{}
 		cfg := logger.Config{
@@ -40,17 +41,17 @@ func TestNewLogger(t *testing.T) {
 			Format: logger.FormatText,
 			Level:  slog.LevelInfo,
 		}
-		
+
 		log := logger.NewLogger(cfg)
 		require.NotNil(t, log)
-		
+
 		log.Info("test message")
-		
+
 		logOutput := buf.String()
 		assert.Contains(t, logOutput, "INFO")
 		assert.Contains(t, logOutput, "test message")
 	})
-	
+
 	t.Run("includes default attributes", func(t *testing.T) {
 		buf := &bytes.Buffer{}
 		cfg := logger.Config{
@@ -60,26 +61,26 @@ func TestNewLogger(t *testing.T) {
 				slog.Int("version", 1),
 			},
 		}
-		
+
 		log := logger.NewLogger(cfg)
 		require.NotNil(t, log)
-		
+
 		log.Info("test message")
-		
-		var logEntry map[string]interface{}
+
+		var logEntry map[string]any
 		err := json.Unmarshal(buf.Bytes(), &logEntry)
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, "test-service", logEntry["service"])
 		assert.Equal(t, float64(1), logEntry["version"]) // JSON unmarshals as float64
 	})
-	
+
 	t.Run("extracts values from context", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		
+
 		type contextKey string
 		testKey := contextKey("test-key")
-		
+
 		cfg := logger.Config{
 			Output: buf,
 			ContextExtractors: []logger.ContextExtractor{
@@ -91,17 +92,17 @@ func TestNewLogger(t *testing.T) {
 				},
 			},
 		}
-		
+
 		log := logger.NewLogger(cfg)
 		require.NotNil(t, log)
-		
+
 		ctx := context.WithValue(context.Background(), testKey, "test-value")
 		log.InfoContext(ctx, "test message")
-		
-		var logEntry map[string]interface{}
+
+		var logEntry map[string]any
 		err := json.Unmarshal(buf.Bytes(), &logEntry)
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, "test-value", logEntry["test_id"])
 	})
 }
@@ -112,16 +113,16 @@ func TestSetAsDefault(t *testing.T) {
 		cfg := logger.Config{
 			Output: buf,
 		}
-		
+
 		log := logger.NewLogger(cfg)
 		logger.SetAsDefault(log)
-		
+
 		slog.Info("default logger test")
-		
-		var logEntry map[string]interface{}
+
+		var logEntry map[string]any
 		err := json.Unmarshal(buf.Bytes(), &logEntry)
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, "INFO", logEntry["level"])
 		assert.Equal(t, "default logger test", logEntry["msg"])
 	})

@@ -17,17 +17,17 @@ type Event interface {
 }
 
 // Action is a function that is executed during a state transition.
-type Action func(ctx context.Context, from, to State, event Event, data interface{}) error
+type Action func(ctx context.Context, from, to State, event Event, data any) error
 
 // Guard is a function that determines if a transition can occur.
-type Guard func(ctx context.Context, from State, event Event, data interface{}) bool
+type Guard func(ctx context.Context, from State, event Event, data any) bool
 
 // Transition represents a possible transition between states.
 type Transition struct {
-	From   State
-	To     State
-	Event  Event
-	Guards []Guard
+	From    State
+	To      State
+	Event   Event
+	Guards  []Guard
 	Actions []Action
 }
 
@@ -35,16 +35,16 @@ type Transition struct {
 type StateMachine interface {
 	// Current returns the current state of the state machine.
 	Current() State
-	
+
 	// AddTransition adds a new transition to the state machine.
 	AddTransition(from, to State, event Event, guards []Guard, actions []Action) error
-	
+
 	// Fire triggers an event in the state machine, potentially causing a state transition.
-	Fire(ctx context.Context, event Event, data interface{}) error
-	
+	Fire(ctx context.Context, event Event, data any) error
+
 	// CanFire checks if an event can be fired in the current state.
-	CanFire(ctx context.Context, event Event, data interface{}) bool
-	
+	CanFire(ctx context.Context, event Event, data any) bool
+
 	// Reset resets the state machine to its initial state.
 	Reset() error
 }

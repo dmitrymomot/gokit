@@ -54,7 +54,7 @@ var (
 	validatorsMutex sync.RWMutex
 )
 
-func requiredValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func requiredValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value := reflect.ValueOf(fieldValue)
 	valid := true
 
@@ -82,7 +82,7 @@ func requiredValidator(fieldValue interface{}, fieldType reflect.StructField, pa
 	return nil
 }
 
-func maxValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func maxValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil // No max value specified
 	}
@@ -119,7 +119,7 @@ func maxValidator(fieldValue interface{}, fieldType reflect.StructField, params 
 	return nil
 }
 
-func minValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func minValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil // No min value specified
 	}
@@ -163,7 +163,7 @@ func minValidator(fieldValue interface{}, fieldType reflect.StructField, params 
 // It supports int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, and float64 types.
 // It supports time.Time type.
 // It supports time.Duration type.
-func rangeValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func rangeValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) != 2 {
 		return nil
 	}
@@ -244,7 +244,7 @@ func rangeValidator(fieldValue interface{}, fieldType reflect.StructField, param
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 
 // emailValidator validates an email address.
-func emailValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func emailValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value, ok := fieldValue.(string)
 	if !ok {
 		return errors.New(translator("validation.email", label, params...))
@@ -263,7 +263,7 @@ func emailValidator(fieldValue interface{}, fieldType reflect.StructField, param
 // It checks if the domain has an MX record.
 // It also checks if the domain is in the public suffix list.
 // It does not check if the domain is reserved or has an A record.
-func realEmailValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func realEmailValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value, ok := fieldValue.(string)
 	if !ok {
 		return errors.New(translator("validation.realemail", label, params...))
@@ -283,7 +283,7 @@ func realEmailValidator(fieldValue interface{}, fieldType reflect.StructField, p
 }
 
 // regexValidator validates a field against a regular expression.
-func regexValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func regexValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil // No pattern specified
 	}
@@ -300,7 +300,7 @@ func regexValidator(fieldValue interface{}, fieldType reflect.StructField, param
 }
 
 // numericValidator checks if a field is numeric.
-func numericValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func numericValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	switch v := fieldValue.(type) {
 	case string:
 		if _, err := strconv.ParseFloat(v, 64); err != nil {
@@ -317,7 +317,7 @@ func numericValidator(fieldValue interface{}, fieldType reflect.StructField, par
 }
 
 // alphaValidator checks if a field contains only alphabetic characters.
-func alphaValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func alphaValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value, ok := fieldValue.(string)
 	if !ok {
 		return nil
@@ -329,7 +329,7 @@ func alphaValidator(fieldValue interface{}, fieldType reflect.StructField, param
 }
 
 // alphanumValidator checks if a field contains only alphanumeric characters.
-func alphanumValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func alphanumValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value, ok := fieldValue.(string)
 	if !ok {
 		return nil
@@ -341,7 +341,7 @@ func alphanumValidator(fieldValue interface{}, fieldType reflect.StructField, pa
 }
 
 // urlValidator checks if a field is a valid URL.
-func urlValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func urlValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value, ok := fieldValue.(string)
 	if !ok || value == "" {
 		return nil
@@ -354,7 +354,7 @@ func urlValidator(fieldValue interface{}, fieldType reflect.StructField, params 
 }
 
 // ipValidator checks if a field is a valid IP address.
-func ipValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func ipValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value, ok := fieldValue.(string)
 	if !ok || value == "" {
 		return nil
@@ -366,7 +366,7 @@ func ipValidator(fieldValue interface{}, fieldType reflect.StructField, params [
 }
 
 // dateValidator checks if a field is a valid date with the specified format.
-func dateValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func dateValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil
 	}
@@ -382,7 +382,7 @@ func dateValidator(fieldValue interface{}, fieldType reflect.StructField, params
 }
 
 // inValidator checks if a field value is in the specified list.
-func inValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func inValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil
 	}
@@ -396,7 +396,7 @@ func inValidator(fieldValue interface{}, fieldType reflect.StructField, params [
 }
 
 // notInValidator checks if a field value is not in the specified list.
-func notInValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func notInValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil
 	}
@@ -410,7 +410,7 @@ func notInValidator(fieldValue interface{}, fieldType reflect.StructField, param
 }
 
 // lengthValidator checks if a field length is equal to the specified value.
-func lengthValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func lengthValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil
 	}
@@ -433,7 +433,7 @@ func lengthValidator(fieldValue interface{}, fieldType reflect.StructField, para
 }
 
 // betweenValidator checks if a field value is between min and max.
-func betweenValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func betweenValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) != 2 {
 		return nil
 	}
@@ -466,7 +466,7 @@ func betweenValidator(fieldValue interface{}, fieldType reflect.StructField, par
 }
 
 // booleanValidator checks if a field is a boolean.
-func booleanValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func booleanValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if _, ok := fieldValue.(bool); !ok {
 		return errors.New(translator("validation.boolean", label, params...))
 	}
@@ -474,7 +474,7 @@ func booleanValidator(fieldValue interface{}, fieldType reflect.StructField, par
 }
 
 // uuidValidator checks if a field is a valid UUID.
-func uuidValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func uuidValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	uuidRegex := `[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[1-5][a-fA-F0-9]{3}-[89abAB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}`
 	value, ok := fieldValue.(string)
 	if !ok {
@@ -487,7 +487,7 @@ func uuidValidator(fieldValue interface{}, fieldType reflect.StructField, params
 }
 
 // creditCardValidator checks if a field is a valid credit card number using Luhn algorithm.
-func creditCardValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func creditCardValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	number, ok := fieldValue.(string)
 	if !ok {
 		return nil
@@ -519,7 +519,7 @@ func creditCardValidator(fieldValue interface{}, fieldType reflect.StructField, 
 }
 
 // equalValidator checks if a field is equal to parameter value.
-func equalValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func equalValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil
 	}
@@ -533,7 +533,7 @@ func equalValidator(fieldValue interface{}, fieldType reflect.StructField, param
 // notEqualValidator checks if a field is not equal to parameter value.
 // It returns an error if the field value is equal to the parameter value.
 // It returns nil if the field value is not equal to the parameter value.
-func notEqualValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func notEqualValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil
 	}
@@ -547,7 +547,7 @@ func notEqualValidator(fieldValue interface{}, fieldType reflect.StructField, pa
 // lessThanValidator checks if a field is less than the parameter value.
 // It returns an error if the field value is greater than or equal to the parameter value.
 // It returns nil if the field value is less than the parameter value.
-func lessThanValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func lessThanValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil
 	}
@@ -568,7 +568,7 @@ func lessThanValidator(fieldValue interface{}, fieldType reflect.StructField, pa
 // lessThanOrEqualValidator checks if a field is less than or equal to the parameter value.
 // It returns an error if the field value is greater than the parameter value.
 // It returns nil if the field value is less than or equal to the parameter value.
-func lessThanOrEqualValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func lessThanOrEqualValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil
 	}
@@ -589,7 +589,7 @@ func lessThanOrEqualValidator(fieldValue interface{}, fieldType reflect.StructFi
 // greaterThanValidator checks if a field is greater than the parameter value.
 // It returns an error if the field value is less than or equal to the parameter value.
 // It returns nil if the field value is greater than the parameter value.
-func greaterThanValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func greaterThanValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil
 	}
@@ -610,7 +610,7 @@ func greaterThanValidator(fieldValue interface{}, fieldType reflect.StructField,
 // greaterThanOrEqualValidator checks if a field is greater than or equal to the parameter value.
 // It returns an error if the field value is less than the parameter value.
 // It returns nil if the field value is greater than or equal to the parameter value.
-func greaterThanOrEqualValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func greaterThanOrEqualValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil
 	}
@@ -632,7 +632,7 @@ func greaterThanOrEqualValidator(fieldValue interface{}, fieldType reflect.Struc
 // It returns an error if the field length is not equal to the parameter value.
 // It returns nil if the field length is equal to the parameter value.
 // It supports string, slice, array, and map types.
-func lenValidator(fieldValue interface{}, _ reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func lenValidator(fieldValue any, _ reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	if len(params) == 0 {
 		return nil
 	}
@@ -657,7 +657,7 @@ func lenValidator(fieldValue interface{}, _ reflect.StructField, params []string
 // It returns nil if the field value is a valid password.
 // Password must be at least 8 characters long and contain at least
 // one uppercase letter, one lowercase letter, one number, and one special character.
-func passwordValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func passwordValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value := reflect.ValueOf(fieldValue)
 	password := value.String()
 	strings.TrimSpace(password)
@@ -698,7 +698,7 @@ func passwordValidator(fieldValue interface{}, fieldType reflect.StructField, pa
 var phoneRegex = regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
 
 // phoneValidator checks if a field is a valid phone number in international format.
-func phoneValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func phoneValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value := reflect.ValueOf(fieldValue)
 	if !phoneRegex.MatchString(value.String()) {
 		return errors.New(translator("validation.phone", label, params...))
@@ -714,7 +714,7 @@ var usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]{3,}$`)
 // It returns an error if the field value is not a valid username.
 // It returns nil if the field value is a valid username.
 // Username must be at least 3 characters long and contain only alphanumeric characters and underscores.
-func usernameValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func usernameValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value := reflect.ValueOf(fieldValue)
 	if len(value.String()) < 3 || !usernameRegex.MatchString(value.String()) {
 		return errors.New(translator("validation.username", label, params...))
@@ -732,7 +732,7 @@ func usernameValidator(fieldValue interface{}, fieldType reflect.StructField, pa
 // Slug must not contain uppercase letters.
 // Slug must not contain special characters.
 // Slug must not be a reserved word.
-func slugValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func slugValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value := reflect.ValueOf(fieldValue)
 	slug := value.String()
 	if len(slug) < 3 {
@@ -768,7 +768,7 @@ func slugValidator(fieldValue interface{}, fieldType reflect.StructField, params
 // It returns an error if the field value is not a valid hexadecimal color code.
 // It returns nil if the field value is a valid hexadecimal color code.
 // Hexadecimal color code must be 7 characters long and start with a hash symbol.
-func hexcolorValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func hexcolorValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value := reflect.ValueOf(fieldValue)
 	hexcolor := value.String()
 	if len(hexcolor) != 7 || hexcolor[0] != '#' {
@@ -785,7 +785,7 @@ func hexcolorValidator(fieldValue interface{}, fieldType reflect.StructField, pa
 // Full name must not start or end with a space or hyphen.
 // Full name must not contain special characters.
 // Full name must not contain numbers.
-func fullnameValidator(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+func fullnameValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value := reflect.ValueOf(fieldValue)
 	fullname := value.String()
 	if len(fullname) < 3 {

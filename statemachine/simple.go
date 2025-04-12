@@ -60,7 +60,7 @@ func (sm *SimpleStateMachine) AddTransition(from, to State, event Event, guards 
 }
 
 // Fire triggers an event in the state machine, potentially causing a state transition.
-func (sm *SimpleStateMachine) Fire(ctx context.Context, event Event, data interface{}) error {
+func (sm *SimpleStateMachine) Fire(ctx context.Context, event Event, data any) error {
 	if event == nil {
 		return ErrInvalidEvent
 	}
@@ -115,7 +115,7 @@ func (sm *SimpleStateMachine) Fire(ctx context.Context, event Event, data interf
 }
 
 // CanFire checks if an event can be fired in the current state.
-func (sm *SimpleStateMachine) CanFire(ctx context.Context, event Event, data interface{}) bool {
+func (sm *SimpleStateMachine) CanFire(ctx context.Context, event Event, data any) bool {
 	if event == nil {
 		return false
 	}

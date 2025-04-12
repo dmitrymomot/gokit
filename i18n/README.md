@@ -103,13 +103,13 @@ Example `fr/common.json`:
 
 ```go
 // Translate with variables
-welcomeMsg, err := translator.TranslateWithVars("welcome", map[string]interface{}{
+welcomeMsg, err := translator.TranslateWithVars("welcome", map[string]any{
 	"name": "John",
 })
 fmt.Println(welcomeMsg) // Output: Welcome to our application, John!
 
 // Translate with variables in a specific language
-frenchWelcome, err := translator.TranslateWithLangAndVars("welcome", "fr", map[string]interface{}{
+frenchWelcome, err := translator.TranslateWithLangAndVars("welcome", "fr", map[string]any{
 	"name": "John",
 })
 fmt.Println(frenchWelcome) // Output: Bienvenue dans notre application, John!
@@ -215,13 +215,13 @@ func main() {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Get the locale from the request context
 		locale := i18n.GetLocale(r.Context())
-		
+
 		// Use the detected language for translations
 		greeting, err := translator.TranslateWithLang("greeting", locale)
 		if err != nil {
 			greeting, _ = translator.Translate("greeting") // Fallback to default
 		}
-		
+
 		fmt.Fprintf(w, "Detected language: %s\n", locale)
 		fmt.Fprintf(w, "Greeting: %s\n", greeting)
 	})
@@ -229,7 +229,7 @@ func main() {
 	// Apply the i18n middleware to automatically detect language
 	// Pass nil instead of customExtractor if you want to rely only on Accept-Language header
 	http.Handle("/", i18n.Middleware(translator, customExtractor)(handler))
-	
+
 	log.Println("Server started at http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
@@ -264,10 +264,10 @@ func I18nMiddleware(translator *i18n.Translator) FrameworkMiddleware {
 		// Extract language from request headers
 		acceptLanguage := c.Request.Header.Get("Accept-Language")
 		lang := translator.Lang(acceptLanguage)
-		
+
 		// Store in framework context
 		c.Set("locale", lang)
-		
+
 		return c.Next()
 	}
 }

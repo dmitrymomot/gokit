@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	
+
 	"github.com/dmitrymomot/gokit/statemachine"
 )
 
@@ -83,8 +83,8 @@ func TestSimpleStateMachine(t *testing.T) {
 		sm := statemachine.NewSimpleStateMachine(Draft)
 
 		// Define guards
-		isAuthorized := func(ctx context.Context, from statemachine.State, event statemachine.Event, data interface{}) bool {
-			userData, ok := data.(map[string]interface{})
+		isAuthorized := func(ctx context.Context, from statemachine.State, event statemachine.Event, data any) bool {
+			userData, ok := data.(map[string]any)
 			if !ok {
 				return false
 			}
@@ -97,10 +97,10 @@ func TestSimpleStateMachine(t *testing.T) {
 
 		// Add transitions with guards
 		if err := sm.AddTransition(
-			Draft, 
-			InReview, 
-			Submit, 
-			[]statemachine.Guard{isAuthorized}, 
+			Draft,
+			InReview,
+			Submit,
+			[]statemachine.Guard{isAuthorized},
 			nil,
 		); err != nil {
 			t.Fatalf("Failed to add transition with guard: %v", err)
@@ -109,7 +109,7 @@ func TestSimpleStateMachine(t *testing.T) {
 		ctx := context.Background()
 
 		// Test with unauthorized data
-		unauthorizedData := map[string]interface{}{
+		unauthorizedData := map[string]any{
 			"authorized": false,
 		}
 
@@ -125,7 +125,7 @@ func TestSimpleStateMachine(t *testing.T) {
 		}
 
 		// Test with authorized data
-		authorizedData := map[string]interface{}{
+		authorizedData := map[string]any{
 			"authorized": true,
 		}
 
@@ -154,7 +154,7 @@ func TestSimpleStateMachine(t *testing.T) {
 		actionData := ""
 
 		// Define action
-		logAction := func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data interface{}) error {
+		logAction := func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data any) error {
 			actionExecuted = true
 			if str, ok := data.(string); ok {
 				actionData = str
@@ -162,26 +162,26 @@ func TestSimpleStateMachine(t *testing.T) {
 			return nil
 		}
 
-		errorAction := func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data interface{}) error {
+		errorAction := func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data any) error {
 			return errors.New("action error")
 		}
 
 		// Add transitions with actions
 		if err := sm.AddTransition(
-			Draft, 
-			InReview, 
-			Submit, 
-			nil, 
+			Draft,
+			InReview,
+			Submit,
+			nil,
 			[]statemachine.Action{logAction},
 		); err != nil {
 			t.Fatalf("Failed to add transition with action: %v", err)
 		}
 
 		if err := sm.AddTransition(
-			InReview, 
-			Rejected, 
-			Reject, 
-			nil, 
+			InReview,
+			Rejected,
+			Reject,
+			nil,
 			[]statemachine.Action{errorAction},
 		); err != nil {
 			t.Fatalf("Failed to add transition with error action: %v", err)
@@ -257,51 +257,51 @@ func TestBuilder(t *testing.T) {
 
 	// Define events
 	const (
-		Submit   = statemachine.StringEvent("submit")
-		Approve  = statemachine.StringEvent("approve")
-		Publish  = statemachine.StringEvent("publish")
+		Submit  = statemachine.StringEvent("submit")
+		Approve = statemachine.StringEvent("approve")
+		Publish = statemachine.StringEvent("publish")
 	)
 
 	t.Run("Basic Builder", func(t *testing.T) {
 		// Create a builder
 		builder := statemachine.NewBuilder(Draft)
-		
+
 		// Define transitions
 		if _, err := builder.From(Draft).When(Submit).To(InReview).Add(); err != nil {
 			t.Fatalf("Failed to add transition: %v", err)
 		}
-		
+
 		if _, err := builder.From(InReview).When(Approve).To(Approved).Add(); err != nil {
 			t.Fatalf("Failed to add transition: %v", err)
 		}
-		
+
 		if _, err := builder.From(Approved).When(Publish).To(Published).Add(); err != nil {
 			t.Fatalf("Failed to add transition: %v", err)
 		}
-		
+
 		// Build the state machine
 		machine := builder.Build()
-		
+
 		// Check initial state
 		if machine.Current() != Draft {
 			t.Fatalf("Expected initial state to be %s, got %s", Draft, machine.Current())
 		}
-		
+
 		ctx := context.Background()
-		
+
 		// Execute the full workflow
 		if err := machine.Fire(ctx, Submit, nil); err != nil {
 			t.Fatalf("Failed to fire Submit event: %v", err)
 		}
-		
+
 		if err := machine.Fire(ctx, Approve, nil); err != nil {
 			t.Fatalf("Failed to fire Approve event: %v", err)
 		}
-		
+
 		if err := machine.Fire(ctx, Publish, nil); err != nil {
 			t.Fatalf("Failed to fire Publish event: %v", err)
 		}
-		
+
 		// Check final state
 		if machine.Current() != Published {
 			t.Fatalf("Expected final state to be %s, got %s", Published, machine.Current())
@@ -311,20 +311,20 @@ func TestBuilder(t *testing.T) {
 	t.Run("Builder with Guards and Actions", func(t *testing.T) {
 		// Create a builder
 		builder := statemachine.NewBuilder(Draft)
-		
+
 		// Track action execution
 		actionExecuted := false
-		
+
 		// Define guard and action
-		isAuthorized := func(ctx context.Context, from statemachine.State, event statemachine.Event, data interface{}) bool {
+		isAuthorized := func(ctx context.Context, from statemachine.State, event statemachine.Event, data any) bool {
 			return data.(bool)
 		}
-		
-		logAction := func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data interface{}) error {
+
+		logAction := func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data any) error {
 			actionExecuted = true
 			return nil
 		}
-		
+
 		// Define transition with guard and action
 		if _, err := builder.From(Draft).When(Submit).To(InReview).
 			WithGuard(isAuthorized).
@@ -332,33 +332,33 @@ func TestBuilder(t *testing.T) {
 			Add(); err != nil {
 			t.Fatalf("Failed to add transition: %v", err)
 		}
-		
+
 		// Build the state machine
 		machine := builder.Build()
-		
+
 		ctx := context.Background()
-		
+
 		// Try with unauthorized data
 		err := machine.Fire(ctx, Submit, false)
 		if !statemachine.IsTransitionRejectedError(err) {
 			t.Fatalf("Expected TransitionRejectedError, got: %v", err)
 		}
-		
+
 		// Check that action was not executed
 		if actionExecuted {
 			t.Fatal("Expected action not to be executed")
 		}
-		
+
 		// Try with authorized data
 		if err := machine.Fire(ctx, Submit, true); err != nil {
 			t.Fatalf("Failed to fire Submit event: %v", err)
 		}
-		
+
 		// Check that action was executed
 		if !actionExecuted {
 			t.Fatal("Expected action to be executed")
 		}
-		
+
 		// Check state
 		if machine.Current() != InReview {
 			t.Fatalf("Expected state to be %s, got %s", InReview, machine.Current())
@@ -368,32 +368,32 @@ func TestBuilder(t *testing.T) {
 	t.Run("WithTransition Shorthand", func(t *testing.T) {
 		// Create a builder
 		builder := statemachine.NewBuilder(Draft)
-		
+
 		// Use the shorthand method
 		if _, err := builder.WithTransition(
-			Draft, 
-			InReview, 
+			Draft,
+			InReview,
 			Submit,
-			func(ctx context.Context, from statemachine.State, event statemachine.Event, data interface{}) bool {
+			func(ctx context.Context, from statemachine.State, event statemachine.Event, data any) bool {
 				return true
 			},
-			func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data interface{}) error {
+			func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data any) error {
 				return nil
 			},
 		); err != nil {
 			t.Fatalf("Failed to add transition: %v", err)
 		}
-		
+
 		// Build the state machine
 		machine := builder.Build()
-		
+
 		ctx := context.Background()
-		
+
 		// Fire event
 		if err := machine.Fire(ctx, Submit, nil); err != nil {
 			t.Fatalf("Failed to fire Submit event: %v", err)
 		}
-		
+
 		// Check state
 		if machine.Current() != InReview {
 			t.Fatalf("Expected state to be %s, got %s", InReview, machine.Current())

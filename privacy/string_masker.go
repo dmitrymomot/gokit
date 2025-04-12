@@ -45,7 +45,7 @@ func WithStrategy(strategy MaskingStrategy) StringMaskerOption {
 	}
 }
 
-// WithVisibleChars sets the number of characters to keep visible from 
+// WithVisibleChars sets the number of characters to keep visible from
 // the start and end of the string.
 func WithVisibleChars(start, end int) StringMaskerOption {
 	return func(sm *StringMasker) error {
@@ -73,11 +73,11 @@ func WithMinLength(length int) StringMaskerOption {
 func NewStringMasker(opts ...StringMaskerOption) (*StringMasker, error) {
 	// Default configuration
 	sm := &StringMasker{
-		replacement:      '*',
-		strategy:         StrategyPartialMask,
+		replacement:       '*',
+		strategy:          StrategyPartialMask,
 		visibleStartChars: 0,
 		visibleEndChars:   0,
-		minLength:        1,
+		minLength:         1,
 	}
 
 	// Apply options
@@ -96,13 +96,13 @@ func NewStringMasker(opts ...StringMaskerOption) (*StringMasker, error) {
 }
 
 // CanMask checks if the masker can mask the given data.
-func (sm *StringMasker) CanMask(data interface{}) bool {
+func (sm *StringMasker) CanMask(data any) bool {
 	_, ok := data.(string)
 	return ok
 }
 
 // Mask applies the masking strategy to the given string.
-func (sm *StringMasker) Mask(ctx context.Context, data interface{}) (interface{}, error) {
+func (sm *StringMasker) Mask(ctx context.Context, data any) (any, error) {
 	// Check if context is canceled
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -127,7 +127,7 @@ func (sm *StringMasker) Mask(ctx context.Context, data interface{}) (interface{}
 		return sm.partialMask(str), nil
 
 	default:
-		return nil, errors.Join(ErrInvalidMask, 
+		return nil, errors.Join(ErrInvalidMask,
 			fmt.Errorf("unsupported strategy: %s", sm.strategy))
 	}
 }

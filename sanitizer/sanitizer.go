@@ -6,7 +6,7 @@ import (
 )
 
 // SanitizeFunc defines the signature of a sanitization function.
-type SanitizeFunc func(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{}
+type SanitizeFunc func(fieldValue any, fieldType reflect.StructField, params []string) any
 
 // RegisterSanitizer registers a custom sanitization function.
 func RegisterSanitizer(tag string, fn SanitizeFunc) {
@@ -22,7 +22,7 @@ func RegisterSanitizer(tag string, fn SanitizeFunc) {
 }
 
 // SanitizeStruct sanitizes the struct fields based on 'sanitize' tags.
-func SanitizeStruct(s interface{}) {
+func SanitizeStruct(s any) {
 	val := reflect.ValueOf(s)
 	if val.Kind() != reflect.Ptr || val.IsNil() {
 		return

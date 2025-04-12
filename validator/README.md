@@ -93,7 +93,7 @@ func main() {
 You can register custom validation functions:
 
 ```go
-validator.RegisterValidation("custom", func(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator validator.ErrorTranslatorFunc) error {
+validator.RegisterValidation("custom", func(fieldValue any, fieldType reflect.StructField, params []string, label string, translator validator.ErrorTranslatorFunc) error {
     // Your custom validation logic here
     return nil
 })

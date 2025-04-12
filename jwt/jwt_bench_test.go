@@ -40,12 +40,12 @@ func BenchmarkGenerate(b *testing.B) {
 	b.Run("CustomClaims", func(b *testing.B) {
 		type BenchClaims struct {
 			jwt.StandardClaims
-			UserID    string   `json:"user_id"`
-			Email     string   `json:"email"`
-			FirstName string   `json:"first_name"`
-			LastName  string   `json:"last_name"`
-			Roles     []string `json:"roles"`
-			Metadata  map[string]interface{} `json:"metadata"`
+			UserID    string         `json:"user_id"`
+			Email     string         `json:"email"`
+			FirstName string         `json:"first_name"`
+			LastName  string         `json:"last_name"`
+			Roles     []string       `json:"roles"`
+			Metadata  map[string]any `json:"metadata"`
 		}
 
 		claims := BenchClaims{
@@ -62,13 +62,13 @@ func BenchmarkGenerate(b *testing.B) {
 			FirstName: "John",
 			LastName:  "Doe",
 			Roles:     []string{"admin", "user", "manager"},
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"login_count": 42,
 				"last_login":  time.Now().Format(time.RFC3339),
 				"preferences": map[string]string{
-					"theme":     "dark",
-					"timezone":  "UTC",
-					"language":  "en",
+					"theme":    "dark",
+					"timezone": "UTC",
+					"language": "en",
 				},
 			},
 		}
@@ -125,12 +125,12 @@ func BenchmarkParse(b *testing.B) {
 		// Define a complex custom claims type
 		type BenchClaims struct {
 			jwt.StandardClaims
-			UserID    string                 `json:"user_id"`
-			Email     string                 `json:"email"`
-			FirstName string                 `json:"first_name"`
-			LastName  string                 `json:"last_name"`
-			Roles     []string               `json:"roles"`
-			Metadata  map[string]interface{} `json:"metadata"`
+			UserID    string         `json:"user_id"`
+			Email     string         `json:"email"`
+			FirstName string         `json:"first_name"`
+			LastName  string         `json:"last_name"`
+			Roles     []string       `json:"roles"`
+			Metadata  map[string]any `json:"metadata"`
 		}
 
 		// Generate a token once for parsing benchmark
@@ -148,13 +148,13 @@ func BenchmarkParse(b *testing.B) {
 			FirstName: "John",
 			LastName:  "Doe",
 			Roles:     []string{"admin", "user", "manager"},
-			Metadata: map[string]interface{}{
+			Metadata: map[string]any{
 				"login_count": 42,
 				"last_login":  time.Now().Format(time.RFC3339),
 				"preferences": map[string]string{
-					"theme":     "dark",
-					"timezone":  "UTC",
-					"language":  "en",
+					"theme":    "dark",
+					"timezone": "UTC",
+					"language": "en",
 				},
 			},
 		}
@@ -214,8 +214,8 @@ func BenchmarkEnd2End(b *testing.B) {
 	b.Run("CustomClaims", func(b *testing.B) {
 		type BenchClaims struct {
 			jwt.StandardClaims
-			UserID string `json:"user_id"`
-			Email  string `json:"email"`
+			UserID string   `json:"user_id"`
+			Email  string   `json:"email"`
 			Roles  []string `json:"roles"`
 		}
 

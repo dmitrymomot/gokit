@@ -7,7 +7,7 @@ import (
 )
 
 // ValidationFunc defines the signature of a validation function.
-type ValidationFunc func(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error
+type ValidationFunc func(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error
 
 // Validator struct holds instance-specific data like the error translator function.
 type Validator struct {
@@ -42,7 +42,7 @@ func RegisterValidation(tag string, fn ValidationFunc) {
 
 // ValidateStruct validates the struct fields based on 'validate' tags.
 // It returns a url.Values containing validation errors.
-func (v *Validator) ValidateStruct(s interface{}) error {
+func (v *Validator) ValidateStruct(s any) error {
 	errors := url.Values{}
 	val := reflect.ValueOf(s)
 	if val.Kind() == reflect.Ptr {

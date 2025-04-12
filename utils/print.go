@@ -17,7 +17,7 @@ import (
 //	}
 //	user := User{Name: "John", Age: 30}
 //	FormatJSON(user) // returns formatted JSON representation
-func FormatJSON(v ...interface{}) string {
+func FormatJSON(v ...any) string {
 	var result string
 	for i, val := range v {
 		if i > 0 {
@@ -34,6 +34,6 @@ func FormatJSON(v ...interface{}) string {
 }
 
 // Deprecated: PrettyPrint is deprecated, use FormatJSON instead.
-func PrettyPrint(v ...interface{}) string {
+func PrettyPrint(v ...any) string {
 	return FormatJSON(v...)
 }

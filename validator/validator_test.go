@@ -18,7 +18,7 @@ func TestValidateStruct(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		input         interface{}
+		input         any
 		expectedError validator.ValidationErrors
 	}{
 		{
@@ -185,7 +185,7 @@ func TestValidateStruct(t *testing.T) {
 	}
 
 	// Register custom validation for testing
-	validator.RegisterValidation("custom", func(fieldValue interface{}, fieldType reflect.StructField, params []string, label string, translator validator.ErrorTranslatorFunc) error {
+	validator.RegisterValidation("custom", func(fieldValue any, fieldType reflect.StructField, params []string, label string, translator validator.ErrorTranslatorFunc) error {
 		return nil
 	})
 

@@ -54,7 +54,7 @@ func main() {
 
 	// Create a state machine
 	builder := statemachine.NewBuilder(Draft)
-	
+
 	// Define transitions
 	builder.From(Draft).When(Submit).To(InReview).Add()
 	builder.From(InReview).When(Approve).To(Approved).Add()
@@ -62,18 +62,18 @@ func main() {
 	builder.From(Approved).When(Publish).To(Published).Add()
 	builder.From(Approved).When(Withdraw).To(Draft).Add()
 	builder.From(Rejected).When(Submit).To(InReview).Add()
-	
+
 	machine := builder.Build()
 
 	// Use the state machine
 	ctx := context.Background()
-	
+
 	fmt.Printf("Current state: %s\n", machine.Current().Name())
-	
+
 	if err := machine.Fire(ctx, Submit, nil); err != nil {
 		log.Fatalf("Failed to submit: %v", err)
 	}
-	
+
 	fmt.Printf("Current state: %s\n", machine.Current().Name())
 }
 ```
@@ -115,16 +115,16 @@ func main() {
 	builder := statemachine.NewBuilder(Idle)
 
 	// Add a guard function
-	isAuthorized := func(ctx context.Context, from statemachine.State, event statemachine.Event, data interface{}) bool {
-		if userData, ok := data.(map[string]interface{}); ok {
+	isAuthorized := func(ctx context.Context, from statemachine.State, event statemachine.Event, data any) bool {
+		if userData, ok := data.(map[string]any); ok {
 			return userData["is_authorized"].(bool)
 		}
 		return false
 	}
 
 	// Add an action function
-	logTransition := func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data interface{}) error {
-		fmt.Printf("Transitioning from %s to %s via %s at %s\n", 
+	logTransition := func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data any) error {
+		fmt.Printf("Transitioning from %s to %s via %s at %s\n",
 			from.Name(), to.Name(), event.Name(), time.Now().Format(time.RFC3339))
 		return nil
 	}
@@ -141,7 +141,7 @@ func main() {
 
 	// Use the state machine with user data
 	ctx := context.Background()
-	userData := map[string]interface{}{
+	userData := map[string]any{
 		"is_authorized": true,
 		"user_id": 123,
 	}
@@ -181,7 +181,7 @@ func (s OrderState) Name() string {
 // Define custom event type
 type OrderEvent struct {
 	code string
-	data map[string]interface{}
+	data map[string]any
 }
 
 func (e OrderEvent) Name() string {
@@ -211,10 +211,10 @@ func main() {
 		Deliver  OrderEvent
 		Cancel   OrderEvent
 	}{
-		Process:  OrderEvent{code: "process", data: map[string]interface{}{}},
-		Ship:     OrderEvent{code: "ship", data: map[string]interface{}{}},
-		Deliver:  OrderEvent{code: "deliver", data: map[string]interface{}{}},
-		Cancel:   OrderEvent{code: "cancel", data: map[string]interface{}{}},
+		Process:  OrderEvent{code: "process", data: map[string]any{}},
+		Ship:     OrderEvent{code: "ship", data: map[string]any{}},
+		Deliver:  OrderEvent{code: "deliver", data: map[string]any{}},
+		Cancel:   OrderEvent{code: "cancel", data: map[string]any{}},
 	}
 
 	// Create and configure state machine
@@ -229,14 +229,14 @@ func main() {
 
 	// Use the state machine
 	ctx := context.Background()
-	
+
 	fmt.Printf("Current state: %s\n", machine.Current().Name())
-	
+
 	if err := machine.Fire(ctx, events.Process, nil); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
 	}
-	
+
 	fmt.Printf("Current state: %s\n", machine.Current().Name())
 }
 ```
@@ -278,7 +278,7 @@ func main() {
 	}
 
 	// Add a guard that always fails
-	alwaysFalse := func(ctx context.Context, from statemachine.State, event statemachine.Event, data interface{}) bool {
+	alwaysFalse := func(ctx context.Context, from statemachine.State, event statemachine.Event, data any) bool {
 		return false
 	}
 

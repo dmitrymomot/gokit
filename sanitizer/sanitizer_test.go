@@ -130,7 +130,7 @@ func TestRegisterSanitizer(t *testing.T) {
 
 	t.Run("Register and use custom sanitizer", func(t *testing.T) {
 		sanitizer.ResetSanitizers() // Reset before each test case
-		sanitizer.RegisterSanitizer("custom", func(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+		sanitizer.RegisterSanitizer("custom", func(fieldValue any, fieldType reflect.StructField, params []string) any {
 			if v, ok := fieldValue.(string); ok {
 				return strings.ToUpper(v) + "!"
 			}
@@ -152,7 +152,7 @@ func TestRegisterSanitizer(t *testing.T) {
 
 	t.Run("Register empty tag", func(t *testing.T) {
 		sanitizer.ResetSanitizers() // Reset before each test case
-		sanitizer.RegisterSanitizer("", func(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+		sanitizer.RegisterSanitizer("", func(fieldValue any, fieldType reflect.StructField, params []string) any {
 			return fieldValue
 		})
 		input := &CustomStruct{Field: "hello"}

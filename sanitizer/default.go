@@ -43,28 +43,28 @@ func ResetSanitizers() {
 	}
 }
 
-func trimSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func trimSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok {
 		return strings.TrimSpace(v)
 	}
 	return fieldValue
 }
 
-func lowerSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func lowerSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok {
 		return strings.ToLower(v)
 	}
 	return fieldValue
 }
 
-func upperSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func upperSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok {
 		return strings.ToUpper(v)
 	}
 	return fieldValue
 }
 
-func replaceSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func replaceSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if len(params) < 2 {
 		return fieldValue
 	}
@@ -76,7 +76,7 @@ func replaceSanitizer(fieldValue interface{}, fieldType reflect.StructField, par
 	return fieldValue
 }
 
-func stripHTMLSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func stripHTMLSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok {
 		// Simple regex to remove HTML tags
 		re := regexp.MustCompile("<[^>]*>")
@@ -85,7 +85,7 @@ func stripHTMLSanitizer(fieldValue interface{}, fieldType reflect.StructField, p
 	return fieldValue
 }
 
-func escapeSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func escapeSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok {
 		// Replace special HTML characters
 		replacer := strings.NewReplacer(
@@ -113,7 +113,7 @@ func escapeSanitizer(fieldValue interface{}, fieldType reflect.StructField, para
 	return fieldValue
 }
 
-func alphanumSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func alphanumSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok {
 		var sb strings.Builder
 		for _, r := range v {
@@ -126,7 +126,7 @@ func alphanumSanitizer(fieldValue interface{}, fieldType reflect.StructField, pa
 	return fieldValue
 }
 
-func numericSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func numericSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok {
 		var sb strings.Builder
 		for _, r := range v {
@@ -139,7 +139,7 @@ func numericSanitizer(fieldValue interface{}, fieldType reflect.StructField, par
 	return fieldValue
 }
 
-func truncateSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func truncateSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if len(params) == 0 {
 		return fieldValue
 	}
@@ -155,7 +155,7 @@ func truncateSanitizer(fieldValue interface{}, fieldType reflect.StructField, pa
 	return fieldValue
 }
 
-func normalizeSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func normalizeSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok {
 		// Replace different types of line endings with \n
 		v = strings.ReplaceAll(v, "\r\n", "\n")
@@ -165,35 +165,35 @@ func normalizeSanitizer(fieldValue interface{}, fieldType reflect.StructField, p
 	return fieldValue
 }
 
-func capitalizeSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func capitalizeSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok && len(v) > 0 {
 		return strings.ToUpper(string(v[0])) + v[1:]
 	}
 	return fieldValue
 }
 
-func camelCaseSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func camelCaseSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok {
 		return strcase.ToLowerCamel(v)
 	}
 	return fieldValue
 }
 
-func snakeCaseSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func snakeCaseSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok {
 		return strcase.ToSnake(v)
 	}
 	return fieldValue
 }
 
-func kebabCaseSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func kebabCaseSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok {
 		return strcase.ToKebab(v)
 	}
 	return fieldValue
 }
 
-func ucfirstSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func ucfirstSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok && len(v) > 0 {
 		return strings.ToUpper(string(v[0])) + v[1:]
 	}

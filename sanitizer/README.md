@@ -4,11 +4,11 @@ The sanitizer package provides a flexible and extensible way to sanitize struct 
 
 ## Features
 
--   Simple tag-based field sanitization
--   Thread-safe operation
--   Multiple sanitization rules per field
--   Extensible with custom sanitizers
--   Various built-in sanitizers
+- Simple tag-based field sanitization
+- Thread-safe operation
+- Multiple sanitization rules per field
+- Extensible with custom sanitizers
+- Various built-in sanitizers
 
 ## Built-in Sanitizers
 
@@ -86,7 +86,7 @@ import (
 )
 
 // Custom sanitizer that removes specific words
-func removeBadWordsSanitizer(fieldValue interface{}, fieldType reflect.StructField, params []string) interface{} {
+func removeBadWordsSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
     if v, ok := fieldValue.(string); ok {
         badWords := []string{"bad", "words"}
         result := v
