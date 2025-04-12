@@ -36,3 +36,4 @@ go.work.sum
 
 # other files
 _legacy_packages/
+templ_doc.md
