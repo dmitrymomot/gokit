@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"hash/fnv"
+	"slices"
 )
 
 // AlwaysStrategy is a strategy that always returns the same value.
@@ -35,9 +36,9 @@ type TargetedStrategy struct {
 // Evaluate determines if a feature should be enabled based on the context and criteria.
 func (s *TargetedStrategy) Evaluate(ctx context.Context) (bool, error) {
 	// Check for nil criteria
-	if s.Criteria.UserIDs == nil && s.Criteria.Groups == nil && 
-	   s.Criteria.Percentage == nil && s.Criteria.AllowList == nil && 
-	   s.Criteria.DenyList == nil {
+	if s.Criteria.UserIDs == nil && s.Criteria.Groups == nil &&
+		s.Criteria.Percentage == nil && s.Criteria.AllowList == nil &&
+		s.Criteria.DenyList == nil {
 		return false, ErrInvalidStrategy
 	}
 
@@ -49,51 +50,35 @@ func (s *TargetedStrategy) Evaluate(ctx context.Context) (bool, error) {
 			return false, nil
 		}
 
-		for _, denied := range s.Criteria.DenyList {
-			if denied == userID {
-				return false, nil
-			}
+		if slices.Contains(s.Criteria.DenyList, userID) {
+			return false, nil
 		}
 	}
 
 	// Check allow list (if a user is on the allow list, they get the feature)
 	if s.Criteria.AllowList != nil && len(s.Criteria.AllowList) > 0 {
 		userID, ok := ctx.Value(UserIDKey).(string)
-		if ok && userID != "" {
-			for _, allowed := range s.Criteria.AllowList {
-				if allowed == userID {
-					return true, nil
-				}
-			}
+		if ok && userID != "" && slices.Contains(s.Criteria.AllowList, userID) {
+			return true, nil
 		}
 	}
 
 	// Check for specific user IDs
 	if s.Criteria.UserIDs != nil && len(s.Criteria.UserIDs) > 0 {
 		userID, ok := ctx.Value(UserIDKey).(string)
-		if !ok || userID == "" {
-			// Can't determine user ID, skip this check
-		} else {
-			for _, id := range s.Criteria.UserIDs {
-				if id == userID {
-					return true, nil
-				}
-			}
+		if ok && userID != "" && slices.Contains(s.Criteria.UserIDs, userID) {
+			return true, nil
 		}
 	}
 
 	// Check for groups
 	if s.Criteria.Groups != nil && len(s.Criteria.Groups) > 0 {
 		userGroups, ok := ctx.Value(UserGroupsKey).([]string)
-		if !ok || len(userGroups) == 0 {
-			// Can't determine user groups, skip this check
-		} else {
-			// Check if the user is in any targeted group
-			for _, targetGroup := range s.Criteria.Groups {
-				for _, userGroup := range userGroups {
-					if targetGroup == userGroup {
-						return true, nil
-					}
+		if ok && len(userGroups) > 0 {
+			// Check if any user group is in the targeted groups
+			for _, userGroup := range userGroups {
+				if slices.Contains(s.Criteria.Groups, userGroup) {
+					return true, nil
 				}
 			}
 		}
@@ -103,7 +88,7 @@ func (s *TargetedStrategy) Evaluate(ctx context.Context) (bool, error) {
 	if s.Criteria.Percentage != nil {
 		percentage := *s.Criteria.Percentage
 		if percentage < 0 || percentage > 100 {
-			return false, errors.Join(ErrInvalidStrategy, 
+			return false, errors.Join(ErrInvalidStrategy,
 				errors.New("percentage must be between 0 and 100"))
 		}
 
@@ -160,10 +145,8 @@ func (s *EnvironmentStrategy) Evaluate(ctx context.Context) (bool, error) {
 	}
 
 	// Check if the environment is in the enabled list
-	for _, enabledEnv := range s.EnabledEnvironments {
-		if enabledEnv == env {
-			return true, nil
-		}
+	if slices.Contains(s.EnabledEnvironments, env) {
+		return true, nil
 	}
 
 	return false, nil

@@ -31,6 +31,7 @@ require (
 	golang.org/x/oauth2 v0.29.0
 	golang.org/x/sync v0.13.0
 	golang.org/x/text v0.24.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -102,5 +103,4 @@ require (
 	golang.org/x/sys v0.32.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
