@@ -1,8 +1,10 @@
 package binder
 
 import (
+	"encoding"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,6 +13,15 @@ import (
 	"strings"
 	"time"
 )
+
+// Common time layouts to try when parsing time strings
+var timeLayouts = []string{
+	time.RFC3339,
+	time.RFC3339Nano,
+	"2006-01-02T15:04:05",
+	"2006-01-02 15:04:05",
+	"2006-01-02",
+}
 
 // Bind binds the request data to the provided struct based on content type
 func Bind(r *http.Request, v any) error {
@@ -102,14 +113,14 @@ func BindQuery(r *http.Request, v any) error {
 // bindValues binds url.Values to a struct
 func bindValues(values url.Values, v any) error {
 	if reflect.TypeOf(v).Kind() != reflect.Ptr {
-		return ErrUnsupportedType
+		return fmt.Errorf("%w: non-pointer value", ErrUnsupportedType)
 	}
 
 	rv := reflect.ValueOf(v).Elem()
 	rt := rv.Type()
 
 	if rt.Kind() != reflect.Struct {
-		return ErrUnsupportedType
+		return fmt.Errorf("%w: non-struct value", ErrUnsupportedType)
 	}
 
 	for i := range rt.NumField() {
@@ -125,7 +136,70 @@ func bindValues(values url.Values, v any) error {
 			continue
 		}
 
+		// Handle nested structs
+		if field.Type.Kind() == reflect.Struct {
+			// Skip time.Time as it needs special handling
+			if field.Type == reflect.TypeOf(time.Time{}) {
+				if vals, ok := values[name]; ok && len(vals) > 0 {
+					if err := setTimeField(fieldValue, vals[0]); err != nil {
+						return err
+					}
+				}
+				continue
+			}
+
+			// For embedded or nested structs, bind with field name as prefix
+			if err := bindNestedStruct(values, fieldValue, name); err != nil {
+				return err
+			}
+			continue
+		}
+
 		vals, ok := values[name]
+		if !ok || len(vals) == 0 {
+			continue
+		}
+
+		if err := setFieldValue(fieldValue, vals); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// bindNestedStruct binds values to a nested struct with the given prefix
+func bindNestedStruct(values url.Values, structValue reflect.Value, prefix string) error {
+	if structValue.Kind() != reflect.Struct {
+		return nil
+	}
+
+	structType := structValue.Type()
+	for i := 0; i < structType.NumField(); i++ {
+		field := structType.Field(i)
+		fieldValue := structValue.Field(i)
+
+		if !fieldValue.CanSet() {
+			continue
+		}
+
+		name := getFieldName(field)
+		if name == "-" || name == "" {
+			continue
+		}
+
+		// Construct the prefixed field name
+		prefixedName := prefix + "." + name
+
+		// Handle nested structs recursively
+		if field.Type.Kind() == reflect.Struct && field.Type != reflect.TypeOf(time.Time{}) {
+			if err := bindNestedStruct(values, fieldValue, prefixedName); err != nil {
+				return err
+			}
+			continue
+		}
+
+		vals, ok := values[prefixedName]
 		if !ok || len(vals) == 0 {
 			continue
 		}
@@ -154,6 +228,23 @@ func getFieldName(field reflect.StructField) string {
 
 	// Default to field name
 	return field.Name
+}
+
+// setTimeField sets a time.Time field from a string value
+func setTimeField(field reflect.Value, timeStr string) error {
+	if timeStr == "" {
+		return nil
+	}
+
+	// Try parsing with various time layouts
+	for _, layout := range timeLayouts {
+		if t, err := time.Parse(layout, timeStr); err == nil {
+			field.Set(reflect.ValueOf(t))
+			return nil
+		}
+	}
+
+	return fmt.Errorf("%w: %s", ErrUnsupportedTimeFormat, timeStr)
 }
 
 // setFieldValue sets the value of a struct field based on form values
@@ -216,11 +307,76 @@ func setFieldValue(fieldValue reflect.Value, values []string) error {
 
 		fieldValue.Set(slice)
 
+	case reflect.Map:
+		// Only support maps with string keys
+		if fieldValue.Type().Key().Kind() != reflect.String {
+			return fmt.Errorf("%w: non-string map key", ErrInvalidMapKey)
+		}
+
+		// Create a new map if it's nil
+		if fieldValue.IsNil() {
+			fieldValue.Set(reflect.MakeMap(fieldValue.Type()))
+		}
+
+		// Set map values
+		elemType := fieldValue.Type().Elem()
+
+		// For maps, we expect param names in the form of map[key]
+		// and we need to extract the key and set the value
+		for k, v := range extractMapValues(values[0]) {
+			elem := reflect.New(elemType).Elem()
+			if err := setSingleValue(elem, v); err != nil {
+				return err
+			}
+			fieldValue.SetMapIndex(reflect.ValueOf(k), elem)
+		}
+
 	default:
-		return ErrUnsupportedType
+		// Try to handle custom types via TextUnmarshaler interface
+		if reflect.PtrTo(fieldValue.Type()).Implements(reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()) ||
+			reflect.PtrTo(fieldValue.Type()).Implements(reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()) {
+			// Create a new pointer to the value
+			ptr := reflect.New(fieldValue.Type())
+			ptr.Elem().Set(fieldValue)
+
+			// Try json.Unmarshaler first
+			if unmarshaler, ok := ptr.Interface().(json.Unmarshaler); ok {
+				if err := unmarshaler.UnmarshalJSON([]byte(`"` + values[0] + `"`)); err != nil {
+					return fmt.Errorf("%w: %v", ErrInvalidFormData, err)
+				}
+				fieldValue.Set(ptr.Elem())
+				return nil
+			}
+
+			// Try encoding.TextUnmarshaler
+			if unmarshaler, ok := ptr.Interface().(encoding.TextUnmarshaler); ok {
+				if err := unmarshaler.UnmarshalText([]byte(values[0])); err != nil {
+					return fmt.Errorf("%w: %v", ErrInvalidFormData, err)
+				}
+				fieldValue.Set(ptr.Elem())
+				return nil
+			}
+		}
+
+		return fmt.Errorf("%w: %T", ErrUnsupportedType, fieldValue.Type())
 	}
 
 	return nil
+}
+
+// extractMapValues extracts map values from a string in the format key1=value1,key2=value2
+func extractMapValues(str string) map[string]string {
+	result := make(map[string]string)
+	pairs := strings.Split(str, ",")
+
+	for _, pair := range pairs {
+		kv := strings.SplitN(pair, "=", 2)
+		if len(kv) == 2 {
+			result[kv[0]] = kv[1]
+		}
+	}
+
+	return result
 }
 
 // setSingleValue sets a single value to a reflect.Value
@@ -235,11 +391,19 @@ func setSingleValue(value reflect.Value, strVal string) error {
 		}
 		value.SetBool(val)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		val, err := strconv.ParseInt(strVal, 10, 64)
-		if err != nil {
-			return errors.Join(ErrInvalidFormData, err)
+		if value.Type() == reflect.TypeOf(time.Duration(0)) {
+			duration, err := time.ParseDuration(strVal)
+			if err != nil {
+				return fmt.Errorf("%w: %v", ErrInvalidFormData, err)
+			}
+			value.SetInt(int64(duration))
+		} else {
+			val, err := strconv.ParseInt(strVal, 10, 64)
+			if err != nil {
+				return errors.Join(ErrInvalidFormData, err)
+			}
+			value.SetInt(val)
 		}
-		value.SetInt(val)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		val, err := strconv.ParseUint(strVal, 10, 64)
 		if err != nil {
@@ -252,8 +416,13 @@ func setSingleValue(value reflect.Value, strVal string) error {
 			return errors.Join(ErrInvalidFormData, err)
 		}
 		value.SetFloat(val)
+	case reflect.Struct:
+		if value.Type() == reflect.TypeOf(time.Time{}) {
+			return setTimeField(value, strVal)
+		}
+		return fmt.Errorf("%w: %T", ErrUnsupportedType, value.Type())
 	default:
-		return ErrUnsupportedType
+		return fmt.Errorf("%w: %T", ErrUnsupportedType, value.Type())
 	}
 
 	return nil
