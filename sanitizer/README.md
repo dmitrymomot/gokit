@@ -33,7 +33,7 @@ The sanitizer package provides a flexible and extensible way to sanitize struct 
 ## Installation
 
 ```bash
-go get github.com/yourusername/godevkit/pkg/sanitizer
+go get github.com/dmitrymomot/gokit/pkg/sanitizer
 ```
 
 ## Usage
@@ -45,7 +45,7 @@ package main
 
 import (
     "fmt"
-    "github.com/yourusername/godevkit/pkg/sanitizer"
+    "github.com/yourusername/gokit/pkg/sanitizer"
 )
 
 type User struct {
@@ -82,7 +82,7 @@ package main
 import (
     "reflect"
     "strings"
-    "github.com/yourusername/godevkit/pkg/sanitizer"
+    "github.com/yourusername/gokit/pkg/sanitizer"
 )
 
 // Custom sanitizer that removes specific words
