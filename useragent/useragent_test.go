@@ -281,7 +281,7 @@ func TestGetShortIdentifier(t *testing.T) {
 				useragent.BrowserChrome,
 				"91.0.4472.124",
 			),
-			expected: "chrome/91.0.4472.1 (windows, desktop)",
+			expected: "chrome/91.0.44721 (windows, desktop)",
 		},
 		{
 			name: "Safari on iOS",
