@@ -199,6 +199,18 @@ The `sanitizer` package provides input sanitization utilities.
 
 [View the Sanitizer package documentation](./sanitizer/README.md)
 
+### Scopes
+
+The `scopes` package provides functionality for handling authentication and authorization scopes in API systems.
+
+Key features:
+- Parsing and joining scope strings
+- Hierarchical scope support with wildcard matching
+- Scope validation and comparison utilities
+- Customizable delimiters and separators
+- Scope normalization for consistent handling
+
+[View the Scopes package documentation](./scopes/README.md)
 
 ### Semantic Versioning
 
