@@ -1,0 +1,68 @@
+#!/bin/bash
+set -e
+
+echo "Running pre-push hook..."
+
+# Function to detect Go files that have been changed
+changed_go_files() {
+  git diff --cached --name-only --diff-filter=ACM | grep '\.go$' | grep -v "_legacy_packages/"
+}
+
+# Function to check if any Go files were changed
+go_files_changed() {
+  [ -n "$(changed_go_files)" ]
+}
+
+if go_files_changed; then
+  echo "Go files have changed. Running checks..."
+  
+  # Check go version (should be 1.24 or higher)
+  GO_VERSION=$(go version | grep -o "go[0-9]\+\.[0-9]\+" | sed 's/go//')
+  MAJOR=$(echo $GO_VERSION | cut -d. -f1)
+  MINOR=$(echo $GO_VERSION | cut -d. -f2)
+  
+  if [ "$MAJOR" -lt 1 ] || ([ "$MAJOR" -eq 1 ] && [ "$MINOR" -lt 24 ]); then
+    echo "Error: Go version should be 1.24 or higher, found $GO_VERSION"
+    exit 1
+  fi
+  
+  # Run go fmt on all changed Go files
+  echo "Running go fmt on changed files..."
+  for file in $(changed_go_files); do
+    go fmt $file
+  done
+  
+  # Run goimports on all changed Go files if available
+  if command -v goimports >/dev/null 2>&1; then
+    echo "Running goimports on changed files..."
+    for file in $(changed_go_files); do
+      goimports -w $file
+    done
+  else
+    echo "Warning: goimports not installed. Skipping import formatting."
+    echo "Consider installing with: go install golang.org/x/tools/cmd/goimports@latest"
+  fi
+  
+  # Add any files that were reformatted
+  REFORMATTED_FILES=$(git diff --name-only)
+  if [ -n "$REFORMATTED_FILES" ]; then
+    echo "The following files were reformatted:"
+    echo "$REFORMATTED_FILES"
+    git add $REFORMATTED_FILES
+    echo "Reformatted files have been added to the commit."
+  fi
+  
+  # Run tests on all packages
+  echo "Running tests on all packages (excluding _legacy_packages)..."
+  PACKAGES=$(go list ./... | grep -v "_legacy_packages")
+  go test $PACKAGES
+  
+  if [ $? -ne 0 ]; then
+    echo "Tests failed. Push aborted."
+    exit 1
+  fi
+fi
+
+# All checks passed
+echo "All checks passed. Proceeding with push."
+exit 0

@@ -269,3 +269,22 @@ Key features:
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE).
+
+## Development
+
+### Git Hooks
+
+This repository includes git hooks to ensure code quality and consistency:
+
+- **pre-push**: Automatically runs `go fmt`, `goimports` (if available), and tests before pushing commits
+
+To install the git hooks, run:
+
+```sh
+./scripts/setup-git-hooks.sh
+```
+
+The hooks will ensure that:
+- Code is properly formatted according to Go standards
+- All tests pass before pushing commits
+- Only Go 1.24+ is used for development
