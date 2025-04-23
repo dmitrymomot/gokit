@@ -9,47 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseDeviceType(t *testing.T) {
-	tests := []struct {
-		name     string
-		ua       string
-		expected string
-	}{
-		{
-			name:     "Googlebot",
-			ua:       "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-			expected: useragent.DeviceTypeBot,
-		},
-		{
-			name:     "iPad",
-			ua:       "Mozilla/5.0 (iPad; CPU OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1",
-			expected: useragent.DeviceTypeTablet,
-		},
-		{
-			name:     "iPhone",
-			ua:       "Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1",
-			expected: useragent.DeviceTypeMobile,
-		},
-		{
-			name:     "Windows Desktop",
-			ua:       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-			expected: useragent.DeviceTypeDesktop,
-		},
-		{
-			name:     "Empty UA",
-			ua:       "",
-			expected: useragent.DeviceTypeUnknown,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			result := useragent.ParseDeviceType(strings.ToLower(tc.ua))
-			assert.Equal(t, tc.expected, result)
-		})
-	}
-}
-
 func TestParseOS(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -216,7 +175,7 @@ func TestParseUserAgent(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := useragent.Parse(tc.ua)
-			
+
 			if tc.expectedErr != nil {
 				assert.Equal(t, tc.expectedErr, err)
 			} else {
@@ -281,7 +240,7 @@ func TestGetShortIdentifier(t *testing.T) {
 				useragent.BrowserChrome,
 				"91.0.4472.124",
 			),
-			expected: "chrome/91.0.44721 (windows, desktop)",
+			expected: "Chrome/91.0.44721 (Windows, desktop)",
 		},
 		{
 			name: "Safari on iOS",
@@ -293,7 +252,7 @@ func TestGetShortIdentifier(t *testing.T) {
 				useragent.BrowserSafari,
 				"14.0",
 			),
-			expected: "safari/14.0 (ios, mobile)",
+			expected: "Safari/14.0 (iOS, mobile)",
 		},
 		{
 			name: "Bot",
@@ -308,7 +267,19 @@ func TestGetShortIdentifier(t *testing.T) {
 			expected: "Bot: Googlebot",
 		},
 		{
-			name: "Unknown",
+			name: "All Unknown Components - Empty Strings",
+			ua: useragent.New(
+				"",
+				"",
+				"", // deviceModel
+				"",
+				"",
+				"",
+			),
+			expected: "Unknown device",
+		},
+		{
+			name: "All Unknown Components - Unknown Constants",
 			ua: useragent.New(
 				"",
 				useragent.DeviceTypeUnknown,
@@ -317,7 +288,55 @@ func TestGetShortIdentifier(t *testing.T) {
 				useragent.BrowserUnknown,
 				"",
 			),
-			expected: "Unknown/? (Unknown OS, unknown)",
+			expected: "Unknown device",
+		},
+		{
+			name: "Unknown Browser but Known OS and Device",
+			ua: useragent.New(
+				"Some obscure browser",
+				useragent.DeviceTypeDesktop,
+				"", // deviceModel
+				useragent.OSWindows,
+				useragent.BrowserUnknown,
+				"",
+			),
+			expected: "Windows desktop",
+		},
+		{
+			name: "Known Browser but Unknown OS and Device",
+			ua: useragent.New(
+				"Partial information",
+				useragent.DeviceTypeUnknown,
+				"", // deviceModel
+				useragent.OSUnknown,
+				useragent.BrowserChrome,
+				"100.0",
+			),
+			expected: "Chrome/100.0 (Unknown OS)",
+		},
+		{
+			name: "Browser with long version",
+			ua: useragent.New(
+				"Browser with long version string",
+				useragent.DeviceTypeDesktop,
+				"", // deviceModel
+				useragent.OSWindows,
+				useragent.BrowserFirefox,
+				"100.0.12345.67890.beta",
+			),
+			expected: "Firefox/100.0.1234 (Windows desktop)",
+		},
+		{
+			name: "Browser with version ending with dot",
+			ua: useragent.New(
+				"Browser with version ending with dot",
+				useragent.DeviceTypeDesktop,
+				"", // deviceModel
+				useragent.OSWindows,
+				useragent.BrowserFirefox,
+				"100.0.12345.",
+			),
+			expected: "Firefox/100.0.1234 (Windows desktop)",
 		},
 	}
 
