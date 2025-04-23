@@ -1,6 +1,6 @@
 # Redis Package
 
-A Go package that provides a simple and configurable Redis client with automatic connection retries and environment variable support.
+A Go package that provides a simple and configurable Redis client with connection helpers, healthcheck functionality, and a Fiber storage interface implementation.
 
 ## Installation
 
@@ -8,7 +8,11 @@ A Go package that provides a simple and configurable Redis client with automatic
 go get github.com/dmitrymomot/gokit/redis
 ```
 
-## Quick Start
+## Primary Features
+
+### Redis Connection
+
+This package provides simplified connection helpers for Redis with automatic retries and robust configuration:
 
 ```go
 import "github.com/dmitrymomot/gokit/redis"
@@ -27,13 +31,25 @@ func main() {
 }
 ```
 
-## Configuration
+### Healthcheck Functionality
+
+The package includes a built-in healthcheck function that can be used for service readiness probes:
+
+```go
+// Using the healthcheck
+healthcheck := redis.Healthcheck(client)
+if err := healthcheck(ctx); err != nil {
+    log.Fatal("Redis healthcheck failed:", err)
+}
+```
+
+### Configuration
 
 The package uses environment variables for configuration and supports `.env` files through `godotenv/autoload`.
 
-### Environment Variables
+#### Environment Variables
 
-The following environment variables are used to configure the Redis client:
+The following environment variables configure the Redis client:
 
 | Environment Variable    | Description                 | Default                    | Required |
 | ----------------------- | --------------------------- | -------------------------- | -------- |
@@ -42,13 +58,74 @@ The following environment variables are used to configure the Redis client:
 | `REDIS_RETRY_INTERVAL`  | Interval between retries    | "5s"                       | No       |
 | `REDIS_CONNECT_TIMEOUT` | Connection timeout duration | "30s"                      | No       |
 
-### Connection URL Format
+## Fiber Storage Interface
 
-The Redis connection URL should be in the following format:
+The package also provides a Redis-based storage implementation that satisfies the Fiber storage interface. This makes it compatible with various Fiber features that require storage capabilities.
 
+### Storage Usage
+
+```go
+import (
+    "github.com/dmitrymomot/gokit/redis"
+    "github.com/gofiber/fiber/v2"
+    "github.com/gofiber/fiber/v2/middleware/session"
+)
+
+func main() {
+    // Create a Redis client
+    client, err := redis.New()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Close()
+    
+    // Create a Redis-based storage for Fiber
+    storage := redis.NewStorage(client)
+    
+    // Example: Use with session middleware
+    store := session.New(session.Config{
+        Storage: storage,
+    })
+    
+    app := fiber.New()
+    
+    // Use the session middleware as an example
+    app.Use(func(c *fiber.Ctx) error {
+        sess, err := store.Get(c)
+        if err != nil {
+            return err
+        }
+        
+        // Set a value
+        sess.Set("user", "john")
+        
+        // Save the session
+        if err := sess.Save(); err != nil {
+            return err
+        }
+        
+        return c.Next()
+    })
+    
+    // Start server
+    app.Listen(":3000")
+}
 ```
-redis://:password@localhost:6379/0
-```
+
+### Storage Methods
+
+The Redis storage implementation provides the following methods that fulfill the Fiber storage interface:
+
+- `Get(key string) ([]byte, error)`: Retrieve a value by key
+- `Set(key string, val []byte, exp time.Duration) error`: Store a value with optional expiration
+- `Delete(key string) error`: Remove a key-value pair
+- `Reset() error`: Clear all stored data
+- `Close() error`: Close the Redis connection
+
+Additionally, it provides these helper methods:
+
+- `Conn() redis.UniversalClient`: Access the underlying Redis client
+- `Keys() ([][]byte, error)`: Get all keys in the database
 
 ## Error Handling
 
@@ -58,56 +135,6 @@ The package provides several error types for better error handling:
 - `ErrFailedToParseRedisConnString`: Invalid Redis connection string
 - `ErrRedisNotReady`: Redis server not ready within timeout period
 - `ErrHealthcheckFailed`: Redis healthcheck failed
-
-## Features
-
-- Automatic connection retries
-- Environment variable configuration
-- Built-in healthcheck functionality
-- Connection timeout handling
-- `.env` file support
-
-## Example Usage
-
-```go
-package main
-
-import (
-    "context"
-    "log"
-    "time"
-
-    "github.com/dmitrymomot/gokit/redis"
-)
-
-func main() {
-    // Create a new Redis client
-    client, err := redis.New()
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer client.Close()
-
-    // Use the client
-    ctx := context.Background()
-    err = client.Set(ctx, "key", "value", time.Hour).Err()
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    val, err := client.Get(ctx, "key").Result()
-    if err != nil {
-        log.Fatal(err)
-    }
-    log.Printf("Value: %s", val)
-
-    // Using the healthcheck
-    healthcheck := redis.Healthcheck(client)
-    if err := healthcheck(ctx); err != nil {
-        log.Fatal("Redis healthcheck failed:", err)
-    }
-}
-```
 
 ## Dependencies
 

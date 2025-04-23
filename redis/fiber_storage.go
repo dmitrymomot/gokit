@@ -8,7 +8,8 @@ import (
 )
 
 // Storage is a Redis-based storage implementation that provides a key-value
-// store compatible with various caching and session management interfaces.
+// store compatible with various caching and session management interfaces,
+// including Fiber's session storage interface.
 // It wraps the go-redis client to provide a simplified storage API.
 type Storage struct {
 	db redis.UniversalClient

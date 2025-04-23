@@ -118,7 +118,7 @@ Key features:
 
 The `oauth` package provides OAuth authentication utilities.
 
-[View the OAuth package documentation](./oauth/README.md)
+[View the OAuth package documentation](./oauth/google/README.md)
 
 ### OpenSearch
 
@@ -164,13 +164,14 @@ The `rbac` package provides Role-Based Access Control functionality.
 
 ### Redis
 
-The `redis` package provides a Redis client wrapper for key-value storage.
+The `redis` package provides a Redis client wrapper with connection helpers, healthcheck functionality, and a Fiber storage interface implementation.
 
 Key features:
-- Simple key-value storage interface
-- Support for various Redis client implementations
-- Key expiration support
-- Proper error handling
+- Simple connection helpers with automatic retries
+- Built-in healthcheck function for service readiness probes
+- Environment-based configuration
+- Fiber storage interface implementation for web applications
+- Thread-safe key-value operations
 
 [View the Redis package documentation](./redis/README.md)
 
