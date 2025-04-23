@@ -4,50 +4,67 @@ import (
 	"strings"
 )
 
-// Device type keyword maps for faster lookups
-var (
-	// Maps for device type detection
-	botKeywords     = makeKeywordMap([]string{"bot", "spider", "crawler", "archiver", "ping", "lighthouse", "slurp", "daum", "sogou", "yeti", "facebook", "twitter", "slack", "linkedin", "whatsapp", "telegram", "discord", "camo asset", "generator", "monitor", "analyzer", "validator", "fetcher", "scraper", "check"})
-	tvKeywords      = makeKeywordMap([]string{"tv", "appletv", "smarttv", "googletv", "android tv", "webos", "tizen"})
-	consoleKeywords = makeKeywordMap([]string{"playstation", "xbox", "nintendo", "wiiu", "switch"})
-	tabletKeywords  = makeKeywordMap([]string{"tablet", "kindle", "silk"})
-	mobileKeywords  = makeKeywordMap([]string{"mobile", "iphone", "android", "windows phone", "iemobile", "blackberry", "nokia"})
-	desktopKeywords = makeKeywordMap([]string{"windows", "macintosh", "mac os x", "linux", "x11", "ubuntu", "fedora", "debian", "chromeos", "cros"})
+// keywordSet is a set of keywords for fast lookups
+type keywordSet map[string]struct{}
 
-	// Maps for mobile device models
-	iPhoneKeywords     = makeKeywordMap([]string{"iphone"})
-	samsungMobileWords = makeKeywordMap([]string{"samsung", "sm-g", "sm-a", "sm-n", "samsungbrowser"})
-	huaweiMobileWords  = makeKeywordMap([]string{"huawei", "hwa-", "honor", "h60-", "h30-"})
-	xiaomiMobileWords  = makeKeywordMap([]string{"xiaomi", "mi ", "redmi", "miui"})
-	oppoMobileWords    = makeKeywordMap([]string{"oppo", "cph1", "cph2", "f1f"})
-	vivoMobileWords    = makeKeywordMap([]string{"vivo", "viv-", "v1730", "v1731"})
-
-	// Maps for tablet device models
-	iPadKeywords      = makeKeywordMap([]string{"ipad"})
-	surfaceWords      = makeKeywordMap([]string{"windows touch", "windows tablet"})
-	samsungTabletWords = makeKeywordMap([]string{"sm-t", "gt-p", "sm-p"})
-	huaweiTabletWords  = makeKeywordMap([]string{"mediapad", "agassi"})
-	kindleWords        = makeKeywordMap([]string{"kindle", "silk", "kftt", "kfjwi"})
-)
-
-// makeKeywordMap creates a map from a slice of keywords for fast lookups
-func makeKeywordMap(keywords []string) map[string]struct{} {
-	result := make(map[string]struct{}, len(keywords))
+// newKeywordSet creates a set from a slice of keywords
+func newKeywordSet(keywords ...string) keywordSet {
+	result := make(keywordSet, len(keywords))
 	for _, word := range keywords {
 		result[word] = struct{}{}
 	}
 	return result
 }
 
-// hasAnyKeyword checks if the user agent contains any of the keywords in the map
-func hasAnyKeyword(ua string, keywordMap map[string]struct{}) bool {
-	for keyword := range keywordMap {
-		if strings.Contains(ua, keyword) {
+// contains checks if the string contains any of the keywords in the set
+func (k keywordSet) contains(s string) bool {
+	for keyword := range k {
+		if strings.Contains(s, keyword) {
 			return true
 		}
 	}
 	return false
 }
+
+// containsAll checks if the string contains all keywords in the set
+func (k keywordSet) containsAll(s string) bool {
+	if len(k) == 0 {
+		return true
+	}
+
+	for keyword := range k {
+		if !strings.Contains(s, keyword) {
+			return false
+		}
+	}
+	return true
+}
+
+// Device type keyword maps for faster lookups
+var (
+	// Maps for device type detection
+	botKeywords     = newKeywordSet("bot", "spider", "crawler", "archiver", "ping", "lighthouse", "slurp", "daum", "sogou", "yeti", "facebook", "twitter", "slack", "linkedin", "whatsapp", "telegram", "discord", "camo asset", "generator", "monitor", "analyzer", "validator", "fetcher", "scraper", "check")
+	tvKeywords      = newKeywordSet("tv", "appletv", "smarttv", "googletv", "android tv", "webos", "tizen")
+	consoleKeywords = newKeywordSet("playstation", "xbox", "nintendo", "wiiu", "switch")
+	tabletKeywords  = newKeywordSet("tablet", "kindle", "silk")
+	mobileKeywords  = newKeywordSet("mobile", "iphone", "android", "windows phone", "iemobile", "blackberry", "nokia")
+	desktopKeywords = newKeywordSet("windows", "macintosh", "mac os x", "linux", "x11", "ubuntu", "fedora", "debian", "chromeos", "cros")
+
+	// Maps for mobile device models
+	iPhoneKeywords     = newKeywordSet("iphone")
+	samsungMobileWords = newKeywordSet("samsung", "sm-g", "sm-a", "sm-n", "samsungbrowser")
+	huaweiMobileWords  = newKeywordSet("huawei", "hwa-", "honor", "h60-", "h30-")
+	xiaomiMobileWords  = newKeywordSet("xiaomi", "mi ", "redmi", "miui")
+	oppoMobileWords    = newKeywordSet("oppo", "cph1", "cph2", "f1f")
+	vivoMobileWords    = newKeywordSet("vivo", "viv-", "v1730", "v1731")
+
+	// Maps for tablet device models
+	iPadKeywords       = newKeywordSet("ipad")
+	surfaceWords       = newKeywordSet("windows touch", "windows tablet")
+	samsungTabletWords = newKeywordSet("sm-t", "gt-p", "sm-p")
+	huaweiTabletWords  = newKeywordSet("mediapad", "agassi")
+	kindleWords        = newKeywordSet("kindle", "silk", "kftt", "kfjwi")
+)
 
 // ParseDeviceType determines the device type from a user agent string
 // Optimized version using hash map lookups instead of regex
@@ -68,7 +85,7 @@ func ParseDeviceType(lowerUA string) string {
 	}
 
 	// Check for bots
-	if hasAnyKeyword(lowerUA, botKeywords) {
+	if botKeywords.contains(lowerUA) {
 		return DeviceTypeBot
 	}
 
@@ -82,33 +99,33 @@ func ParseDeviceType(lowerUA string) string {
 	}
 
 	// Check for tablets
-	if hasAnyKeyword(lowerUA, tabletKeywords) {
+	if tabletKeywords.contains(lowerUA) {
 		return DeviceTypeTablet
 	}
 
 	// Check for mobile devices
-	if hasAnyKeyword(lowerUA, mobileKeywords) {
+	if mobileKeywords.contains(lowerUA) {
 		return DeviceTypeMobile
 	}
 
 	// Check for TV
-	if hasAnyKeyword(lowerUA, tvKeywords) {
+	if tvKeywords.contains(lowerUA) {
 		return DeviceTypeTV
 	}
 
 	// Check for gaming consoles
-	if hasAnyKeyword(lowerUA, consoleKeywords) {
+	if consoleKeywords.contains(lowerUA) {
 		return DeviceTypeConsole
 	}
 
 	// Windows tablets check - must come before desktop check
-	if strings.Contains(lowerUA, "windows") && 
+	if strings.Contains(lowerUA, "windows") &&
 		(strings.Contains(lowerUA, "touch") || strings.Contains(lowerUA, "tablet")) {
 		return DeviceTypeTablet
 	}
-	
+
 	// Check for desktop (most common)
-	if hasAnyKeyword(lowerUA, desktopKeywords) {
+	if desktopKeywords.contains(lowerUA) {
 		return DeviceTypeDesktop
 	}
 
@@ -130,23 +147,23 @@ func GetDeviceModel(lowerUA, deviceType string) string {
 			return MobileDeviceIPhone
 		}
 
-		if hasAnyKeyword(lowerUA, samsungMobileWords) {
+		if samsungMobileWords.contains(lowerUA) {
 			return MobileDeviceSamsung
 		}
 
-		if hasAnyKeyword(lowerUA, huaweiMobileWords) {
+		if huaweiMobileWords.contains(lowerUA) {
 			return MobileDeviceHuawei
 		}
 
-		if hasAnyKeyword(lowerUA, xiaomiMobileWords) {
+		if xiaomiMobileWords.contains(lowerUA) {
 			return MobileDeviceXiaomi
 		}
 
-		if hasAnyKeyword(lowerUA, oppoMobileWords) {
+		if oppoMobileWords.contains(lowerUA) {
 			return MobileDeviceOppo
 		}
 
-		if hasAnyKeyword(lowerUA, vivoMobileWords) {
+		if vivoMobileWords.contains(lowerUA) {
 			return MobileDeviceVivo
 		}
 
@@ -166,21 +183,21 @@ func GetDeviceModel(lowerUA, deviceType string) string {
 		}
 
 		// Surface tablets
-		if strings.Contains(lowerUA, "windows") && 
+		if strings.Contains(lowerUA, "windows") &&
 			(strings.Contains(lowerUA, "touch") || strings.Contains(lowerUA, "tablet")) {
 			return TabletDeviceSurface
 		}
 
-		if strings.Contains(lowerUA, "samsung") || hasAnyKeyword(lowerUA, samsungTabletWords) {
+		if strings.Contains(lowerUA, "samsung") || samsungTabletWords.contains(lowerUA) {
 			return TabletDeviceSamsung
 		}
 
-		if strings.Contains(lowerUA, "huawei") || hasAnyKeyword(lowerUA, huaweiTabletWords) {
+		if strings.Contains(lowerUA, "huawei") || huaweiTabletWords.contains(lowerUA) {
 			return TabletDeviceHuawei
 		}
 
 		// Kindle Fire
-		if hasAnyKeyword(lowerUA, kindleWords) {
+		if kindleWords.contains(lowerUA) {
 			return TabletDeviceKindleFire
 		}
 

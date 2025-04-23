@@ -4,17 +4,17 @@ import (
 	"strings"
 )
 
-// OS detection keyword maps for faster lookups
+// OS detection keyword sets for faster lookups
 var (
-	windowsPhoneKeywords = makeKeywordMap([]string{"windows phone"})
-	windowsKeywords     = makeKeywordMap([]string{"windows"})
-	iOSKeywords         = makeKeywordMap([]string{"iphone", "ipad", "ipod"})
-	macOSKeywords       = makeKeywordMap([]string{"macintosh", "mac os x"})
-	harmonyOSKeywords   = makeKeywordMap([]string{"harmonyos"})
-	androidKeywords     = makeKeywordMap([]string{"android"})
-	fireOSKeywords      = makeKeywordMap([]string{"kindle", "silk"})
-	chromeOSKeywords    = makeKeywordMap([]string{"cros", "chromeos", "chrome os"})
-	linuxKeywords       = makeKeywordMap([]string{"linux", "ubuntu", "debian", "fedora", "mint", "x11"})
+	windowsPhoneKeywords = newKeywordSet("windows phone")
+	windowsKeywords      = newKeywordSet("windows")
+	iOSKeywords          = newKeywordSet("iphone", "ipad", "ipod")
+	macOSKeywords        = newKeywordSet("macintosh", "mac os x")
+	harmonyOSKeywords    = newKeywordSet("harmonyos")
+	androidKeywords      = newKeywordSet("android")
+	fireOSKeywords       = newKeywordSet("kindle", "silk")
+	chromeOSKeywords     = newKeywordSet("cros", "chromeos", "chrome os")
+	linuxKeywords        = newKeywordSet("linux", "ubuntu", "debian", "fedora", "mint", "x11")
 )
 
 // ParseOS determines the operating system from a user agent string
@@ -26,47 +26,42 @@ func ParseOS(lowerUA string) string {
 
 	// Order checks by frequency for typical traffic patterns
 	// Windows is most common in desktop traffic
-	if strings.Contains(lowerUA, "windows") {
-		if strings.Contains(lowerUA, "windows phone") {
+	if windowsKeywords.contains(lowerUA) {
+		if windowsPhoneKeywords.contains(lowerUA) {
 			return OSWindowsPhone
 		}
 		return OSWindows
 	}
 
 	// iOS and macOS checks
-	if strings.Contains(lowerUA, "iphone") || strings.Contains(lowerUA, "ipad") || strings.Contains(lowerUA, "ipod") {
+	if iOSKeywords.contains(lowerUA) {
 		return OSiOS
 	}
 
-	if strings.Contains(lowerUA, "macintosh") || strings.Contains(lowerUA, "mac os x") {
+	if macOSKeywords.contains(lowerUA) {
 		return OSMacOS
 	}
 
 	// Android is very common in mobile
-	if strings.Contains(lowerUA, "android") {
+	if androidKeywords.contains(lowerUA) || strings.Contains(lowerUA, "android") {
 		return OSAndroid
 	}
 
 	// Less common OS checks
-	// Use direct string checks for frequently occurring patterns
-	if strings.Contains(lowerUA, "linux") || strings.Contains(lowerUA, "ubuntu") {
-		return OSLinux
-	}
-
 	// Use map lookups for less common patterns to reduce code size
-	if hasAnyKeyword(lowerUA, harmonyOSKeywords) {
+	if harmonyOSKeywords.contains(lowerUA) {
 		return OSHarmonyOS
 	}
 
-	if hasAnyKeyword(lowerUA, fireOSKeywords) {
+	if fireOSKeywords.contains(lowerUA) {
 		return OSFireOS
 	}
 
-	if hasAnyKeyword(lowerUA, chromeOSKeywords) {
+	if chromeOSKeywords.contains(lowerUA) {
 		return OSChromeOS
 	}
 
-	if hasAnyKeyword(lowerUA, linuxKeywords) {
+	if linuxKeywords.contains(lowerUA) {
 		return OSLinux
 	}
 
