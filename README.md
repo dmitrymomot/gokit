@@ -10,6 +10,18 @@ go get github.com/dmitrymomot/gokit
 
 ## Packages
 
+### API Key
+
+The `apikey` package provides API key generation, hashing, and validation functionality for building secure API authentication systems.
+
+Key features:
+- Cryptographically secure API key generation
+- Time-ordered API key generation for sortability
+- Secure key hashing for storage
+- Scope-based authorization (in the companion `scopes` package)
+
+[View the API Key package documentation](./apikey/README.md)
+
 ### Async
 
 The `async` package provides a simple and type-safe way to run functions concurrently and wait for their results. It allows you to execute functions in parallel and retrieve their results once they are completed.
@@ -186,6 +198,7 @@ The `router` package provides an HTTP router with middleware support.
 The `sanitizer` package provides input sanitization utilities.
 
 [View the Sanitizer package documentation](./sanitizer/README.md)
+
 
 ### Semantic Versioning
 
