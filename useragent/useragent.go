@@ -23,20 +23,6 @@ type UserAgent struct {
 	os          string
 	browserName string
 	browserVer  string
-
-	// Device type flags
-	DeviceFlags
-}
-
-// DeviceFlags contains boolean flags for device type classification
-type DeviceFlags struct {
-	isBot     bool
-	isMobile  bool
-	isDesktop bool
-	isTablet  bool
-	isTV      bool
-	isConsole bool
-	isUnknown bool
 }
 
 // String returns the user agent as a string
@@ -66,25 +52,25 @@ func (ua UserAgent) BrowserInfo() Browser {
 }
 
 // IsBot returns true if the user agent is a bot
-func (ua UserAgent) IsBot() bool { return ua.isBot }
+func (ua UserAgent) IsBot() bool { return ua.deviceType == DeviceTypeBot }
 
 // IsMobile returns true if the user agent is a mobile device
-func (ua UserAgent) IsMobile() bool { return ua.isMobile }
+func (ua UserAgent) IsMobile() bool { return ua.deviceType == DeviceTypeMobile }
 
 // IsDesktop returns true if the user agent is a desktop device
-func (ua UserAgent) IsDesktop() bool { return ua.isDesktop }
+func (ua UserAgent) IsDesktop() bool { return ua.deviceType == DeviceTypeDesktop }
 
 // IsTablet returns true if the user agent is a tablet device
-func (ua UserAgent) IsTablet() bool { return ua.isTablet }
+func (ua UserAgent) IsTablet() bool { return ua.deviceType == DeviceTypeTablet }
 
 // IsTV returns true if the user agent is a TV device
-func (ua UserAgent) IsTV() bool { return ua.isTV }
+func (ua UserAgent) IsTV() bool { return ua.deviceType == DeviceTypeTV }
 
 // IsConsole returns true if the user agent is a gaming console
-func (ua UserAgent) IsConsole() bool { return ua.isConsole }
+func (ua UserAgent) IsConsole() bool { return ua.deviceType == DeviceTypeConsole }
 
 // IsUnknown returns true if the user agent is unknown
-func (ua UserAgent) IsUnknown() bool { return ua.isUnknown }
+func (ua UserAgent) IsUnknown() bool { return ua.deviceType == DeviceTypeUnknown || ua.deviceType == "" }
 
 // Bot name extraction keywords - direct mapping for common bots
 var botNameMap = map[string]string{
@@ -298,34 +284,12 @@ func Parse(ua string) (UserAgent, error) {
 
 // New creates a new UserAgent with the provided parameters
 func New(ua, deviceType, deviceModel, os, browserName, browserVer string) UserAgent {
-	result := UserAgent{
+	return UserAgent{
 		userAgent:   ua,
 		deviceType:  deviceType,
 		deviceModel: deviceModel,
 		os:          os,
 		browserName: browserName,
 		browserVer:  browserVer,
-	}
-
-	// Set boolean flags
-	setDeviceFlags(&result)
-
-	return result
-}
-
-// setDeviceFlags sets the boolean flags based on device type
-func setDeviceFlags(ua *UserAgent) {
-	deviceFlagsMap := map[string]func(*UserAgent){
-		DeviceTypeBot:     func(ua *UserAgent) { ua.isBot = true },
-		DeviceTypeMobile:  func(ua *UserAgent) { ua.isMobile = true },
-		DeviceTypeTablet:  func(ua *UserAgent) { ua.isTablet = true },
-		DeviceTypeDesktop: func(ua *UserAgent) { ua.isDesktop = true },
-		DeviceTypeTV:      func(ua *UserAgent) { ua.isTV = true },
-		DeviceTypeConsole: func(ua *UserAgent) { ua.isConsole = true },
-		DeviceTypeUnknown: func(ua *UserAgent) { ua.isUnknown = true },
-	}
-
-	if fn, ok := deviceFlagsMap[ua.deviceType]; ok {
-		fn(ua)
 	}
 }
