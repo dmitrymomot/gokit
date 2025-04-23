@@ -26,20 +26,6 @@ func (k keywordSet) contains(s string) bool {
 	return false
 }
 
-// containsAll checks if the string contains all keywords in the set
-func (k keywordSet) containsAll(s string) bool {
-	if len(k) == 0 {
-		return true
-	}
-
-	for keyword := range k {
-		if !strings.Contains(s, keyword) {
-			return false
-		}
-	}
-	return true
-}
-
 // Device type keyword maps for faster lookups
 var (
 	// Maps for device type detection
