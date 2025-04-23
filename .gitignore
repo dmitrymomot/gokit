@@ -32,8 +32,10 @@ go.work.sum
 .aider*
 
 # windsurf rules
-.windsurfrules
+#.windsurfrules
 
 # other files
 _legacy_packages/
 templ_doc.md
+_archive/
+_archived/
