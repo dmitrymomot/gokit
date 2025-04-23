@@ -9,6 +9,7 @@ require (
 	github.com/ThreeDotsLabs/watermill-redisstream v1.4.2
 	github.com/ThreeDotsLabs/watermill-sql/v4 v4.0.0-rc.4
 	github.com/a-h/templ v0.3.857
+	github.com/agentstation/uuidkey v0.0.0-20250206235508-cad0c80935df
 	github.com/alicebob/miniredis/v2 v2.34.0
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/config v1.29.14
@@ -20,7 +21,7 @@ require (
 	github.com/iancoleman/strcase v0.3.0
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/joho/godotenv v1.5.1
-	github.com/mrz1836/postmark v1.7.1
+	github.com/mrz1836/postmark v1.7.3
 	github.com/opensearch-project/opensearch-go/v2 v2.3.0
 	github.com/pressly/goose/v3 v3.24.2
 	github.com/redis/go-redis/v9 v9.7.3
@@ -85,6 +86,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
+	github.com/richardlehane/crock32 v1.0.1 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
