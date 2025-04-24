@@ -87,6 +87,14 @@ func main() {
 | slug       | Must be a valid slug                  | `validate:"slug"`            |
 | hexcolor   | Must be a valid hex color             | `validate:"hexcolor"`        |
 | fullname   | Must be a valid full name             | `validate:"fullname"`        |
+| eq         | Must be equal to the specified value         | `validate:"eq:expected"`         |
+| ne         | Must not be equal to the specified value     | `validate:"ne:unexpected"`       |
+| lt         | Must be less than the specified value        | `validate:"lt:10"`               |
+| lte        | Must be less than or equal to the value      | `validate:"lte:10"`              |
+| gt         | Must be greater than the specified value     | `validate:"gt:1"`                |
+| gte        | Must be greater than or equal to the value   | `validate:"gte:1"`               |
+| len        | Must have exact length (alias for length)    | `validate:"len:10"`              |
+| realemail  | Must be a real, deliverable email address    | `validate:"realemail"`           |
 
 ## Custom Validation
 
