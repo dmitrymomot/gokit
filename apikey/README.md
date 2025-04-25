@@ -1,21 +1,25 @@
 # API Key Package
 
-This package provides API key generation, hashing, and validation functionality for building secure API authentication systems.
-
-## Overview
-
-The `apikey` package offers tools to:
-
-1. Generate cryptographically secure API keys
-2. Hash API keys with a secret key for secure storage
-3. Validate API keys against stored hashes
-4. Compare strings in constant time to prevent timing attacks
+A secure API key generation, hashing, and validation package for authentication systems.
 
 ## Installation
 
-```go
-import "github.com/dmitrymomot/gokit/apikey"
+```bash
+go get github.com/dmitrymomot/gokit/apikey
 ```
+
+## Overview
+
+The `apikey` package provides tools for creating and managing secure API keys for authentication systems. It offers cryptographically secure key generation with multiple methods, secure hashing for storage, and constant-time validation to prevent timing attacks.
+
+## Features
+
+- Cryptographically secure API key generation
+- Time-ordered keys using UUID V7 for chronological sorting
+- Secure hashing with HMAC-SHA256
+- Constant-time comparison to prevent timing attacks
+- Simple validation against stored hashes
+- Comprehensive error handling
 
 ## Usage
 
@@ -30,15 +34,13 @@ if err != nil {
 
 // Alternative: Generate a time-ordered API key using UUID V7
 // Useful for keys that need to be sortable by creation time
-apiKey, err := apikey.GenerateTimeOrdered()
+orderedKey, err := apikey.GenerateTimeOrdered()
 if err != nil {
     // Handle error
 }
 ```
 
-### Hashing API Keys
-
-Always hash API keys before storing them:
+### Hashing for Storage
 
 ```go
 secretKey := "your-secret-key" // Store this securely
@@ -77,33 +79,27 @@ equal := apikey.SecureCompare(string1, string2)
 2. **Use a strong secret key** - Your secret key should be long, random, and kept secure
 3. **Rotate API keys periodically** - Implement key rotation for enhanced security
 4. **Add rate limiting** - Protect your API from brute force attacks
-5. **Include expiration logic** - Consider adding expiration timestamps to your API keys
 
-## Error Handling
+## API Reference
 
-The package provides the following error types:
+### Functions
 
-- `ErrEmptyInput` - Returned when the API key or secret key is empty
-- `ErrGeneration` - Returned when API key generation fails
-- `ErrInvalidHash` - Returned when the hash format is invalid
+#### `GenerateRandom() (string, error)`
 
-## Key Generation Methods
+Creates a new API key with a secure random value. Returns a hex-encoded string of 64 characters.
 
-The package provides two distinct methods for generating API keys, each designed for different use cases:
+#### `GenerateTimeOrdered() (string, error)`
 
-### GenerateRandom
+Creates a new API key using a UUID V7. Generates a time-ordered key that can be chronologically sorted.
 
-`GenerateRandom()` creates a fully random API key using cryptographically secure random bytes. This method is ideal for maximum security and unpredictability.
+#### `HashKey(apiKey, secretKey string) (string, error)`
 
-Benefits:
-- Maximum entropy and unpredictability
-- Simple implementation with minimal dependencies
-- Hex-encoded output (64 characters)
+Hashes the API key using HMAC-SHA256 with a secret key.
 
-### GenerateTimeOrdered
+#### `ValidateKey(apiKey, hash, secretKey string) bool`
 
-`GenerateTimeOrdered()` creates an API key based on a UUID V7, which embeds a timestamp. This makes the keys sortable by creation time.
+Checks if the API key matches the hash using the secret key.
 
-Benefits:
-- Keys can be chronologically ordered
-- Still maintains good entropy and security
+#### `SecureCompare(a, b string) bool`
+
+Performs a constant-time comparison of two strings to prevent timing attacks.
