@@ -1,96 +1,128 @@
-# OpenSearch
+# OpenSearch Package
 
-A lightweight wrapper for the official OpenSearch Go client that provides:
-
-- Simple configuration with environment variable binding
-- Client creation with automatic healthcheck
-- Error handling and custom error types
+A lightweight wrapper for the official OpenSearch Go client with type-safe configuration.
 
 ## Installation
 
-```go
+```bash
 go get github.com/dmitrymomot/gokit/opensearch
 ```
 
+## Overview
+
+The `opensearch` package provides a simple, type-safe interface to OpenSearch with environment-based configuration, automatic health checking, and standardized error handling.
+
+## Features
+
+- Type-safe configuration with environment variable support
+- Built-in health check on connection
+- Comprehensive error handling with specific error types
+- Simplified client initialization
+
 ## Usage
 
-### Basic Setup
+### Basic Connection
 
 ```go
-package main
-
 import (
-	"context"
-	"log"
-
-	"github.com/dmitrymomot/gokit/opensearch"
+    "context"
+    "github.com/dmitrymomot/gokit/opensearch"
 )
 
-func main() {
-	// Create configuration
-	cfg := opensearch.Config{
-		Addresses:    []string{"https://localhost:9200"},
-		Username:     "admin",
-		Password:     "admin",
-		MaxRetries:   3,
-		DisableRetry: false,
-	}
-
-	// Create a new client
-	ctx := context.Background()
-	client, err := opensearch.New(ctx, cfg)
-	if err != nil {
-		log.Fatalf("Failed to create OpenSearch client: %v", err)
-	}
-
-	// Use the client for OpenSearch operations
-	info, err := client.Info()
-	if err != nil {
-		log.Fatalf("Failed to get cluster info: %v", err)
-	}
-	log.Printf("Connected to OpenSearch cluster: %s", info.ClusterName)
+// Create an OpenSearch client with direct configuration
+client, err := opensearch.New(context.Background(), opensearch.Config{
+    Addresses: []string{"https://localhost:9200"},
+    Username:  "admin",
+    Password:  "admin",
+})
+if err != nil {
+    // Handle error
 }
+
+// Use the client
+info, err := client.Info()
 ```
 
-### Environment Variables
-
-The configuration can be loaded from environment variables:
-
-```
-OPENSEARCH_ADDRESSES=https://localhost:9200
-OPENSEARCH_USERNAME=admin
-OPENSEARCH_PASSWORD=admin
-OPENSEARCH_MAX_RETRIES=3
-OPENSEARCH_DISABLE_RETRY=false
-```
-
-### Healthcheck
-
-The built-in healthcheck function can be used independently:
+### Environment-Based Configuration
 
 ```go
-// Run a healthcheck on an existing client
-err := opensearch.Healthcheck(client)(ctx)
+import (
+    "github.com/dmitrymomot/gokit/config"
+    "github.com/dmitrymomot/gokit/opensearch"
+)
+
+// Load OpenSearch config from environment variables
+cfg, err := config.Load[opensearch.Config]()
 if err != nil {
-    log.Fatalf("OpenSearch cluster is not healthy: %v", err)
+    // Handle error
+}
+
+// Create client with loaded config
+client, err := opensearch.New(context.Background(), cfg)
+```
+
+### Health Check Integration
+
+```go
+import (
+    "net/http"
+)
+
+// Create a healthcheck function for an existing client
+healthCheck := opensearch.Healthcheck(client)
+
+// Use in HTTP handler
+http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+    if err := healthCheck(r.Context()); err != nil {
+        w.WriteHeader(http.StatusServiceUnavailable)
+        w.Write([]byte("OpenSearch unavailable"))
+        return
+    }
+    w.Write([]byte("OpenSearch healthy"))
+})
+```
+
+## Configuration
+
+The `Config` struct provides options for OpenSearch connections with environment variable integration:
+
+```go
+type Config struct {
+    Addresses    []string `env:"OPENSEARCH_ADDRESSES,required"`
+    Username     string   `env:"OPENSEARCH_USERNAME,notEmpty"`
+    Password     string   `env:"OPENSEARCH_PASSWORD,notEmpty"`
+    MaxRetries   int      `env:"OPENSEARCH_MAX_RETRIES" default:"3"`
+    DisableRetry bool     `env:"OPENSEARCH_DISABLE_RETRY" default:"false"`
 }
 ```
 
 ## API Reference
 
-### Config Struct
+### Client Creation
+
+- `New(ctx context.Context, cfg Config) (*opensearch.Client, error)`: Create an OpenSearch client with built-in health check
+
+### Health Monitoring
+
+- `Healthcheck(client *opensearch.Client) func(context.Context) error`: Create a health check function for OpenSearch
+
+### Error Handling
 
 ```go
-type Config struct {
-	Addresses    []string // OpenSearch node addresses
-	Username     string   // Basic auth username
-	Password     string   // Basic auth password
-	MaxRetries   int      // Maximum number of retries
-	DisableRetry bool     // Disable retry mechanism
+// Check for specific errors
+if errors.Is(err, opensearch.ErrConnectionFailed) {
+    // Handle connection failure
+}
+
+if errors.Is(err, opensearch.ErrHealthcheckFailed) {
+    // Handle health check failure
 }
 ```
 
-### Functions
+## Best Practices
 
-- `New(ctx context.Context, cfg Config) (*opensearch.Client, error)`: Creates a new OpenSearch client with the provided configuration and performs a health check
-- `Healthcheck(client *opensearch.Client) func(context.Context) error`: Returns a function that checks the health of the OpenSearch cluster
+1. **Secure credential storage**: Store OpenSearch credentials in environment variables
+2. **Implement health checks**: Use the provided health check functionality in your application
+3. **Configure retries appropriately**: Adjust MaxRetries based on your network reliability
+4. **Handle errors specifically**: Use the provided error types for better error handling
+5. **Use context for cancellation**: Pass appropriate context to control operation lifetimes
