@@ -1,18 +1,6 @@
-# Random Name Generator
+# Randomname Package
 
-A Go package for generating random, human-readable workspace names in the format "adjective-noun" or "adjective-noun-xxxxxx".
-
-## Features
-
-- Thread-safe implementation
-- Session-based uniqueness tracking
-- Support for external validation (e.g., database checks)
-- Two generation formats:
-    - With suffix: `brave-tiger-1a2b3c`
-    - Without suffix: `brave-tiger`
-- Large namespace:
-    - 42 adjectives × 44 nouns = 1,848 base combinations
-    - With 24-bit suffix: 1,848 × 16,777,215 ≈ 31 billion possible combinations
+Thread-safe random name generator for workspace, project, and resource naming.
 
 ## Installation
 
@@ -20,94 +8,115 @@ A Go package for generating random, human-readable workspace names in the format
 go get github.com/dmitrymomot/gokit/randomname
 ```
 
+## Overview
+
+The `randomname` package generates human-readable, memorable names in either "adjective-noun" or "adjective-noun-suffix" format. It's designed for creating workspace, project, or resource identifiers with built-in collision prevention.
+
+## Features
+
+- Thread-safe implementation with mutex protection
+- Session-based uniqueness tracking
+- Support for custom validation callbacks (e.g., database checks)
+- Two name formats:
+  - "adjective-noun" (brave-tiger)
+  - "adjective-noun-xxxxxx" (brave-tiger-1a2b3c)
+- Rich word variety: 42 adjectives × 44 nouns (1,848 base combinations)
+- With 24-bit suffix: ~31 billion unique combinations
+
 ## Usage
 
-### Basic Usage
+### Basic Generation
 
 ```go
 import "github.com/dmitrymomot/gokit/randomname"
 
-// Generate a name with suffix (e.g., "brave-tiger-1a2b3c")
+// Generate name with suffix (e.g., "brave-tiger-1a2b3c")
 name := randomname.Generate(nil)
 
 // Generate a simple name without suffix (e.g., "brave-tiger")
 simpleName := randomname.GenerateSimple(nil)
 ```
 
-### With Database Validation
+### With Custom Validation
 
 ```go
 // Generate a name that doesn't exist in the database
 name := randomname.Generate(func(name string) bool {
-    exists, _ := db.WorkspaceExists(name)
-    return !exists
+    exists, err := db.WorkspaceExists(name)
+    if err != nil {
+        log.Printf("Error checking workspace name: %v", err)
+        return false // Reject this candidate on error
+    }
+    return !exists // Accept only if name doesn't exist
 })
 ```
 
 ### Managing Used Names
 
 ```go
-// Clear the internal cache of used names
+// Clear the internal cache of used names when no longer needed
 randomname.Reset()
 ```
 
+### HTTP Handler Example
+
+```go
+http.HandleFunc("/api/generate-project-name", func(w http.ResponseWriter, r *http.Request) {
+    // Generate a name with an optional database check
+    name := randomname.Generate(func(name string) bool {
+        // Check if name exists in your datastore
+        exists, _ := projectStore.Exists(name)
+        return !exists
+    })
+    
+    // Return the generated name
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{"name": name})
+})
+```
+
+## API Reference
+
+### Name Generation
+
+- `Generate(check func(name string) bool) string`: Generate a name with suffix
+- `GenerateSimple(check func(name string) bool) string`: Generate a name without suffix
+- `Reset()`: Clear the internal cache of used names
+
+### Name Validation
+
+The `check` callback function allows for custom validation:
+
+```go
+type ValidateFunc func(name string) bool
+```
+
+The callback should:
+- Return `true` to accept the name
+- Return `false` to reject the name and generate a new one
+
 ## Thread Safety
 
-The package is thread-safe and optimized for concurrent use:
+The package provides thread-safe operation:
 
-- Uses mutex for synchronization
-- Efficiently handles slow validation callbacks
+- Uses sync.Mutex for synchronization
 - Prevents race conditions with immediate name reservation
-- Cleans up rejected names automatically
+- Executes validation outside the lock to avoid deadlocks
+- Automatically cleans up rejected names
 
-## Implementation Details
-
-### Name Generation Process
-
-1. Generate and reserve a candidate name under lock
-2. Release the lock and execute any validation callback
-3. If the callback rejects the candidate:
-    - Remove it from reservations
-    - Try again with a new candidate
-4. Return the successful candidate
-
-### Word Lists
+## Customization
 
 The package includes carefully selected word lists:
+- 42 descriptive adjectives (brave, swift, gentle, etc.)
+- 44 animal nouns (tiger, eagle, panda, etc.)
 
-- 42 descriptive adjectives (e.g., brave, swift, gentle)
-- 44 animal nouns (e.g., tiger, eagle, panda)
-
-These words are chosen to create memorable, friendly, and professional workspace names.
+These create memorable, friendly, and professional resource names.
 
 ## Best Practices
 
-1. **Database Validation**
-
-    ```go
-    // Always handle database errors appropriately
-    name := randomname.Generate(func(name string) bool {
-        exists, err := db.WorkspaceExists(name)
-        if err != nil {
-            // Handle error appropriately
-            return false
-        }
-        return !exists
-    })
-    ```
-
-2. **Memory Management**
-
-    ```go
-    // Periodically reset the used names cache if not needed
-    // for the entire session
-    randomname.Reset()
-    ```
-
-3. **Suffix Usage**
-    - Use `Generate()` when uniqueness is critical
-    - Use `GenerateSimple()` when readability is more important than uniqueness
-
-## License
-
-This package is part of the github.com/dmitrymomot/gokit project. See the LICENSE file in the root directory for details.
+1. **Reset when appropriate**: Clear the name cache when starting a new session
+2. **Handle validation errors**: Always properly handle errors in validation callbacks
+3. **Choose the right format**:
+   - Use `Generate()` (with suffix) when uniqueness is critical
+   - Use `GenerateSimple()` when readability is more important than uniqueness
+4. **Consider namespace size**: With only 1,848 base combinations, `GenerateSimple()` has higher collision probability
