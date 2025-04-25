@@ -1,20 +1,6 @@
 # Feature Flags Package
 
-This package provides a flexible and extensible feature flagging system for Go applications.
-
-## Features
-
-- Generic `Provider` interface that supports different backend storage options
-- In-memory implementation for testing and simple applications
-- Powerful rollout strategies:
-  - Always on/off strategies
-  - Targeted strategies (by user IDs, groups, etc.)
-  - Percentage-based rollouts
-  - Environment-based flags
-  - Composite strategies with AND/OR operators
-- Context-based evaluation for request-specific flag resolution
-- Support for tagging and metadata
-- Thread-safe implementations
+A flexible and extensible feature flagging system for Go applications.
 
 ## Installation
 
@@ -22,11 +8,27 @@ This package provides a flexible and extensible feature flagging system for Go a
 go get github.com/dmitrymomot/gokit/feature
 ```
 
+## Overview
+
+The `feature` package provides a robust feature flagging system to control feature rollouts in your application. It supports various strategies including percentage-based rollouts, targeted users/groups, environment-based flags, and composite conditions.
+
+## Features
+
+- Generic `Provider` interface with pluggable storage backends
+- In-memory implementation for quick setup and testing
+- Flexible rollout strategies:
+  - Always on/off flags
+  - Targeted user/group flags
+  - Percentage-based progressive rollouts
+  - Environment-based flags 
+  - Composite strategies (AND/OR logic)
+- Context-based evaluation for user-specific flags
+- Tag-based flag organization
+- Thread-safe implementations
+
 ## Usage
 
 ### Basic Setup
-
-Create a feature flag provider and check if features are enabled:
 
 ```go
 package main
@@ -39,7 +41,7 @@ import (
 )
 
 func main() {
-	// Create an in-memory provider with initial flags
+	// Create a provider with initial flags
 	provider, err := feature.NewMemoryProvider(
 		&feature.Flag{
 			Name:        "dark-mode",
@@ -75,66 +77,49 @@ func main() {
 }
 ```
 
-### Context-Aware Flags
-
-Use context values to provide user-specific data for feature flag evaluation:
+### User-Specific Features
 
 ```go
 // Add user information to context
-userID := "user-123"
-userGroups := []string{"beta-users", "premium"}
-
 ctx := context.Background()
-ctx = context.WithValue(ctx, feature.UserIDKey, userID)
-ctx = context.WithValue(ctx, feature.UserGroupsKey, userGroups)
+ctx = context.WithValue(ctx, feature.UserIDKey, "user-123")
+ctx = context.WithValue(ctx, feature.UserGroupsKey, []string{"beta-users"})
 
 // Check if beta features are enabled for this user
 betaEnabled, err := provider.IsEnabled(ctx, "beta-features")
-if err != nil {
-	log.Printf("Error checking beta flag: %v", err)
-}
-
-if betaEnabled {
-	// Show beta features to this user
-	log.Println("Beta features are enabled for this user!")
-}
 ```
 
-### Creating Rollout Strategies
-
-The package supports various rollout strategies:
+### Rollout Strategies
 
 ```go
 // Always on strategy
 alwaysOn := feature.NewAlwaysOnStrategy()
 
-// Environment-based strategy (only enabled in dev/staging)
+// Environment-based strategy
 envStrategy := feature.NewEnvironmentStrategy("dev", "staging")
 
-// Targeted strategy for specific users and groups
+// Targeted strategy
 targetedStrategy := feature.NewTargetedStrategy(feature.TargetCriteria{
-	UserIDs:    []string{"user-1", "user-2"},      // Specific users
-	Groups:     []string{"beta", "internal"},      // User groups
-	Percentage: intPtr(20),                       // 20% of all users
-	AllowList:  []string{"vip-1", "admin-user"},  // Always enabled for these users
-	DenyList:   []string{"banned-user"},          // Never enabled for these users
+	UserIDs:    []string{"user-1", "user-2"},  // Specific users
+	Groups:     []string{"beta", "internal"},  // User groups
+	Percentage: intPtr(20),                    // 20% of users
+	AllowList:  []string{"vip-1"},             // Always enabled
+	DenyList:   []string{"banned-user"},       // Never enabled
 })
 
-// Composite strategies
+// Composite strategy (both conditions must be true)
 compositeStrategy := feature.NewAndStrategy(
-	envStrategy,                // Must be in dev/staging AND
-	targetedStrategy,           // Must match targeting criteria
+	envStrategy,      // Must be in dev/staging
+	targetedStrategy, // Must match target criteria
 )
 
-// Helper for percentage pointer
+// Helper function for percentage
 func intPtr(i int) *int {
 	return &i
 }
 ```
 
 ### Managing Flags
-
-Create, update, and delete flags programmatically:
 
 ```go
 // Create a new flag
@@ -145,69 +130,34 @@ newFlag := &feature.Flag{
 	Strategy:    feature.NewTargetedStrategy(feature.TargetCriteria{
 		Percentage: intPtr(10), // 10% rollout
 	}),
-	Tags: []string{"experimental", "v2"},
+	Tags: []string{"experimental"},
 }
-
 err = provider.CreateFlag(ctx, newFlag)
-if err != nil {
-	log.Printf("Failed to create flag: %v", err)
-}
 
 // Update an existing flag
-updatedFlag, err := provider.GetFlag(ctx, "new-feature") 
-if err != nil {
-	log.Printf("Failed to get flag: %v", err)
-}
-
-// Increase rollout to 50%
-percentage := 50
-updatedFlag.Strategy = feature.NewTargetedStrategy(feature.TargetCriteria{
-	Percentage: &percentage,
+flag, err := provider.GetFlag(ctx, "new-feature")
+flag.Strategy = feature.NewTargetedStrategy(feature.TargetCriteria{
+	Percentage: intPtr(50), // Increase to 50% rollout
 })
+err = provider.UpdateFlag(ctx, flag)
 
-err = provider.UpdateFlag(ctx, updatedFlag)
-if err != nil {
-	log.Printf("Failed to update flag: %v", err)
-}
-
-// Delete a flag when no longer needed
+// Delete a flag
 err = provider.DeleteFlag(ctx, "deprecated-feature")
-if err != nil {
-	log.Printf("Failed to delete flag: %v", err)
-}
 ```
 
 ### Listing Flags
 
-List all flags or filter by tags:
-
 ```go
 // List all flags
 allFlags, err := provider.ListFlags(ctx)
-if err != nil {
-	log.Printf("Failed to list flags: %v", err)
-}
 
-for _, flag := range allFlags {
-	log.Printf("Flag: %s, Enabled: %v", flag.Name, flag.Enabled)
-}
-
-// List flags by tags
-uiFlags, err := provider.ListFlags(ctx, "ui")
-if err != nil {
-	log.Printf("Failed to list UI flags: %v", err)
-}
-
-// List flags with multiple tags (OR operation)
-filteredFlags, err := provider.ListFlags(ctx, "experimental", "beta")
-if err != nil {
-	log.Printf("Failed to list filtered flags: %v", err)
-}
+// List flags by tags (flags with any of these tags)
+uiFlags, err := provider.ListFlags(ctx, "ui", "theme")
 ```
 
 ## Custom Providers
 
-You can implement your own providers by implementing the `Provider` interface:
+Implement the `Provider` interface to create custom storage backends:
 
 ```go
 type Provider interface {
@@ -221,24 +171,7 @@ type Provider interface {
 }
 ```
 
-This allows for implementing providers backed by Redis, databases, or remote services.
-
 ## Error Handling
-
-The package defines standard errors:
-
-```go
-var (
-	ErrFlagNotFound          = errors.New("feature: flag not found")
-	ErrInvalidFlag           = errors.New("feature: invalid flag parameters")
-	ErrProviderNotInitialized = errors.New("feature: provider not initialized")
-	ErrInvalidContext        = errors.New("feature: invalid context")
-	ErrInvalidStrategy       = errors.New("feature: invalid rollout strategy")
-	ErrOperationFailed       = errors.New("feature: operation failed")
-)
-```
-
-Use `errors.Is()` to check for specific error types:
 
 ```go
 enabled, err := provider.IsEnabled(ctx, "my-flag")
@@ -250,3 +183,12 @@ if err != nil {
 	}
 }
 ```
+
+The package defines the following errors:
+
+- `ErrFlagNotFound`: Flag doesn't exist
+- `ErrInvalidFlag`: Invalid flag parameters 
+- `ErrProviderNotInitialized`: Provider not ready
+- `ErrInvalidContext`: Missing required context values
+- `ErrInvalidStrategy`: Invalid rollout strategy
+- `ErrOperationFailed`: General operation failure
