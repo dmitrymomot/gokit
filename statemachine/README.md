@@ -8,33 +8,33 @@ A flexible, type-safe state machine implementation for Go applications.
 go get github.com/dmitrymomot/gokit/statemachine
 ```
 
+## Overview
+
+The `statemachine` package provides a clean, flexible implementation of the state machine pattern for Go applications. It offers a fluent builder API and type-safety through interfaces, making it ideal for modeling complex workflows, business processes, and application states.
+
 ## Features
 
-- Simple, intuitive API for defining state machines
-- Type-safety through interfaces and generics
-- Fluent builder pattern for easy construction
-- Support for guards and actions during transitions
-- Concurrent access safety through mutex locks
-- Clear error messages for troubleshooting
+- Fluent builder pattern for intuitive state machine construction
+- Type-safe implementation using Go interfaces and generics
+- Built-in support for guards (transition conditions) and actions (side effects)
+- Thread-safe operation with mutex locks for concurrent access
 - String-based or custom state/event implementations
+- Comprehensive error handling with specific error types
+- Simple API with minimal boilerplate
 
 ## Usage
 
-### Basic Usage
+### Basic State Machine
 
 ```go
-package main
-
 import (
 	"context"
 	"fmt"
-	"log"
-
 	"github.com/dmitrymomot/gokit/statemachine"
 )
 
 func main() {
-	// Define states
+	// Define states using string constants
 	const (
 		Draft     = statemachine.StringState("draft")
 		InReview  = statemachine.StringState("in_review")
@@ -52,10 +52,8 @@ func main() {
 		Withdraw = statemachine.StringEvent("withdraw")
 	)
 
-	// Create a state machine
+	// Create and configure the state machine using the fluent builder API
 	builder := statemachine.NewBuilder(Draft)
-
-	// Define transitions
 	builder.From(Draft).When(Submit).To(InReview).Add()
 	builder.From(InReview).When(Approve).To(Approved).Add()
 	builder.From(InReview).When(Reject).To(Rejected).Add()
@@ -67,107 +65,46 @@ func main() {
 
 	// Use the state machine
 	ctx := context.Background()
+	fmt.Printf("Current state: %s\n", machine.Current().Name()) // "draft"
 
-	fmt.Printf("Current state: %s\n", machine.Current().Name())
-
-	if err := machine.Fire(ctx, Submit, nil); err != nil {
-		log.Fatalf("Failed to submit: %v", err)
-	}
-
-	fmt.Printf("Current state: %s\n", machine.Current().Name())
+	// Trigger transitions
+	machine.Fire(ctx, Submit, nil)
+	fmt.Printf("Current state: %s\n", machine.Current().Name()) // "in_review"
+	
+	machine.Fire(ctx, Approve, nil)
+	fmt.Printf("Current state: %s\n", machine.Current().Name()) // "approved"
 }
 ```
 
-### Advanced Usage with Guards and Actions
+### Guards and Actions
 
 ```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"log"
-	"time"
-
-	"github.com/dmitrymomot/gokit/statemachine"
-)
-
-func main() {
-	// Define states and events
-	const (
-		Idle      = statemachine.StringState("idle")
-		Running   = statemachine.StringState("running")
-		Paused    = statemachine.StringState("paused")
-		Completed = statemachine.StringState("completed")
-		Failed    = statemachine.StringState("failed")
-	)
-
-	const (
-		Start   = statemachine.StringEvent("start")
-		Pause   = statemachine.StringEvent("pause")
-		Resume  = statemachine.StringEvent("resume")
-		Finish  = statemachine.StringEvent("finish")
-		Fail    = statemachine.StringEvent("fail")
-		Restart = statemachine.StringEvent("restart")
-	)
-
-	// Create state machine
-	builder := statemachine.NewBuilder(Idle)
-
-	// Add a guard function
-	isAuthorized := func(ctx context.Context, from statemachine.State, event statemachine.Event, data any) bool {
-		if userData, ok := data.(map[string]any); ok {
-			return userData["is_authorized"].(bool)
-		}
-		return false
-	}
-
-	// Add an action function
-	logTransition := func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data any) error {
-		fmt.Printf("Transitioning from %s to %s via %s at %s\n",
-			from.Name(), to.Name(), event.Name(), time.Now().Format(time.RFC3339))
-		return nil
-	}
-
-	// Define transitions with guards and actions
-	builder.From(Idle).When(Start).To(Running).WithGuard(isAuthorized).WithAction(logTransition).Add()
-	builder.From(Running).When(Pause).To(Paused).WithAction(logTransition).Add()
-	builder.From(Paused).When(Resume).To(Running).WithGuard(isAuthorized).WithAction(logTransition).Add()
-	builder.From(Running).When(Finish).To(Completed).WithAction(logTransition).Add()
-	builder.From(Running).When(Fail).To(Failed).WithAction(logTransition).Add()
-	builder.From(Failed).When(Restart).To(Idle).WithAction(logTransition).Add()
-
-	machine := builder.Build()
-
-	// Use the state machine with user data
-	ctx := context.Background()
-	userData := map[string]any{
-		"is_authorized": true,
-		"user_id": 123,
-	}
-
-	fmt.Printf("Current state: %s\n", machine.Current().Name())
-
-	if err := machine.Fire(ctx, Start, userData); err != nil {
-		log.Fatalf("Failed to start: %v", err)
-	}
-
-	fmt.Printf("Current state: %s\n", machine.Current().Name())
+// Add conditional transition with a guard
+isAuthorized := func(ctx context.Context, from statemachine.State, event statemachine.Event, data any) bool {
+	userData, ok := data.(map[string]any)
+	return ok && userData["is_authorized"].(bool)
 }
+
+// Add a side effect with an action
+logTransition := func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data any) error {
+	fmt.Printf("Transition: %s -> %s via %s\n", from.Name(), to.Name(), event.Name())
+	return nil
+}
+
+// Add a transition with guard and action
+builder.From(Idle).When(Start).To(Running)
+	.WithGuard(isAuthorized)
+	.WithAction(logTransition)
+	.Add()
+
+// Fire event with context data
+userData := map[string]any{"is_authorized": true, "user_id": 123}
+machine.Fire(ctx, Start, userData)
 ```
 
 ### Custom State and Event Types
 
 ```go
-package main
-
-import (
-	"context"
-	"fmt"
-
-	"github.com/dmitrymomot/gokit/statemachine"
-)
-
 // Define custom state type
 type OrderState struct {
 	code        string
@@ -188,118 +125,148 @@ func (e OrderEvent) Name() string {
 	return e.code
 }
 
-func main() {
-	// Define states with custom type
-	states := struct {
-		New       OrderState
-		Processing OrderState
-		Shipped    OrderState
-		Delivered  OrderState
-		Cancelled  OrderState
-	}{
-		New:       OrderState{code: "new", description: "Order has been created"},
-		Processing: OrderState{code: "processing", description: "Order is being processed"},
-		Shipped:    OrderState{code: "shipped", description: "Order has been shipped"},
-		Delivered:  OrderState{code: "delivered", description: "Order has been delivered"},
-		Cancelled:  OrderState{code: "cancelled", description: "Order has been cancelled"},
-	}
-
-	// Define events with custom type
-	events := struct {
-		Process  OrderEvent
-		Ship     OrderEvent
-		Deliver  OrderEvent
-		Cancel   OrderEvent
-	}{
-		Process:  OrderEvent{code: "process", data: map[string]any{}},
-		Ship:     OrderEvent{code: "ship", data: map[string]any{}},
-		Deliver:  OrderEvent{code: "deliver", data: map[string]any{}},
-		Cancel:   OrderEvent{code: "cancel", data: map[string]any{}},
-	}
-
-	// Create and configure state machine
-	machine := statemachine.NewSimpleStateMachine(states.New)
-
-	// Add transitions
-	machine.AddTransition(states.New, states.Processing, events.Process, nil, nil)
-	machine.AddTransition(states.Processing, states.Shipped, events.Ship, nil, nil)
-	machine.AddTransition(states.Shipped, states.Delivered, events.Deliver, nil, nil)
-	machine.AddTransition(states.New, states.Cancelled, events.Cancel, nil, nil)
-	machine.AddTransition(states.Processing, states.Cancelled, events.Cancel, nil, nil)
-
-	// Use the state machine
-	ctx := context.Background()
-
-	fmt.Printf("Current state: %s\n", machine.Current().Name())
-
-	if err := machine.Fire(ctx, events.Process, nil); err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-
-	fmt.Printf("Current state: %s\n", machine.Current().Name())
+// Create state machine with custom types
+states := struct {
+	New        OrderState
+	Processing OrderState
+	Shipped    OrderState
+}{
+	New:        OrderState{code: "new", description: "Order created"},
+	Processing: OrderState{code: "processing", description: "In process"},
+	Shipped:    OrderState{code: "shipped", description: "Shipped"},
 }
+
+events := struct {
+	Process OrderEvent
+	Ship    OrderEvent
+}{
+	Process: OrderEvent{code: "process"},
+	Ship:    OrderEvent{code: "ship"},
+}
+
+// Configure state machine
+machine := statemachine.NewSimpleStateMachine(states.New)
+machine.AddTransition(states.New, states.Processing, events.Process, nil, nil)
+machine.AddTransition(states.Processing, states.Shipped, events.Ship, nil, nil)
 ```
 
-## Error Handling
+### Error Handling
 
 ```go
-package main
+// Try an invalid transition
+err := machine.Fire(ctx, InvalidEvent, nil)
+if statemachine.IsNoTransitionAvailableError(err) {
+	fmt.Printf("Error: %v\n", err) // No transition defined for event
+}
 
-import (
-	"context"
-	"fmt"
+// Add a guard that rejects the transition
+alwaysFalse := func(ctx context.Context, from statemachine.State, event statemachine.Event, data any) bool {
+	return false
+}
 
-	"github.com/dmitrymomot/gokit/statemachine"
-)
+machine.AddTransition(Initial, Final, Event, []statemachine.Guard{alwaysFalse}, nil)
 
-func main() {
-	// Define states and events
-	const (
-		Initial = statemachine.StringState("initial")
-		Final   = statemachine.StringState("final")
-	)
-
-	const (
-		Valid   = statemachine.StringEvent("valid")
-		Invalid = statemachine.StringEvent("invalid")
-	)
-
-	// Create state machine with only one valid transition
-	machine := statemachine.NewSimpleStateMachine(Initial)
-	machine.AddTransition(Initial, Final, Valid, nil, nil)
-
-	ctx := context.Background()
-
-	// Try an invalid transition
-	err := machine.Fire(ctx, Invalid, nil)
-	if statemachine.IsNoTransitionAvailableError(err) {
-		fmt.Printf("Expected error: %v\n", err)
-	}
-
-	// Add a guard that always fails
-	alwaysFalse := func(ctx context.Context, from statemachine.State, event statemachine.Event, data any) bool {
-		return false
-	}
-
-	machine.AddTransition(Initial, Final, Invalid, []statemachine.Guard{alwaysFalse}, nil)
-
-	// Try a transition that will be rejected by the guard
-	err = machine.Fire(ctx, Invalid, nil)
-	if statemachine.IsTransitionRejectedError(err) {
-		fmt.Printf("Expected error: %v\n", err)
-	}
+// Try a transition that will be rejected by the guard
+err = machine.Fire(ctx, Event, nil)
+if statemachine.IsTransitionRejectedError(err) {
+	fmt.Printf("Error: %v\n", err) // Transition rejected by guard
 }
 ```
 
-## Implementation Notes
+## API Reference
 
-- The state machine is safe for concurrent use with its internal mutex
-- All methods that modify state are thread-safe
-- Custom state and event implementations can be created by implementing the `State` and `Event` interfaces
-- Guards can be used to implement complex conditional transitions
-- Actions allow side effects during transitions while maintaining the state machine's integrity
+### Core Types
 
-## License
+```go
+// State interface - implement this for custom states
+type State interface {
+	Name() string
+}
 
-MIT
+// Event interface - implement this for custom events
+type Event interface {
+	Name() string
+}
+
+// Action function type - executed during transitions
+type Action func(ctx context.Context, from, to State, event Event, data any) error
+
+// Guard function type - controls whether transitions can occur
+type Guard func(ctx context.Context, from State, event Event, data any) bool
+
+// Transition structure - represents a possible state change
+type Transition struct {
+	From    State
+	To      State
+	Event   Event
+	Guards  []Guard
+	Actions []Action
+}
+```
+
+### State Machine Interface
+
+```go
+// StateMachine interface - core API
+type StateMachine interface {
+	// Returns the current state
+	Current() State
+	
+	// Adds a new transition
+	AddTransition(from, to State, event Event, guards []Guard, actions []Action) error
+	
+	// Triggers an event, potentially causing a state transition
+	Fire(ctx context.Context, event Event, data any) error
+	
+	// Checks if an event can be fired in the current state
+	CanFire(ctx context.Context, event Event, data any) bool
+	
+	// Resets to initial state
+	Reset() error
+}
+```
+
+### Builder Pattern
+
+```go
+// Create a new builder with initial state
+builder := statemachine.NewBuilder(initialState)
+
+// Fluent API for defining transitions
+builder.From(stateA).When(eventX).To(stateB).WithGuard(guard).WithAction(action).Add()
+
+// Build the state machine
+machine := builder.Build()
+```
+
+### Helper Functions
+
+```go
+// Check for specific error types
+statemachine.IsNoTransitionAvailableError(err)
+statemachine.IsTransitionRejectedError(err)
+statemachine.IsInvalidTransitionError(err)
+statemachine.IsActionExecutionError(err)
+```
+
+## Best Practices
+
+1. **Separate State Logic**: Use the state machine to handle state transitions, but keep business logic in your application code.
+
+2. **Use the Builder Pattern**: The fluent builder API is more readable than direct transition creation, especially for complex state machines.
+
+3. **Context Propagation**: Always pass the context through the state machine to ensure proper cancellation and timeout handling.
+
+4. **Immutable State Objects**: Define state and event objects as immutable to prevent bugs from unexpected mutations.
+
+5. **Error Handling**: Check for specific error types using the provided helper functions rather than string comparisons.
+
+6. **Thread Safety**: The state machine is safe for concurrent use, but consider whether your application needs additional synchronization.
+
+7. **Testing**: Create test cases that validate state transitions, especially those with guards and actions.
+
+8. **Documentation**: Document your states, events, and transitions to make the state machine's behavior clear to others.
+
+## Thread Safety
+
+The state machine implementation is thread-safe for concurrent access with internal mutex locks. All methods that modify state are protected, making the state machine safe to use in concurrent environments without additional synchronization.
