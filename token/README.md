@@ -1,14 +1,6 @@
 # Token Package
 
-A lightweight and secure token generation and validation package for Go applications. This package provides functionality to create and validate tokens with HMAC-SHA256 signatures.
-
-## Features
-
-- Generic type support for payload data
-- HMAC-SHA256 signature for security
-- Base64URL encoding for URL-safe tokens
-- Simple and easy-to-use API
-- Zero external dependencies
+A lightweight, secure token generation and validation library with HMAC signatures.
 
 ## Installation
 
@@ -16,64 +8,100 @@ A lightweight and secure token generation and validation package for Go applicat
 go get github.com/dmitrymomot/gokit/token
 ```
 
+## Overview
+
+The `token` package provides a simple way to create and validate secure tokens with HMAC-SHA256 signatures. It's designed for applications that need a lightweight token solution without the complexity of JWT.
+
+## Features
+
+- Type-safe payload handling with Go generics
+- HMAC-SHA256 signatures for security
+- Base64URL encoding for URL-safe tokens
+- Simple, intuitive API with minimal code
+- Zero external dependencies
+- Fast encoding and decoding
+
 ## Usage
 
-### Basic Example
+### Generating Tokens
 
 ```go
-package main
-
-import (
-    "fmt"
-    "github.com/dmitrymomot/gokit/token"
-)
+import "github.com/dmitrymomot/gokit/token"
 
 // Define your payload structure
 type UserPayload struct {
     ID    int    `json:"id"`
     Email string `json:"email"`
+    Role  string `json:"role"`
 }
 
-func main() {
-    // Your secret key for signing tokens
-    secret := "your-secret-key"
-
-    // Create a payload
-    payload := UserPayload{
-        ID:    123,
-        Email: "user@example.com",
-    }
-
-    // Generate a token
-    tokenStr, err := token.GenerateToken(payload, secret)
-    if err != nil {
-        panic(err)
-    }
-    fmt.Printf("Generated token: %s\n", tokenStr)
-
-    // Parse and validate the token
-    var parsedPayload UserPayload
-    parsedPayload, err = token.ParseToken[UserPayload](tokenStr, secret)
-    if err != nil {
-        panic(err)
-    }
-    fmt.Printf("Parsed payload: %+v\n", parsedPayload)
+// Create a payload
+payload := UserPayload{
+    ID:    123,
+    Email: "user@example.com",
+    Role:  "admin",
 }
+
+// Your secret key for signing tokens
+secret := "your-secret-key"
+
+// Generate a token
+tokenStr, err := token.GenerateToken(payload, secret)
+if err != nil {
+    // Handle error
+}
+
+fmt.Printf("Generated token: %s\n", tokenStr)
 ```
 
-### Error Handling
+### Validating Tokens
 
 ```go
-// Handle invalid token format
-_, err := token.ParseToken[UserPayload]("invalid-token", secret)
-if err == token.ErrInvalidToken {
-    fmt.Println("Invalid token format")
+// Parse and validate the token
+var parsedPayload UserPayload
+parsedPayload, err = token.ParseToken[UserPayload](tokenStr, secret)
+if err != nil {
+    if err == token.ErrInvalidToken {
+        // Handle invalid token format
+    } else if err == token.ErrSignatureInvalid {
+        // Handle invalid signature
+    } else {
+        // Handle other errors
+    }
+    return
 }
 
-// Handle signature mismatch
-_, err = token.ParseToken[UserPayload](validToken, "wrong-secret")
-if err == token.ErrSignatureInvalid {
-    fmt.Println("Token signature is invalid")
+// Use the validated payload
+fmt.Printf("User ID: %d, Email: %s, Role: %s\n", 
+    parsedPayload.ID, parsedPayload.Email, parsedPayload.Role)
+```
+
+### With Expiration Time
+
+```go
+// Add expiration time to your payload
+type TokenWithExpiry struct {
+    UserID int       `json:"user_id"`
+    Exp    time.Time `json:"exp"`
+}
+
+// Create token with expiration
+expToken := TokenWithExpiry{
+    UserID: 123,
+    Exp:    time.Now().Add(24 * time.Hour), // Expires in 24 hours
+}
+
+token, _ := token.GenerateToken(expToken, secret)
+
+// When validating, check expiration
+var parsed TokenWithExpiry
+parsed, err = token.ParseToken[TokenWithExpiry](token, secret)
+if err != nil {
+    // Handle token validation error
+}
+
+if time.Now().After(parsed.Exp) {
+    // Token has expired
 }
 ```
 
@@ -81,50 +109,50 @@ if err == token.ErrSignatureInvalid {
 
 ### Functions
 
-#### `GenerateToken[T any](payload T, secret string) (string, error)`
+```go
+// GenerateToken encodes and signs a payload into a token
+func GenerateToken[T any](payload T, secret string) (string, error)
 
-Generates a token by JSON encoding the payload and appending an 8-byte truncated HMAC-SHA256 signature.
-
-Parameters:
-
-- `payload T`: The data to be encoded in the token (must be JSON serializable)
-- `secret string`: The secret key used for signing the token
-
-Returns:
-
-- `string`: The generated token in the format `payload.signature`
-- `error`: Any error that occurred during token generation
-
-#### `ParseToken[T any](token string, secret string) (T, error)`
-
-Verifies the token's signature and decodes the JSON payload into the specified type.
-
-Parameters:
-
-- `token string`: The token to parse and validate
-- `secret string`: The secret key used for verifying the signature
-
-Returns:
-
-- `T`: The decoded payload
-- `error`: Any error that occurred during parsing or validation
+// ParseToken validates and extracts the payload from a token
+func ParseToken[T any](token string, secret string) (T, error)
+```
 
 ### Errors
 
-- `ErrInvalidToken`: Returned when the token format is invalid
-- `ErrSignatureInvalid`: Returned when the token signature doesn't match
+```go
+// ErrInvalidToken indicates the token format is invalid
+var ErrInvalidToken = errors.New("invalid token format")
 
-## Security Considerations
+// ErrSignatureInvalid indicates the token signature doesn't match
+var ErrSignatureInvalid = errors.New("invalid token signature")
+```
 
-1. Keep your secret key secure and never expose it in your code or version control
-2. Use a strong, random secret key
-3. Consider implementing token expiration in your payload if needed
-4. Always validate tokens before trusting their contents
+## Implementation Details
 
-## Contributing
+Tokens are generated in the format `payload.signature` where:
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+1. `payload` is the Base64URL-encoded JSON representation of your data
+2. `signature` is the truncated (8 bytes) HMAC-SHA256 signature of the payload, also Base64URL-encoded
 
-## License
+This creates compact tokens that can be safely used in URLs and cookies.
 
-This package is part of the SaaSKit project.
+## Security Best Practices
+
+1. **Secret Management**:
+   - Store secrets securely, not in code or version control
+   - Use environment variables or a secret management service
+   - Use different secrets for different environments
+
+2. **Token Design**:
+   - Include expiration time in your payload
+   - Consider adding a unique token ID for revocation capability
+   - Include only necessary data in the payload
+
+3. **Application Security**:
+   - Validate all tokens before trusting their contents
+   - Use HTTPS when transmitting tokens
+   - Consider token rotation for long-lived sessions
+
+4. **Error Handling**:
+   - Use specific error checks rather than string comparisons
+   - Don't reveal details about token validation failures to clients
