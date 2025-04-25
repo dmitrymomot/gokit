@@ -265,20 +265,6 @@ const (
 )
 ```
 
-## Performance
-
-This package is highly optimized for performance with minimal memory allocations:
-
-```
-BenchmarkParse_ChromeDesktop     	  237394	      4923 ns/op	     161 B/op	       2 allocs/op
-BenchmarkParse_Bot               	  643960	      1857 ns/op	      80 B/op	       1 allocs/op
-BenchmarkParseDeviceType         	  810921	      1484 ns/op	     124 B/op	       1 allocs/op
-BenchmarkGetDeviceModel          	 2893405	       413.9 ns/op	     136 B/op	       1 allocs/op
-BenchmarkParseOS                 	 1998298	       601.0 ns/op	     124 B/op	       1 allocs/op
-BenchmarkParseBrowser            	  437187	      2768 ns/op	     177 B/op	       2 allocs/op
-BenchmarkGetShortIdentifier      	 5514026	       218.1 ns/op	     112 B/op	       4 allocs/op
-```
-
 ## Best Practices
 
 1. **Performance Optimization**:
