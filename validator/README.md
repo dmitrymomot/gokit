@@ -1,16 +1,6 @@
 # Validator Package
 
-The validator package provides a robust and flexible validation system for Go structs. It supports a wide range of built-in validators and allows for custom validation rules.
-
-## Features
-
-- Simple struct tag-based validation
-- 25+ built-in validators
-- Custom validation rules support
-- Customizable error messages with translation support
-- Thread-safe validation
-- Support for nested structs
-- Comprehensive field type support
+A flexible, tag-based validation system for Go structs with customizable error messages.
 
 ## Installation
 
@@ -18,15 +8,26 @@ The validator package provides a robust and flexible validation system for Go st
 go get github.com/dmitrymomot/gokit/validator
 ```
 
-## Basic Usage
+## Overview
+
+The `validator` package provides a robust validation system for Go structs using struct tags. It includes a wide range of built-in validators and supports custom validation rules, with flexibility for error message customization.
+
+## Features
+
+- Simple struct tag-based validation
+- 25+ built-in validators covering common use cases
+- Custom validation rule support with simple registration
+- Customizable error messages with translation support
+- Support for nested structs and complex validation rules
+- Thread-safe operation for concurrent validation
+- Comprehensive field type support
+
+## Usage
+
+### Basic Validation
 
 ```go
-package main
-
-import (
-    "fmt"
-    "github.com/dmitrymomot/gokit/validator"
-)
+import "github.com/dmitrymomot/gokit/validator"
 
 type User struct {
     Username  string `validate:"required,username" label:"Username"`
@@ -38,94 +39,199 @@ type User struct {
 }
 
 func main() {
-    // Create a new validator instance
-    v := validator.NewValidator(nil) // Use default error translator
-
+    // Create a validator with default error messages
+    v := validator.NewValidator(nil)
+    
     user := User{
         Username: "john_doe",
         Email: "invalid-email",
         Age: 15,
         Password: "weak",
-        Phone: "invalid-phone",
-        Website: "invalid-url",
+        Phone: "123", // Invalid phone
+        Website: "example", // Invalid URL
     }
-
+    
     // Validate the struct
-    if err := v.ValidateStruct(user); err != nil {
+    err := v.ValidateStruct(user)
+    if err != nil {
         // Handle validation errors
-        fmt.Printf("Validation errors: %v\n", err)
+        // err will contain all validation failures
+        fmt.Println(err)
     }
 }
 ```
 
-## Built-in Validators
-
-| Validator  | Description                           | Example Usage                |
-| ---------- | ------------------------------------- | ---------------------------- |
-| required   | Field must not be empty               | `validate:"required"`        |
-| email      | Must be a valid email address         | `validate:"email"`           |
-| min        | Minimum value/length                  | `validate:"min:5"`           |
-| max        | Maximum value/length                  | `validate:"max:100"`         |
-| range      | Value must be within range            | `validate:"range:1,10"`      |
-| regex      | Must match regular expression         | `validate:"regex:^[0-9]+$"`  |
-| numeric    | Must be numeric                       | `validate:"numeric"`         |
-| alpha      | Must contain only letters             | `validate:"alpha"`           |
-| alphanum   | Must contain only letters and numbers | `validate:"alphanum"`        |
-| url        | Must be a valid URL                   | `validate:"url"`             |
-| ip         | Must be a valid IP address            | `validate:"ip"`              |
-| date       | Must be a valid date                  | `validate:"date:2006-01-02"` |
-| in         | Must be one of the values             | `validate:"in:a,b,c"`        |
-| notin      | Must not be one of the values         | `validate:"notin:x,y,z"`     |
-| length     | Must have exact length                | `validate:"length:10"`       |
-| between    | Must be between min and max           | `validate:"between:5,10"`    |
-| boolean    | Must be a boolean                     | `validate:"boolean"`         |
-| uuid       | Must be a valid UUID                  | `validate:"uuid"`            |
-| creditcard | Must be a valid credit card number    | `validate:"creditcard"`      |
-| password   | Must meet password requirements       | `validate:"password"`        |
-| phone      | Must be a valid phone number          | `validate:"phone"`           |
-| username   | Must be a valid username              | `validate:"username"`        |
-| slug       | Must be a valid slug                  | `validate:"slug"`            |
-| hexcolor   | Must be a valid hex color             | `validate:"hexcolor"`        |
-| fullname   | Must be a valid full name             | `validate:"fullname"`        |
-| eq         | Must be equal to the specified value         | `validate:"eq:expected"`         |
-| ne         | Must not be equal to the specified value     | `validate:"ne:unexpected"`       |
-| lt         | Must be less than the specified value        | `validate:"lt:10"`               |
-| lte        | Must be less than or equal to the value      | `validate:"lte:10"`              |
-| gt         | Must be greater than the specified value     | `validate:"gt:1"`                |
-| gte        | Must be greater than or equal to the value   | `validate:"gte:1"`               |
-| len        | Must have exact length (alias for length)    | `validate:"len:10"`              |
-| realemail  | Must be a real, deliverable email address    | `validate:"realemail"`           |
-
-## Custom Validation
-
-You can register custom validation functions:
+### Custom Error Translator
 
 ```go
-validator.RegisterValidation("custom", func(fieldValue any, fieldType reflect.StructField, params []string, label string, translator validator.ErrorTranslatorFunc) error {
-    // Your custom validation logic here
-    return nil
-})
-```
-
-## Custom Error Messages
-
-You can provide custom error messages by implementing a translator function:
-
-```go
+// Create a custom error translator function
 translator := func(key string, label string, params ...any) string {
     switch key {
     case "validation.required":
-        return fmt.Sprintf("%s is required", label)
+        return fmt.Sprintf("%s field cannot be empty", label)
     case "validation.email":
-        return fmt.Sprintf("%s must be a valid email address", label)
+        return fmt.Sprintf("%s must be a valid email (e.g., user@example.com)", label)
+    case "validation.range":
+        min, max := params[0], params[1]
+        return fmt.Sprintf("%s must be between %v and %v", label, min, max)
     default:
         return fmt.Sprintf("Invalid %s", label)
     }
 }
 
+// Create a validator with custom error messages
 v := validator.NewValidator(translator)
 ```
 
-## Contributing
+### Custom Validation Rules
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+```go
+import (
+    "reflect"
+    "regexp"
+    "github.com/dmitrymomot/gokit/validator"
+)
+
+// Register a custom validation function
+validator.RegisterValidation("zipcode", func(fieldValue any, fieldType reflect.StructField, params []string, label string, translator validator.ErrorTranslatorFunc) error {
+    // Convert field value to string
+    val, ok := fieldValue.(string)
+    if !ok {
+        return validator.NewValidationError("validation.type_mismatch", label)
+    }
+    
+    // Validate US zip code format
+    zipcodeRegex := regexp.MustCompile(`^\d{5}(-\d{4})?$`)
+    if !zipcodeRegex.MatchString(val) {
+        return validator.NewValidationError("validation.zipcode", label)
+    }
+    
+    return nil
+})
+
+// Use in struct definition
+type Address struct {
+    Street  string `validate:"required" label:"Street Address"`
+    City    string `validate:"required" label:"City"`
+    State   string `validate:"required,length:2" label:"State"`
+    ZipCode string `validate:"required,zipcode" label:"ZIP Code"`
+}
+```
+
+### Validating Nested Structs
+
+```go
+type Address struct {
+    Street  string `validate:"required" label:"Street"`
+    City    string `validate:"required" label:"City"`
+    Country string `validate:"required" label:"Country"`
+}
+
+type Customer struct {
+    Name      string   `validate:"required,fullname" label:"Full Name"`
+    Email     string   `validate:"required,email" label:"Email"`
+    Address   Address  `validate:"required"` // Validates nested struct
+    ShipAddrs []Address `validate:"required"` // Validates slice of structs
+}
+
+// Validate
+customer := Customer{
+    Name: "John Doe",
+    Email: "john.doe@example.com",
+    Address: Address{
+        Street: "123 Main St",
+        // Missing City and Country - will fail validation
+    },
+}
+
+err := v.ValidateStruct(customer)
+// err will contain nested validation errors
+```
+
+## Validation Options
+
+### Common Validators
+
+| Validator   | Description                           | Example Usage                |
+|-------------|---------------------------------------|------------------------------|
+| required    | Field must not be empty               | `validate:"required"`        |
+| email       | Must be a valid email                 | `validate:"email"`           |
+| range       | Value must be within range            | `validate:"range:1,100"`     |
+| min         | Minimum value or length               | `validate:"min:5"`           |
+| max         | Maximum value or length               | `validate:"max:100"`         |
+| regex       | Must match regular expression         | `validate:"regex:^[a-z]+$"`  |
+| in          | Must be one of specified values       | `validate:"in:a,b,c"`        |
+| length      | Must be exact length                  | `validate:"length:10"`       |
+
+### Special Formats
+
+| Validator   | Description                           | Example Usage                |
+|-------------|---------------------------------------|------------------------------|
+| url         | Valid URL                             | `validate:"url"`             |
+| phone       | Valid phone number                    | `validate:"phone"`           |
+| uuid        | Valid UUID                            | `validate:"uuid"`            |
+| date        | Valid date in specified format        | `validate:"date:2006-01-02"` |
+| creditcard  | Valid credit card number              | `validate:"creditcard"`      |
+| hexcolor    | Valid hex color code                  | `validate:"hexcolor"`        |
+| ip          | Valid IP address                      | `validate:"ip"`              |
+
+### Content Rules
+
+| Validator   | Description                           | Example Usage                |
+|-------------|---------------------------------------|------------------------------|
+| alpha       | Letters only                          | `validate:"alpha"`           |
+| alphanum    | Letters and numbers only              | `validate:"alphanum"`        |
+| numeric     | Numbers only                          | `validate:"numeric"`         |
+| username    | Valid username format                 | `validate:"username"`        |
+| password    | Meets password complexity rules       | `validate:"password"`        |
+| fullname    | Valid full name format                | `validate:"fullname"`        |
+| slug        | Valid URL slug                        | `validate:"slug"`            |
+
+### Comparison Rules
+
+| Validator   | Description                           | Example Usage                |
+|-------------|---------------------------------------|------------------------------|
+| eq          | Equal to value                        | `validate:"eq:100"`          |
+| ne          | Not equal to value                    | `validate:"ne:0"`            |
+| gt          | Greater than value                    | `validate:"gt:0"`            |
+| gte         | Greater than or equal to value        | `validate:"gte:1"`           |
+| lt          | Less than value                       | `validate:"lt:100"`          |
+| lte         | Less than or equal to value           | `validate:"lte:99"`          |
+
+## Error Handling
+
+The validator returns detailed error information that can be used to display user-friendly messages:
+
+```go
+err := v.ValidateStruct(user)
+if err != nil {
+    // Type assertion to access validation errors
+    if validationErr, ok := err.(*validator.ValidationErrors); ok {
+        // Access specific field errors
+        for field, fieldErr := range validationErr.Errors {
+            fmt.Printf("Field '%s': %s\n", field, fieldErr)
+        }
+    }
+}
+```
+
+## Best Practices
+
+1. **Descriptive Labels**: 
+   - Use the `label` tag to provide user-friendly field names for error messages
+   - Example: `label:"Email Address"` instead of just `label:"email"`
+
+2. **Validation Groups**:
+   - Group related validators together in a logical order
+   - Start with `required` if the field is mandatory
+   - Example: `validate:"required,email,max:100"`
+
+3. **Custom Validations**:
+   - Register custom validators for business-specific rules
+   - Keep custom validation functions small and focused
+   - Return specific error types for better error handling
+
+4. **Error Handling**:
+   - Implement a custom error translator for user-friendly messages
+   - Consider internationalization (i18n) for multi-language support
+   - Return all validation errors at once rather than stopping at the first error
