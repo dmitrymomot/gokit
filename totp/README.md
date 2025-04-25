@@ -1,140 +1,241 @@
 # TOTP Package
 
-The `totp` package provides functionality for implementing Time-based One-Time Password (TOTP) authentication and recovery codes in Go applications. This package can be used to add two-factor authentication (2FA) to your applications, with secure encryption of TOTP secrets.
+A secure Time-based One-Time Password (TOTP) implementation with encryption.
+
+## Installation
+
+```bash
+go get github.com/dmitrymomot/gokit/totp
+```
+
+## Overview
+
+The `totp` package provides a complete solution for implementing secure two-factor authentication (2FA) using Time-based One-Time Passwords (TOTP). It offers functionality for generating and validating TOTP codes, managing secrets with AES-256-GCM encryption, and handling recovery codes.
 
 ## Features
 
-- Generate TOTP secret keys
-- Create TOTP URIs for QR codes
-- Validate TOTP codes
-- Generate and hash recovery codes
-- HMAC-based one-time password (HOTP) generation
-- AES-256-GCM encryption for TOTP secrets
-- Secure key management for encryption
-
-## Configuration
-
-The package requires an encryption key to be set in your environment:
-
-```env
-TOTP_ENCRYPTION_KEY=your_base64_encoded_32_byte_key
-```
-
-You can generate a new encryption key using:
-
-```go
-key, err := totp.GenerateEncryptionKey()
-if err != nil {
-    log.Fatal(err)
-}
-// Encode the key to base64 and store it securely
-encodedKey := base64.StdEncoding.EncodeToString(key)
-```
+- TOTP generation and validation compliant with RFC 6238
+- AES-256-GCM encryption for secure storage of TOTP secrets
+- Recovery code generation and validation
+- QR code URI generation for easy mobile app setup
+- HMAC-based one-time password (HOTP) support
+- Comprehensive error handling
 
 ## Usage
 
-### Generating a Secret Key
+### Setup and Secret Generation
 
 ```go
+import (
+	"encoding/base64"
+	"github.com/dmitrymomot/gokit/totp"
+)
+
+// Generate a new encryption key (store this securely)
+key, err := totp.GenerateEncryptionKey()
+if err != nil {
+	// Handle error
+}
+encodedKey := base64.StdEncoding.EncodeToString(key)
+// Save this key securely (environment variable, key vault, etc.)
+
+// Generate a new TOTP secret for a user
 secret, err := totp.GenerateSecretKey()
 if err != nil {
-    log.Fatal(err)
+	// Handle error
 }
 
-// Encrypt the secret before storing
-key, err := totp.LoadEncryptionKey()
-if err != nil {
-    log.Fatal(err)
-}
-
+// Encrypt the secret before storage
 encryptedSecret, err := totp.EncryptSecret(secret, key)
 if err != nil {
-    log.Fatal(err)
+	// Handle error
 }
-// Store the encrypted secret securely
+// Store encryptedSecret in your database
 ```
 
-### Decrypting and Using a Stored Secret
+### Generating QR Code URI
 
 ```go
-// Retrieve the encrypted secret and decrypt it
-key, err := totp.LoadEncryptionKey()
-if err != nil {
-    log.Fatal(err)
-}
+// Generate a URI for QR code display
+// Parameters: secret, user identifier, issuer name
+uri := totp.GetTOTPURI(secret, "user@example.com", "MyApp")
 
-secret, err := totp.DecryptSecret(encryptedSecret, key)
-if err != nil {
-    log.Fatal(err)
-}
-```
-
-### Creating a TOTP URI
-
-```go
-// Create a URI that can be encoded as a QR code
-uri := totp.GetTOTPURI(secret, "user@example.com", "YourApp")
-// Use this URI with a QR code generator
+// Use this URI with a QR code generator library
+// Example with github.com/skip2/go-qrcode:
+// qrCode, _ := qrcode.New(uri, qrcode.Medium)
+// png, _ := qrCode.PNG(256)
 ```
 
 ### Validating TOTP Codes
 
 ```go
-// When user provides a code
-code := "123456" // Example code from user's authenticator app
-valid, err := totp.ValidateTOTP(secret, code)
+// Retrieve encrypted secret from storage and decrypt it
+key, err := totp.LoadEncryptionKey() // Load from environment
 if err != nil {
-    log.Fatal(err)
+	// Handle error
 }
+
+secret, err := totp.DecryptSecret(encryptedSecret, key)
+if err != nil {
+	// Handle error
+}
+
+// When user submits a TOTP code for verification
+userProvidedCode := "123456" // From user input
+
+valid, err := totp.ValidateTOTP(secret, userProvidedCode)
+if err != nil {
+	// Handle error
+}
+
 if valid {
-    // Code is valid, proceed with authentication
+	// Authentication successful, grant access
 } else {
-    // Invalid code
+	// Authentication failed
 }
 ```
 
-### Generating Recovery Codes
+### Recovery Codes
 
 ```go
-// Generate 8 recovery codes
-codes, err := totp.GenerateRecoveryCodes(8)
+// Generate a set of recovery codes (typically done during 2FA setup)
+recoveryCodes, err := totp.GenerateRecoveryCodes(8) // Generate 8 codes
 if err != nil {
-    log.Fatal(err)
+	// Handle error
 }
-// Store the hashed versions of these codes
-for _, code := range codes {
-    hashedCode := totp.HashRecoveryCode(code)
-    // Store hashedCode in your database securely
+
+// Hash and store codes in database
+var hashedCodes []string
+for _, code := range recoveryCodes {
+	hashedCode := totp.HashRecoveryCode(code)
+	hashedCodes = append(hashedCodes, hashedCode)
+	// Store hashedCode in database
 }
-// Provide the unhashed codes to the user
+
+// Provide the original unhashed codes to user for backup
+
+// Validating a recovery code during account recovery
+userProvidedCode := "ABCD-1234-EFGH" // From user input
+validCode := false
+
+// Check against all stored hashed codes
+for _, hashedCode := range hashedCodes {
+	if totp.ValidateRecoveryCode(userProvidedCode, hashedCode) {
+		validCode = true
+		// Remove this code from database after use
+		break
+	}
+}
+
+if validCode {
+	// Allow access and reset 2FA
+} else {
+	// Invalid recovery code
+}
 ```
 
-## Security Considerations
+### Custom Configuration
 
-- Always store TOTP secrets in encrypted form using the provided encryption functions
-- Keep your encryption key secure and separate from your application code
-- Use HTTPS for all authentication requests
-- Implement rate limiting for TOTP validation attempts
-- Consider implementing backup methods for account recovery
-- Regularly rotate encryption keys and re-encrypt secrets
-- Monitor for suspicious authentication patterns
-- Implement proper key management procedures for your encryption keys
+```go
+// Use custom TOTP parameters (default is 6 digits, 30 seconds)
+valid, err := totp.ValidateTOTPWithParams(
+	secret,
+	userCode,
+	8,        // 8 digits instead of 6
+	60,       // 60 second period instead of 30
+	1,        // Allow 1 period skew before/after
+)
 
-## Best Practices
+// Generate custom TOTP URI
+customURI := totp.GetTOTPURIWithParams(
+	secret,
+	"user@example.com",
+	"MyApp",
+	8,        // 8 digits
+	60,       // 60 second period
+)
+```
 
-1. **Key Management**
+## API Reference
 
-    - Store encryption keys in a secure key management system
-    - Implement key rotation procedures
-    - Never store encryption keys in code or version control
+### Core Functions
 
-2. **Secret Storage**
+```go
+// Generate a new TOTP secret key
+func GenerateSecretKey() (string, error)
 
-    - Always encrypt TOTP secrets before storage
-    - Use secure database systems with encryption at rest
-    - Implement proper access controls
+// Create a TOTP URI for QR code generation
+func GetTOTPURI(secret, accountName, issuer string) string
 
-3. **Authentication Flow**
-    - Implement proper session management
-    - Use rate limiting to prevent brute force attacks
-    - Log authentication attempts for security monitoring
+// Create a TOTP URI with custom parameters
+func GetTOTPURIWithParams(secret, accountName, issuer string, digits, period int) string
+
+// Validate a TOTP code against a secret
+func ValidateTOTP(secret, code string) (bool, error)
+
+// Validate with custom parameters
+func ValidateTOTPWithParams(secret, code string, digits, period, skew int) (bool, error)
+```
+
+### Encryption Functions
+
+```go
+// Generate a new 32-byte encryption key
+func GenerateEncryptionKey() ([]byte, error)
+
+// Load encryption key from environment variable
+func LoadEncryptionKey() ([]byte, error)
+
+// Encrypt a TOTP secret
+func EncryptSecret(secret string, key []byte) (string, error)
+
+// Decrypt a TOTP secret
+func DecryptSecret(encryptedSecret string, key []byte) (string, error)
+```
+
+### Recovery Code Functions
+
+```go
+// Generate recovery codes
+func GenerateRecoveryCodes(count int) ([]string, error)
+
+// Hash a recovery code for storage
+func HashRecoveryCode(code string) string
+
+// Validate a recovery code against its hash
+func ValidateRecoveryCode(code, hash string) bool
+```
+
+### Configuration
+
+Set the following environment variable for encryption key management:
+
+```
+TOTP_ENCRYPTION_KEY=your_base64_encoded_32_byte_key
+```
+
+## Security Best Practices
+
+1. **Secret Management**
+   - Always encrypt TOTP secrets before storage
+   - Use a secure key management system for encryption keys
+   - Never store encryption keys in code or version control
+   - Implement key rotation procedures
+
+2. **Authentication Security**
+   - Implement rate limiting for TOTP verification attempts
+   - Use HTTPS for all authentication endpoints
+   - Log authentication attempts for security monitoring
+   - Set appropriate session timeouts after authentication
+
+3. **Recovery Code Security**
+   - Store only hashed recovery codes
+   - Invalidate recovery codes after use
+   - Generate new recovery codes whenever TOTP is reset
+   - Notify users when recovery codes are used
+
+4. **Implementation Details**
+   - Use a secure random number generator for all crypto operations
+   - Follow the RFC 6238 specification for TOTP implementation
+   - Regularly update dependencies and security libraries
+   - Perform security audits of your authentication flow
