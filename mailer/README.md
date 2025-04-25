@@ -1,20 +1,6 @@
-# Mailer
+# Mailer Package
 
-A package for sending emails with support for Postmark API, HTML templates, and tracking capabilities.
-
-## Overview
-
-The mailer package provides a flexible and type-safe interface for sending emails in Go applications. It integrates with the Postmark API for reliable email delivery and includes a templating system based on [templ](https://github.com/a-h/templ) for creating beautiful, responsive email templates.
-
-## Features
-
-- Type-safe configuration using environment variables
-- Integration with Postmark API for reliable email delivery
-- HTML email format with tracking for opens and links
-- Context support for cancellation and timeouts
-- Comprehensive error handling
-- Reusable email components for consistent design
-- Email template rendering utilities
+Type-safe email sending with Postmark API integration and HTML templates.
 
 ## Installation
 
@@ -22,139 +8,169 @@ The mailer package provides a flexible and type-safe interface for sending email
 go get github.com/dmitrymomot/gokit/mailer
 ```
 
+## Overview
+
+The `mailer` package provides a clean interface for sending emails via Postmark with HTML templating support. It focuses on type safety, tracking capabilities, and reusable components for consistent email design.
+
+## Features
+
+- Postmark API integration for reliable delivery
+- HTML templating with reusable components
+- Email open and link tracking
+- Context-aware for cancellation support
+- Type-safe configuration using environment variables
+- Simple client interface with comprehensive error handling
+
 ## Usage
 
-### Basic Setup
+### Quick Start
 
 ```go
-package main
-
 import (
 	"context"
-	"log"
-
 	"github.com/dmitrymomot/gokit/mailer"
 )
 
-func main() {
-	// Create a new mailer client with configuration
-	config := mailer.Config{
-		PostmarkServerToken:  "your-postmark-server-token",
-		PostmarkAccountToken: "your-postmark-account-token",
-		SenderEmail:          "noreply@example.com",
-		SupportEmail:         "support@example.com",
-	}
-
-	// Create a new client
-	client, err := mailer.NewClient(config)
-	if err != nil {
-		log.Fatalf("Failed to create mailer client: %v", err)
-	}
-
-	// Send an email
-	err = client.SendEmail(context.Background(), mailer.SendEmailParams{
-		SendTo:   "user@example.com",
-		Subject:  "Welcome to Our Service",
-		BodyHTML: "<h1>Welcome!</h1><p>Thank you for signing up.</p>",
-		Tag:      "welcome",
-	})
-	if err != nil {
-		log.Fatalf("Failed to send email: %v", err)
-	}
+// Create a mailer client
+client, err := mailer.NewClient(mailer.Config{
+	PostmarkServerToken:  "your-postmark-server-token",
+	PostmarkAccountToken: "your-postmark-account-token",
+	SenderEmail:          "noreply@example.com",
+	SupportEmail:         "support@example.com",
+})
+if err != nil {
+	// Handle error
 }
+
+// Send a simple email
+err = client.SendEmail(context.Background(), mailer.SendEmailParams{
+	SendTo:   "user@example.com",
+	Subject:  "Welcome!",
+	BodyHTML: "<h1>Hello</h1><p>Welcome to our service!</p>",
+	Tag:      "welcome",
+})
 ```
 
-### Using Email Templates
-
-The package includes a templating system based on `templ` for creating beautiful, responsive email templates:
+### With HTML Templates
 
 ```go
-package main
-
 import (
 	"context"
-	"log"
-
 	"github.com/dmitrymomot/gokit/mailer"
 	"github.com/dmitrymomot/gokit/mailer/templates"
 	"github.com/dmitrymomot/gokit/mailer/templates/components"
 )
 
-func main() {
-	// Create a new mailer client
-	client := mailer.MustNewClient(mailer.Config{
-		PostmarkServerToken:  "your-postmark-server-token",
-		PostmarkAccountToken: "your-postmark-account-token",
-		SenderEmail:          "noreply@example.com",
-		SupportEmail:         "support@example.com",
-	})
+// Create a mailer client
+client := mailer.MustNewClient(mailer.Config{
+	PostmarkServerToken:  "your-token",
+	PostmarkAccountToken: "your-token",
+	SenderEmail:          "noreply@example.com",
+	SupportEmail:         "support@example.com",
+})
 
-	// Create a context
-	ctx := context.Background()
+// Build an email using components
+emailTemplate := components.Layout(
+	components.Header("Welcome to Our Platform"),
+	components.Text("We're excited to have you join us."),
+	components.Button("Get Started", "https://example.com/start"),
+	components.Footer(" 2025 Example Inc."),
+)
 
-	// Create an email template using the provided components
-	emailTemplate := components.Layout(
-		"Welcome to Our Service",
-		components.Header("Welcome!"),
-		components.Text("Thank you for signing up for our service."),
-		components.Button("Get Started", "https://example.com/start"),
-	)
-
-	// Render the template to HTML
-	htmlBody, err := templates.Render(ctx, emailTemplate)
-	if err != nil {
-		log.Fatalf("Failed to render email template: %v", err)
-	}
-
-	// Send the email with the rendered template
-	err = client.SendEmail(ctx, mailer.SendEmailParams{
-		SendTo:   "user@example.com",
-		Subject:  "Welcome to Our Service",
-		BodyHTML: htmlBody,
-		Tag:      "welcome",
-	})
-	if err != nil {
-		log.Fatalf("Failed to send email: %v", err)
-	}
+// Render template to HTML
+htmlBody, err := templates.Render(context.Background(), emailTemplate)
+if err != nil {
+	// Handle error
 }
+
+// Send email with the rendered template
+err = client.SendEmail(context.Background(), mailer.SendEmailParams{
+	SendTo:   "user@example.com",
+	Subject:  "Welcome!",
+	BodyHTML: htmlBody,
+	Tag:      "onboarding",
+})
 ```
 
-### Available Template Components
-
-The package provides several reusable components for building email templates:
-
-- `Layout`: The main layout component that wraps all other components
-- `Header`: For section headers in the email
-- `Text`: For paragraphs of text
-- `Button`: For call-to-action buttons
-- `Link`: For hyperlinks
-- `Logo`: For displaying your company logo
-- `Footer`: For email footers with company information
-- `OTP`: For one-time password display
-
-## Error Handling
-
-The package defines specific error types for handling email-related errors:
+### Loading Config from Environment
 
 ```go
-var (
-	ErrFailedToSendEmail = errors.New("failed to send email")
+import (
+	"github.com/dmitrymomot/gokit/config"
+	"github.com/dmitrymomot/gokit/mailer"
 )
+
+// Load configuration from environment variables
+cfg, err := config.Load[mailer.Config]()
+if err != nil {
+	// Handle error
+}
+
+// Create client with loaded config
+client, err := mailer.NewClient(cfg)
 ```
 
-Errors from the Postmark API are joined with the above error for more context.
+## Template Components
 
-## Configuration
+The package includes reusable components for creating consistent email templates:
 
-The `Config` struct provides essential configuration options for the mailer:
+- `Layout`: Base container for email content
+- `Header`: Section headers with appropriate styling
+- `Text`: Formatted text paragraphs
+- `Button`: Call-to-action buttons with tracking
+- `Link`: Hyperlinks with tracking capabilities
+- `Logo`: Display company logo
+- `OTP`: Format for one-time passwords/codes
+- `Footer`: Standard footer with unsubscribe options
+
+## API Reference
+
+### Client Creation
+
+- `NewClient(cfg Config) (EmailSender, error)`: Create new email client
+- `MustNewClient(cfg Config) EmailSender`: Create client, panics on error
+
+### Configuration
 
 ```go
 type Config struct {
-	PostmarkServerToken  string `env:"POSTMARK_SERVER_TOKEN,required"`  // Postmark API server token
-	PostmarkAccountToken string `env:"POSTMARK_ACCOUNT_TOKEN,required"` // Postmark API account token
-	SenderEmail          string `env:"SENDER_EMAIL,required"`           // Email address of the sender
-	SupportEmail         string `env:"SUPPORT_EMAIL,required"`          // Email address for customer support
+	PostmarkServerToken  string `env:"POSTMARK_SERVER_TOKEN,required"`
+	PostmarkAccountToken string `env:"POSTMARK_ACCOUNT_TOKEN,required"`
+	SenderEmail          string `env:"SENDER_EMAIL,required"`
+	SupportEmail         string `env:"SUPPORT_EMAIL,required"`
 }
 ```
 
-These configuration options can be loaded from environment variables using the `config` package in gokit.
+### Sending Emails
+
+```go
+type SendEmailParams struct {
+	SendTo   string // Recipient email address
+	Subject  string // Email subject
+	BodyHTML string // HTML email content
+	Tag      string // Optional tag for categorization
+}
+```
+
+- `SendEmail(ctx context.Context, params SendEmailParams) error`: Send an email with tracking
+
+### Template Rendering
+
+- `templates.Render(ctx context.Context, tpl templ.Component) (string, error)`: Render a template to HTML
+
+## Error Handling
+
+```go
+// Check for specific errors
+if errors.Is(err, mailer.ErrFailedToSendEmail) {
+	// Handle email sending failure
+}
+```
+
+## Best Practices
+
+1. Use tags to categorize emails for analytics
+2. Enable tracking for open and link metrics
+3. Provide both text and HTML versions for compatibility
+4. Use responsive design in templates
+5. Set appropriate timeout in context for email sending operations
