@@ -1,166 +1,199 @@
 # Utils Package
 
+A collection of common utility functions for Go applications.
+
+## Installation
+
+```bash
+go get github.com/dmitrymomot/gokit/utils
+```
+
 ## Overview
 
-The Utils package provides a collection of common utility functions that are useful across various Go applications. It offers helper functions for working with strings, emails, pointers, function reflection, and more.
+The `utils` package provides a set of lightweight utility functions for common tasks in Go applications, including pointer handling, string manipulation, display name normalization, and reflection helpers.
 
-## Documentation
+## Features
 
-### Email Utilities
+- Generic pointer creation for any type
+- URL-friendly slug generation
+- Email display name normalization
+- Function and struct name reflection
+- Pretty printing of complex data structures
+- Zero external dependencies
 
-#### `NormalizeDisplayName(email string) string`
-
-Extracts a username from an email address and normalizes it for use as a display name.
-
-- **Parameters**:
-  - `email`: The email address to process
-- **Returns**:
-  - A normalized display name extracted from the email address
-
-#### `GetNormalizedDisplayName(email string) string` (Deprecated)
-
-Deprecated alias for `NormalizeDisplayName`.
-
-### Pointer Utilities
-
-#### `Ptr[T any](v T) *T`
-
-A generic utility function that returns a pointer to the provided value.
-
-- **Parameters**:
-  - `v`: A value of any type
-- **Returns**:
-  - A pointer to the input value
-
-### String Utilities
-
-#### `GenerateSlug(s string) string`
-
-Converts a string to a URL-friendly slug by removing diacritics, replacing non-alphanumeric characters with hyphens, and converting to lowercase.
-
-- **Parameters**:
-  - `s`: The string to convert
-- **Returns**:
-  - A URL-friendly slug
-
-#### `ToSlug(s string) string` (Deprecated)
-
-Deprecated alias for `GenerateSlug`.
-
-### Reflection Utilities
-
-#### `QualifiedFuncName(v any) string`
-
-Returns a function's fully qualified name in the format `[package].[func name]`.
-
-- **Parameters**:
-  - `v`: A function
-- **Returns**:
-  - The fully qualified name of the function, or an empty string if the input is not a function
-
-#### `FullyQualifiedFuncName(v any) string` (Deprecated)
-
-Deprecated alias for `QualifiedFuncName`.
-
-### Struct Utilities
-
-#### `GetStructName(v any) string`
-
-Gets the name of a struct type.
-
-- **Parameters**:
-  - `v`: A struct instance or a pointer to a struct
-- **Returns**:
-  - The name of the struct type
-
-## Usage Examples
-
-### Email Utilities
-
-```go
-package main
-
-import (
-	"fmt"
-	
-	"github.com/dmitrymomot/gokit/utils"
-)
-
-func main() {
-	email := "john.doe123@example.com"
-	name := utils.NormalizeDisplayName(email)
-	fmt.Println(name) // Output: "John Doe"
-}
-```
+## Usage
 
 ### Pointer Utilities
 
 ```go
-package main
+import "github.com/dmitrymomot/gokit/utils"
 
-import (
-	"fmt"
-	
-	"github.com/dmitrymomot/gokit/utils"
-)
-
-func main() {
-	// Create a pointer to a string value
-	strPtr := utils.Ptr("hello")
-	fmt.Println(*strPtr) // Output: "hello"
-	
-	// Useful in struct initialization
-	type Config struct {
-		Name    string
-		Enabled *bool
-		Count   *int
-	}
-	
-	config := Config{
-		Name:    "Example",
-		Enabled: utils.Ptr(true),
-		Count:   utils.Ptr(42),
-	}
-	
-	fmt.Printf("Config: %+v\n", config)
+// Create pointers to values without separate variables
+type Config struct {
+    Name     string
+    Enabled  *bool
+    Count    *int
+    Timeout  *time.Duration
 }
+
+// Create a struct with pointer fields directly
+config := Config{
+    Name:     "Example",
+    Enabled:  utils.Ptr(true),
+    Count:    utils.Ptr(42),
+    Timeout:  utils.Ptr(5 * time.Second),
+}
+
+// Works with any type
+stringPtr := utils.Ptr("hello")
+floatPtr := utils.Ptr(3.14)
+timePtr := utils.Ptr(time.Now())
+customPtr := utils.Ptr(MyStruct{Field: "value"})
 ```
 
-### String Utilities
+### String Manipulation
 
 ```go
-package main
+// Generate URL-friendly slugs
+slug := utils.GenerateSlug("Hello World & Café!")
+fmt.Println(slug) // "hello-world-cafe"
 
-import (
-	"fmt"
-	
-	"github.com/dmitrymomot/gokit/utils"
-)
+// Works with special characters, spaces, and diacritics
+titleSlug := utils.GenerateSlug("Über die Brücke")
+fmt.Println(titleSlug) // "uber-die-brucke"
 
-func main() {
-	input := "Hello World & Café!"
-	slug := utils.GenerateSlug(input)
-	fmt.Println(slug) // Output: "hello-world-cafe"
-}
+// Use it for file names, URL paths, etc.
+articleSlug := utils.GenerateSlug("10 Best Ways to Learn Go!")
+fmt.Println(articleSlug) // "10-best-ways-to-learn-go"
+```
+
+### Display Name Utilities
+
+```go
+// Extract and normalize display names from email addresses
+name := utils.NormalizeDisplayName("john.doe123@example.com")
+fmt.Println(name) // "John Doe"
+
+name = utils.NormalizeDisplayName("jane-smith@company.org")
+fmt.Println(name) // "Jane Smith"
+
+name = utils.NormalizeDisplayName("dev.team_lead@tech-corp.io")
+fmt.Println(name) // "Dev Team Lead"
 ```
 
 ### Reflection Utilities
 
 ```go
-package main
+// Get the fully qualified name of a function
+funcName := utils.QualifiedFuncName(myFunction)
+fmt.Println(funcName) // "github.com/myorg/mypackage.myFunction"
 
-import (
-	"fmt"
-	
-	"github.com/dmitrymomot/gokit/utils"
-)
+// Works with method references too
+methodName := utils.QualifiedFuncName(myStruct.Method)
+fmt.Println(methodName) // "github.com/myorg/mypackage.MyStruct.Method"
 
-func exampleFunction() {
-	// Function body
+// Get struct names for logging and reflection
+type User struct {
+    Name string
+    Age  int
 }
+structName := utils.GetStructName(User{})
+fmt.Println(structName) // "User"
 
-func main() {
-	funcName := utils.QualifiedFuncName(exampleFunction)
-	fmt.Println(funcName) // Output: "main.exampleFunction"
-}
+// Works with pointers too
+structName = utils.GetStructName(&User{})
+fmt.Println(structName) // "User"
 ```
+
+### Pretty Printing
+
+```go
+// Pretty print complex data structures
+data := map[string]interface{}{
+    "users": []User{
+        {Name: "Alice", Age: 30},
+        {Name: "Bob", Age: 25},
+    },
+    "settings": map[string]bool{
+        "enabled": true,
+        "debug":   false,
+    },
+}
+
+// Print with formatting and colors (to console)
+utils.PrettyPrint(data)
+
+// Get pretty-printed string
+prettyJSON := utils.PrettyString(data)
+fmt.Println(prettyJSON)
+```
+
+## API Reference
+
+### Pointer Functions
+
+```go
+// Create a pointer to any value
+func Ptr[T any](v T) *T
+```
+
+### String Functions
+
+```go
+// Generate a URL-friendly slug from a string
+func GenerateSlug(s string) string
+
+// Deprecated alias for GenerateSlug
+func ToSlug(s string) string
+```
+
+### Email/Name Functions
+
+```go
+// Extract and normalize a display name from an email address
+func NormalizeDisplayName(email string) string
+
+// Deprecated alias for NormalizeDisplayName
+func GetNormalizedDisplayName(email string) string
+```
+
+### Reflection Functions
+
+```go
+// Get the fully qualified name of a function
+func QualifiedFuncName(v any) string
+
+// Deprecated alias for QualifiedFuncName
+func FullyQualifiedFuncName(v any) string
+
+// Get the name of a struct type
+func GetStructName(v any) string
+```
+
+### Print Functions
+
+```go
+// Pretty print a value to stdout
+func PrettyPrint(v any)
+
+// Get a pretty-printed string representation of a value
+func PrettyString(v any) string
+```
+
+## Best Practices
+
+1. **Using Pointer Helpers**:
+   - Use `Ptr()` when initializing structs with pointer fields
+   - Particularly useful for optional configuration parameters
+
+2. **Slug Generation**:
+   - Use slugs for SEO-friendly URLs and file names
+   - Always validate the output length for database constraints
+
+3. **Display Names**:
+   - Apply `NormalizeDisplayName()` for user-facing displays
+   - Consider additional validation for user-provided display names
+
+4. **Reflection Functions**:
+   - Use reflection utilities primarily for logging and debugging
+   - Avoid relying on reflection in performance-critical code paths
