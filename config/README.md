@@ -1,17 +1,6 @@
 # Config Package
 
-A lightweight, type-safe configuration loader for Go applications using environment variables.
-
-## Overview
-
-The `config` package provides a simple, generic interface for loading type-safe configurations from environment variables. It implements a singleton pattern to ensure each configuration type is loaded only once during the application lifecycle, improving performance and consistency.
-
-## Features
-
-- Type-safe configuration loading with Go generics
-- Automatic .env file loading via godotenv
-- Thread-safe singleton implementation
-- Comprehensive error handling
+A type-safe configuration loader for Go applications using environment variables.
 
 ## Installation
 
@@ -19,11 +8,22 @@ The `config` package provides a simple, generic interface for loading type-safe 
 go get github.com/dmitrymomot/gokit/config
 ```
 
+## Overview
+
+The `config` package provides a simple way to load typed configurations from environment variables. It uses generics for type safety and implements a singleton pattern to ensure each configuration is loaded only once.
+
+## Features
+
+- Type-safe configuration with Go generics
+- Automatic .env file loading
+- Thread-safe singleton implementation
+- Comprehensive error handling
+- Default values support
+- Required field validation
+
 ## Usage
 
-### Basic Usage
-
-Define your configuration struct with environment variable tags:
+### Basic Example
 
 ```go
 package main
@@ -54,82 +54,81 @@ func main() {
 }
 ```
 
-### Multiple Configuration Types
-
-You can define and load multiple configuration types:
+### Multiple Configurations
 
 ```go
+// Server configuration
 type ServerConfig struct {
-	Port      int    `env:"SERVER_PORT" envDefault:"8080"`
-	Host      string `env:"SERVER_HOST" envDefault:"0.0.0.0"`
-	Debug     bool   `env:"DEBUG" envDefault:"false"`
-	LogLevel  string `env:"LOG_LEVEL" envDefault:"info"`
+	Port     int    `env:"SERVER_PORT" envDefault:"8080"`
+	Host     string `env:"SERVER_HOST" envDefault:"0.0.0.0"`
+	LogLevel string `env:"LOG_LEVEL" envDefault:"info"`
 }
 
+// Authentication configuration
 type AuthConfig struct {
 	JWTSecret     string `env:"JWT_SECRET,required"`
-	TokenLifetime int    `env:"TOKEN_LIFETIME" envDefault:"3600"` // in seconds
+	TokenLifetime int    `env:"TOKEN_LIFETIME" envDefault:"3600"`
 }
 
-func main() {
-	// Load server config
-	serverConfig, err := config.Load[ServerConfig]()
-	if err != nil {
-		log.Fatalf("Failed to load server config: %v", err)
-	}
+// Load different configurations independently
+serverCfg, err := config.Load[ServerConfig]()
+authCfg, err := config.Load[AuthConfig]()
+```
 
-	// Load auth config
-	authConfig, err := config.Load[AuthConfig]()
-	if err != nil {
-		log.Fatalf("Failed to load auth config: %v", err)
-	}
+### Using MustLoad
 
-	// ... use configs
+For configurations required at startup:
+
+```go
+// Will panic if environment variables are missing or invalid
+appConfig := config.MustLoad[AppConfig]()
+```
+
+## Environment Variable Tags
+
+The package supports various tag options:
+
+```go
+type Config struct {
+	// Basic with default
+	Port int `env:"PORT" envDefault:"8080"`
+	
+	// Required field
+	APIKey string `env:"API_KEY,required"`
+	
+	// Lists with custom separator
+	Hosts []string `env:"HOSTS" envSeparator:":"`
+	
+	// Duration parsing
+	Timeout time.Duration `env:"TIMEOUT" envDefault:"30s"`
+	
+	// Environment variable expansion
+	TempDir string `env:"TEMP_DIR,expand" envDefault:"${HOME}/tmp"`
 }
 ```
 
 ## Error Handling
 
-The package provides specific error types for different failure scenarios:
-
-- `ErrParsingConfig`: Returned when environment variables cannot be parsed into the config struct
-- `ErrInvalidConfigType`: Returned when trying to access a config with an invalid type
-- `ErrConfigNotLoaded`: Returned when attempting to access a config that hasn't been loaded
-
-Proper error handling:
+The package defines specific error types:
 
 ```go
 config, err := config.Load[MyConfig]()
 if err != nil {
-	if errors.Is(err, config.ErrParsingConfig) {
-		// Handle parsing error
-	} else if errors.Is(err, config.ErrConfigNotLoaded) {
+	switch {
+	case errors.Is(err, config.ErrParsingConfig):
+		// Handle parsing error (missing required field, invalid format)
+	case errors.Is(err, config.ErrConfigNotLoaded):
 		// Handle not loaded error
-	} else {
+	default:
 		// Handle other errors
 	}
 }
 ```
 
-## Advanced Usage
+## Caching Behavior
 
-### Custom Environment Tags
+The `Load` function ensures each configuration type is loaded only once:
 
-The package uses [github.com/caarlos0/env](https://github.com/caarlos0/env) under the hood, which provides extensive tagging options:
-
-```go
-type Config struct {
-	Home         string        `env:"HOME"`
-	Port         int           `env:"PORT" envDefault:"3000"`
-	Password     string        `env:"PASSWORD,required"`
-	IsProduction bool          `env:"PRODUCTION"`
-	Hosts        []string      `env:"HOSTS" envSeparator:":"`
-	Duration     time.Duration `env:"DURATION"`
-	TempFolder   string        `env:"TEMP_FOLDER,expand" envDefault:"${HOME}/tmp"`
-}
-```
-
-## Dependencies
-
-- github.com/caarlos0/env/v11
-- github.com/joho/godotenv/autoload
+1. First call parses environment variables
+2. Subsequent calls return the cached instance
+3. Different configuration types are cached independently
