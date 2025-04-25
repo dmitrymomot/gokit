@@ -1,14 +1,6 @@
-# PGX Package
+# PostgreSQL Package
 
-A Go package that provides a convenient wrapper around the [pgx](https://github.com/jackc/pgx) PostgreSQL driver with additional functionality for connection management, configuration, migrations, and health checking.
-
-## Features
-
-- Connection pooling with automatic retries
-- Database health checking
-- Migration support using [goose](https://github.com/pressly/goose)
-- Error handling utilities
-- Structured logging
+Modern PostgreSQL database wrapper with connection management, migrations, and health checks.
 
 ## Installation
 
@@ -16,163 +8,175 @@ A Go package that provides a convenient wrapper around the [pgx](https://github.
 go get github.com/dmitrymomot/gokit/pg
 ```
 
-## Configuration
+## Overview
 
-The package uses environment variables for configuration. You can set these either in your environment or in a `.env` file:
+The `pg` package provides a robust interface to PostgreSQL databases using the pgx driver. It handles connection management, migrations with goose, health checking, and offers comprehensive error handling.
 
-```env
-PG_CONN_URL=postgres://user:password@localhost:5432/dbname
-PG_MAX_OPEN_CONNS=10
-PG_MAX_IDLE_CONNS=5
-PG_HEALTHCHECK_PERIOD=1m
-PG_MAX_CONN_IDLE_TIME=10m
-PG_MAX_CONN_LIFETIME=30m
-PG_RETRY_ATTEMPTS=3
-PG_RETRY_INTERVAL=5s
-PG_MIGRATIONS_PATH=db/migrations
-PG_MIGRATIONS_TABLE=schema_migrations
-```
+## Features
+
+- Type-safe configuration with environment variable support
+- Connection pooling with retry capabilities
+- Database migrations via [goose](https://github.com/pressly/goose)
+- Built-in health check functionality
+- Comprehensive error handling with specialized error types
+- Context-aware operations for proper cancellation
+- Structured logging integration
 
 ## Usage
 
 ### Basic Connection
 
 ```go
-import "github.com/dmitrymomot/gokit/pg"
+import (
+    "context"
+    "github.com/dmitrymomot/gokit/pg"
+)
 
-func main() {
-    ctx := context.Background()
-
-    // Create a new database connection
-    db, err := pg.Connect(ctx, pg.Config{
-        ConnectionString: "postgres://user:password@localhost:5432/dbname",
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer db.Close()
+// Create a PostgreSQL connection
+db, err := pg.Connect(context.Background(), pg.Config{
+    ConnectionString: "postgres://user:password@localhost:5432/dbname",
+})
+if err != nil {
+    // Handle connection error
 }
+defer db.Close()
+
+// Use the connection
+// ...
 ```
 
-### Custom Configuration
+### Environment-Based Configuration
 
 ```go
-func main() {
-    ctx := context.Background()
+import (
+    "github.com/dmitrymomot/gokit/config"
+    "github.com/dmitrymomot/gokit/pg"
+)
 
-    cfg := pg.Config{
-        ConnectionString: "postgres://user:password@localhost:5432/dbname",
-        MaxOpenConns: 10,
-        MaxIdleConns: 5,
-        HealthCheckPeriod: time.Minute,
-        MaxConnIdleTime: 10 * time.Minute,
-        MaxConnLifetime: 30 * time.Minute,
-        RetryAttempts: 3,
-        RetryInterval: 5 * time.Second,
-        MigrationsPath: "db/migrations",
-        MigrationsTable: "schema_migrations",
-    }
-
-    db, err := pg.Connect(ctx, cfg)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer db.Close()
+// Load PostgreSQL config from environment variables
+cfg, err := config.Load[pg.Config]()
+if err != nil {
+    // Handle configuration error
 }
+
+// Connect with loaded config
+db, err := pg.Connect(context.Background(), cfg)
 ```
 
 ### Database Migrations
 
 ```go
 import (
+    "context"
     "log/slog"
-
     "github.com/dmitrymomot/gokit/pg"
 )
 
-func main() {
-    ctx := context.Background()
-    
-    // Create a logger
-    logger := slog.Default()
-    
-    // Initialize database configuration
-    cfg := pg.Config{
-        ConnectionString: "postgres://user:password@localhost:5432/dbname",
-        MigrationsPath: "./migrations",
-    }
-    
-    // Initialize database connection
-    pool, err := pg.Connect(ctx, cfg)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer pool.Close()
+// Create logger (required for migrations)
+logger := slog.Default()
 
-    // Run migrations
-    err = pg.Migrate(ctx, pool, cfg, logger)
-    if err != nil {
-        log.Fatal(err)
-    }
+// Connect to database
+db, err := pg.Connect(context.Background(), pg.Config{
+    ConnectionString: "postgres://user:password@localhost:5432/dbname",
+    MigrationsPath:   "./migrations", // Path to migration files
+})
+if err != nil {
+    // Handle error
+}
+defer db.Close()
+
+// Run migrations to latest version
+err = pg.Migrate(context.Background(), db, cfg, logger)
+if err != nil {
+    // Handle migration error
 }
 ```
 
 ### Health Checking
 
 ```go
-func main() {
-    ctx := context.Background()
-    db, err := pg.Connect(ctx, pg.Config{
-        ConnectionString: "postgres://user:password@localhost:5432/dbname",
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer db.Close()
+// Create a health check function
+healthCheck := pg.Healthcheck(db)
 
-    // Perform health check
-    healthCheck := pg.Healthcheck(db)
-    if err := healthCheck(ctx); err != nil {
-        log.Printf("Database health check failed: %v", err)
+// Use in HTTP handler
+http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+    if err := healthCheck(r.Context()); err != nil {
+        w.WriteHeader(http.StatusServiceUnavailable)
+        w.Write([]byte("Database unavailable"))
+        return
     }
-}
+    w.Write([]byte("Database healthy"))
+})
 ```
 
 ### Error Handling
 
 ```go
-func handleDatabaseError(err error) {
-    switch {
-    case pg.IsNotFoundError(err):
-        // Handle not found error
-    case pg.IsDuplicateKeyError(err):
-        // Handle duplicate key error
-    case pg.IsForeignKeyViolationError(err):
-        // Handle foreign key violation
-    case pg.IsTxClosedError(err):
-        // Handle closed transaction error
-    default:
-        // Handle other errors
-    }
+// Check for specific error types
+switch {
+case pg.IsNotFoundError(err):
+    // Handle record not found
+case pg.IsDuplicateKeyError(err):
+    // Handle duplicate key constraint violation
+case pg.IsForeignKeyViolationError(err):
+    // Handle foreign key constraint violation
+case pg.IsTxClosedError(err):
+    // Handle closed transaction error
+default:
+    // Handle other errors
+}
+
+// Check for specific connection errors
+if errors.Is(err, pg.ErrFailedToOpenDBConnection) {
+    // Handle connection failure
 }
 ```
 
-## Error Types
+## Configuration
 
-The package provides several error types for common database operations:
+The `Config` struct provides comprehensive options for PostgreSQL connections:
 
-- `ErrFailedToOpenDBConnection`: Failed to establish database connection
-- `ErrEmptyConnectionString`: No connection string provided
-- `ErrHealthcheckFailed`: Database health check failed
-- `ErrFailedToParseDBConfig`: Configuration parsing failed
-- `ErrFailedToApplyMigrations`: Database migration failed
-- `ErrMigrationsDirNotFound`: Migrations directory not found
-- `ErrMigrationPathNotProvided`: Migration path not provided
+```go
+type Config struct {
+    ConnectionString  string        `env:"PG_CONN_URL,required"`
+    MaxOpenConns      int32         `env:"PG_MAX_OPEN_CONNS" envDefault:"10"`
+    MaxIdleConns      int32         `env:"PG_MAX_IDLE_CONNS" envDefault:"5"`
+    HealthCheckPeriod time.Duration `env:"PG_HEALTHCHECK_PERIOD" envDefault:"1m"`
+    MaxConnIdleTime   time.Duration `env:"PG_MAX_CONN_IDLE_TIME" envDefault:"10m"`
+    MaxConnLifetime   time.Duration `env:"PG_MAX_CONN_LIFETIME" envDefault:"30m"`
+    RetryAttempts     int           `env:"PG_RETRY_ATTEMPTS" envDefault:"3"`
+    RetryInterval     time.Duration `env:"PG_RETRY_INTERVAL" envDefault:"5s"`
+    MigrationsPath    string        `env:"PG_MIGRATIONS_PATH" envDefault:"db/migrations"`
+    MigrationsTable   string        `env:"PG_MIGRATIONS_TABLE" envDefault:"schema_migrations"`
+}
+```
 
-## Contributing
+## API Reference
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+### Connection Management
 
-## License
+- `Connect(ctx context.Context, cfg Config) (*pgxpool.Pool, error)`: Create a new database connection pool
 
-This package is part of the gokit project and is released under the MIT License. See the LICENSE file in the root directory for details.
+### Migrations
+
+- `Migrate(ctx context.Context, pool *pgxpool.Pool, cfg Config, log logger) error`: Run database migrations
+
+### Health Monitoring
+
+- `Healthcheck(db *pgxpool.Pool) func(context.Context) error`: Create a health check function
+
+### Error Helpers
+
+- `IsNotFoundError(err error) bool`: Check if error is a "record not found" error
+- `IsDuplicateKeyError(err error) bool`: Check if error is a duplicate key violation
+- `IsForeignKeyViolationError(err error) bool`: Check if error is a foreign key violation
+- `IsTxClosedError(err error) bool`: Check if error is a closed transaction error
+
+## Best Practices
+
+1. **Always close connections**: Use `defer db.Close()` to ensure proper connection cleanup
+2. **Use context for timeouts**: Pass context with timeouts for operations that might take long
+3. **Configure pool sizes appropriately**: Set MaxOpenConns and MaxIdleConns based on your workload
+4. **Run migrations at startup**: Apply migrations when your application starts
+5. **Check specific errors**: Use the provided error helper functions for better error handling
+6. **Monitor connection health**: Implement the health check in your monitoring system
