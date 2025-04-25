@@ -1,30 +1,30 @@
 # Cache Package
 
-This package provides a generic interface and implementations for caching in Go applications.
-
-## Features
-
-- Generic `Cache` interface with standard operations
-- Redis adapter implementation using `github.com/redis/go-redis/v9`
-- In-memory LRU cache adapter using `github.com/hashicorp/golang-lru/v2`
-- Layered cache combining LRU and Redis for multi-level caching
-- Consistent error handling with predefined error types
-- Thread-safe implementations
-- Context support for all operations
+A generic, multi-level caching system with Redis and LRU implementations.
 
 ## Installation
 
 ```bash
 go get github.com/dmitrymomot/gokit/cache
-go get github.com/redis/go-redis/v9 # For Redis adapter
-go get github.com/hashicorp/golang-lru/v2 # For LRU adapter
 ```
+
+## Overview
+
+The `cache` package provides a unified caching interface with multiple implementations, including Redis, in-memory LRU, and a layered combination of both. It supports operations like get, set, delete with a consistent API across all implementations.
+
+## Features
+
+- Generic `Cache` interface for consistent API
+- Redis adapter using `github.com/redis/go-redis/v9`
+- In-memory LRU adapter using `github.com/hashicorp/golang-lru/v2`
+- Layered cache for multi-level caching (LRU + Redis)
+- Context support for all operations
+- Comprehensive error handling
+- Thread-safe implementations
 
 ## Usage
 
 ### Cache Interface
-
-The package defines a common `Cache` interface that all implementations adhere to:
 
 ```go
 type Cache interface {
@@ -37,9 +37,7 @@ type Cache interface {
 }
 ```
 
-### Redis Cache Adapter
-
-The Redis adapter provides a Redis-backed implementation of the `Cache` interface.
+### Redis Cache
 
 ```go
 import (
@@ -50,210 +48,95 @@ import (
     "github.com/redis/go-redis/v9"
 )
 
-func Example_redisCache() {
-    // Create a Redis client
-    redisClient := redis.NewClient(&redis.Options{
-        Addr: "localhost:6379",
-    })
-    
-    // Create a Redis cache adapter
-    redisCache, err := cache.NewRedisAdapter(redisClient)
-    if err != nil {
-        // Handle connection error
-        panic(err)
-    }
-    defer redisCache.Close()
-    
-    ctx := context.Background()
-    
-    // Set a value with a 1 hour TTL
-    err = redisCache.Set(ctx, "user:123", []byte(`{"name":"John","age":30}`), time.Hour)
-    if err != nil {
-        // Handle error
-    }
-    
-    // Get a value
-    value, found, err := redisCache.Get(ctx, "user:123")
-    if err != nil {
-        // Handle error
-    }
-    if found {
-        // Use value ([]byte)
-    }
-    
-    // Check if a key exists
-    exists, err := redisCache.Exists(ctx, "user:123")
-    if err != nil {
-        // Handle error
-    }
-    
-    // Delete a key
-    deleted, err := redisCache.Delete(ctx, "user:123")
-    if err != nil {
-        // Handle error
-    }
-    
-    // Flush all keys (use with caution)
-    err = redisCache.Flush(ctx)
-    if err != nil {
-        // Handle error
-    }
+// Create a Redis client
+redisClient := redis.NewClient(&redis.Options{
+    Addr: "localhost:6379",
+})
+
+// Create a Redis cache adapter
+redisCache, err := cache.NewRedisAdapter(redisClient)
+if err != nil {
+    // Handle error
 }
+defer redisCache.Close()
+
+ctx := context.Background()
+
+// Use the cache
+err = redisCache.Set(ctx, "user:123", []byte(`{"name":"John"}`), time.Hour)
+value, found, err := redisCache.Get(ctx, "user:123")
 ```
 
-### LRU Cache Adapter
-
-The LRU adapter provides an in-memory implementation of the `Cache` interface using a Least Recently Used (LRU) eviction policy.
+### LRU Cache
 
 ```go
-import (
-    "context"
-    "time"
-    
-    "github.com/dmitrymomot/gokit/cache"
-)
-
-func Example_lruCache() {
-    // Create an LRU cache with a capacity of 1000 items
-    lruCache, err := cache.NewLRUAdapter(1000)
-    if err != nil {
-        // Handle error
-        panic(err)
-    }
-    
-    ctx := context.Background()
-    
-    // Set a value with a 5 minute TTL
-    err = lruCache.Set(ctx, "session:xyz", []byte("session-data"), 5*time.Minute)
-    if err != nil {
-        // Handle error
-    }
-    
-    // Get a value
-    value, found, err := lruCache.Get(ctx, "session:xyz")
-    if err != nil {
-        // Handle error
-    }
-    if found {
-        // Use value ([]byte)
-    }
-    
-    // Delete a key
-    deleted, err := lruCache.Delete(ctx, "session:xyz")
-    if err != nil {
-        // Handle error
-    }
-    
-    // LRU cache automatically evicts least recently used items when capacity is reached
+// Create an in-memory LRU cache with capacity of 1000 items
+lruCache, err := cache.NewLRUAdapter(1000)
+if err != nil {
+    // Handle error
 }
+
+// Use the cache (same API as Redis cache)
+err = lruCache.Set(ctx, "session:xyz", []byte("session-data"), 5*time.Minute)
+value, found, err := lruCache.Get(ctx, "session:xyz")
 ```
 
 ### Layered Cache
 
-The layered cache combines an LRU cache (L1) and a Redis cache (L2) to provide a fast, multi-level caching solution.
-
 ```go
-import (
-    "context"
-    "time"
-    
-    "github.com/dmitrymomot/gokit/cache"
-    "github.com/redis/go-redis/v9"
-)
-
-func Example_layeredCache() {
-    // Create an LRU cache as the first layer (L1)
-    lruCache, err := cache.NewLRUAdapter(10000)
-    if err != nil {
-        panic(err)
-    }
-    
-    // Create a Redis cache as the second layer (L2)
-    redisClient := redis.NewClient(&redis.Options{
-        Addr: "localhost:6379",
-    })
-    redisCache, err := cache.NewRedisAdapter(redisClient)
-    if err != nil {
-        panic(err)
-    }
-    
-    // Create a layered cache
-    layeredCache, err := cache.NewLayeredCache(lruCache, redisCache)
-    if err != nil {
-        panic(err)
-    }
-    defer layeredCache.Close()
-    
-    ctx := context.Background()
-    
-    // Set a value (writes to both L1 and L2 concurrently)
-    err = layeredCache.Set(ctx, "product:456", []byte(`{"id":"456","name":"Widget"}`), time.Hour)
-    if err != nil {
-        // Handle error
-    }
-    
-    // Get a value (checks L1 first, then L2 if not found in L1)
-    // If found in L2 but not L1, it's automatically added to L1
-    value, found, err := layeredCache.Get(ctx, "product:456")
-    if err != nil {
-        // Handle error
-    }
-    
-    // Delete a value (removes from both L1 and L2 concurrently)
-    deleted, err := layeredCache.Delete(ctx, "product:456")
-    if err != nil {
-        // Handle error
-    }
+// Create LRU cache (L1)
+lruCache, err := cache.NewLRUAdapter(10000)
+if err != nil {
+    // Handle error
 }
+
+// Create Redis cache (L2)
+redisClient := redis.NewClient(&redis.Options{
+    Addr: "localhost:6379",
+})
+redisCache, err := cache.NewRedisAdapter(redisClient)
+if err != nil {
+    // Handle error
+}
+
+// Create layered cache
+layeredCache, err := cache.NewLayeredCache(lruCache, redisCache)
+if err != nil {
+    // Handle error
+}
+defer layeredCache.Close()
+
+// Use the layered cache (same API)
+// Gets check L1 first, then L2 if not found
+// Sets write to both L1 and L2 concurrently
+err = layeredCache.Set(ctx, "product:123", []byte(`{"name":"Widget"}`), time.Hour)
+value, found, err := layeredCache.Get(ctx, "product:123")
 ```
 
 ## Error Handling
 
-The package defines standard errors that all implementations use:
+The package defines standard errors for consistent error handling:
 
 ```go
 var (
-    // ErrNotFound indicates that the requested key was not found in the cache.
+    // Key not found in the cache
     ErrNotFound = errors.New("cache: key not found")
-
-    // ErrEncoding indicates an error during encoding the cache value.
+    
+    // Error during value encoding/decoding
     ErrEncoding = errors.New("cache: failed to encode value")
-
-    // ErrDecoding indicates an error during decoding the cached value.
     ErrDecoding = errors.New("cache: failed to decode value")
-
-    // ErrConnectionFailed indicates a failure to connect to the cache backend.
-    ErrConnectionFailed = errors.New("cache: connection failed") 
-
-    // ErrOperationFailed indicates a general failure during a cache operation.
+    
+    // Connection or operation failures
+    ErrConnectionFailed = errors.New("cache: connection failed")
     ErrOperationFailed = errors.New("cache: operation failed")
-
-    // ErrNotImplemented indicates a feature is not implemented by the specific cache adapter.
+    
+    // Feature not implemented
     ErrNotImplemented = errors.New("cache: feature not implemented")
 )
 ```
 
 ## Implementation Details
 
-### Redis Adapter
-
-- Wraps any `redis.UniversalClient` (single client, cluster client, etc.)
-- Performs connectivity check during initialization
-- Handles Redis-specific errors and translates them to package errors
-- Safe for concurrent use
-
-### LRU Adapter
-
-- In-memory cache with LRU eviction policy
-- Handles item expiration via time-based mechanism
-- Thread-safe with read/write locks
-- Zero external dependencies at runtime
-- Efficient resource usage
-
-### Layered Cache
-
-- Combines two cache implementations: primary (L1) and secondary (L2)
-- Read-through and write-through caching strategy
-- Automatic LRU cache population from Redis on cache misses
-- Parallel operations using Go's concurrency primitives
-- Robust error handling with error aggregation
+- **Redis Adapter**: Thread-safe wrapper for `redis.UniversalClient`
+- **LRU Adapter**: In-memory cache with LRU eviction and TTL support
+- **Layered Cache**: Combines L1 (fast, limited) and L2 (slower, persistent) caches
