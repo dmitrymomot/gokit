@@ -198,9 +198,9 @@ func TestParse(t *testing.T) {
 	t.Run("with future token", func(t *testing.T) {
 		// Generate a token that's not valid yet
 		futureClaims := jwt.StandardClaims{
-			Subject:    "user123",
-			Issuer:     "gokit",
-			ExpiresAt:  time.Now().Add(time.Hour).Unix(),
+			Subject:   "user123",
+			Issuer:    "gokit",
+			ExpiresAt: time.Now().Add(time.Hour).Unix(),
 			NotBefore: time.Now().Add(time.Hour).Unix(), // Not valid yet
 		}
 

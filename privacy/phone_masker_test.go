@@ -101,8 +101,8 @@ func TestPhoneMasker_Mask(t *testing.T) {
 		assert.True(t, masker.CanMask("+1 555-123-4567"))
 
 		// Invalid phone numbers or non-string types should return false
-		assert.False(t, masker.CanMask("123"))  // Too short
-		assert.False(t, masker.CanMask("abcdefghijklm"))  // Not a phone number
+		assert.False(t, masker.CanMask("123"))           // Too short
+		assert.False(t, masker.CanMask("abcdefghijklm")) // Not a phone number
 		assert.False(t, masker.CanMask(123))
 		assert.False(t, masker.CanMask([]string{"not", "a", "phone"}))
 	})

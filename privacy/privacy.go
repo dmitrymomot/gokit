@@ -66,28 +66,28 @@ const (
 	CategoryCommunication DataCategory = "communication"
 
 	// Specific data categories
-	
+
 	// CategoryCreditCard represents credit card information.
 	CategoryCreditCard DataCategory = "credit_card"
-	
+
 	// CategoryEmail represents email addresses.
 	CategoryEmail DataCategory = "email"
-	
+
 	// CategoryPhone represents phone numbers.
 	CategoryPhone DataCategory = "phone"
-	
+
 	// CategorySSN represents Social Security Numbers.
 	CategorySSN DataCategory = "ssn"
-	
+
 	// CategoryName represents personal names.
 	CategoryName DataCategory = "name"
-	
+
 	// CategoryAddress represents physical addresses.
 	CategoryAddress DataCategory = "address"
-	
+
 	// CategoryPassport represents passport numbers.
 	CategoryPassport DataCategory = "passport"
-	
+
 	// CategoryDriverLicense represents driver's license numbers.
 	CategoryDriverLicense DataCategory = "driver_license"
 )

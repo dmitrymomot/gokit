@@ -22,7 +22,7 @@ type MaskingRegistry struct {
 // NewMaskingRegistry creates a new MaskingRegistry with optional default masker.
 func NewMaskingRegistry(defaultMasker Masker) *MaskingRegistry {
 	return &MaskingRegistry{
-		maskers:      make(map[DataCategory]Masker),
+		maskers:       make(map[DataCategory]Masker),
 		defaultMasker: defaultMasker,
 	}
 }

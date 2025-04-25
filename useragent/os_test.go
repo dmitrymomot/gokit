@@ -74,6 +74,6 @@ func TestOSAccessors(t *testing.T) {
 		useragent.BrowserChrome,
 		"91.0.4472.124",
 	)
-	
+
 	assert.Equal(t, useragent.OSWindows, ua.OS())
 }

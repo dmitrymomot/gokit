@@ -38,7 +38,7 @@ func TestCommandProcessor(t *testing.T) {
 	bus, subscriberConstructor := test.NewChannelMessageBus(t, ctx, test.TestBusConfig{
 		Logger: logger,
 		// Use a larger buffer to ensure messages don't get dropped
-		BufferSize: 100, 
+		BufferSize: 100,
 	})
 
 	// Command handler execution tracker
@@ -53,11 +53,11 @@ func TestCommandProcessor(t *testing.T) {
 		handlerMutex.Lock()
 		defer handlerMutex.Unlock()
 		handlerExecuted = true
-		
+
 		// Validate command data
 		assert.Equal(t, "test-id", cmd.ID)
 		assert.Equal(t, "test-name", cmd.Name)
-		
+
 		return handlerErr
 	})
 
@@ -112,7 +112,7 @@ func TestCommandProcessor(t *testing.T) {
 			ID:   "test-id",
 			Name: "test-name",
 		}
-		
+
 		// Use the command bus to send the command
 		commandBus, err := cqrs.NewCommandBus(bus.PubSub, logger)
 		require.NoError(t, err)
@@ -153,7 +153,7 @@ func TestCommandProcessor(t *testing.T) {
 			ID:   "test-id",
 			Name: "test-name",
 		}
-		
+
 		// Use the command bus to send the command
 		commandBus, err := cqrs.NewCommandBus(bus.PubSub, logger)
 		require.NoError(t, err)
@@ -173,7 +173,7 @@ func TestCommandProcessor(t *testing.T) {
 			defer errorMutex.Unlock()
 			return errorHandlerCalled && errorReceived != nil
 		}, 2*time.Second, 100*time.Millisecond, "Error handler should have been called with an error")
-		
+
 		errorMutex.Lock()
 		errReceived := errorReceived
 		errorMutex.Unlock()
@@ -194,7 +194,7 @@ func TestCommandProcessorFunc(t *testing.T) {
 	// Create a basic configuration
 	logger := slog.Default()
 	ctx := context.Background()
-	
+
 	// Create a test command handler
 	handler := cqrs.NewCommandHandler(func(ctx context.Context, cmd *test.TestCommand) error {
 		return nil
@@ -217,15 +217,15 @@ func TestCommandProcessorFunc(t *testing.T) {
 
 	require.NotNil(t, processorFunc)
 	assert.IsType(t, (func() error)(nil), processorFunc)
-	
+
 	// Optional: Verify the processor can actually be started (although we don't wait for it to complete)
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(processorFunc)
-	
+
 	// Send a command to the processor
 	commandBus, err := cqrs.NewCommandBus(bus.PubSub, logger)
 	require.NoError(t, err)
-	
+
 	err = commandBus.Send(ctx, &test.TestCommand{
 		ID:   "test-processor-func",
 		Name: "processor-test",

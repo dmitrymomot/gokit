@@ -61,19 +61,19 @@ func (b *Builder) Add() (*Builder, error) {
 func (b *Builder) WithTransition(from, to State, event Event, guard Guard, action Action) (*Builder, error) {
 	var guards []Guard
 	var actions []Action
-	
+
 	if guard != nil {
 		guards = append(guards, guard)
 	}
-	
+
 	if action != nil {
 		actions = append(actions, action)
 	}
-	
+
 	if err := b.machine.AddTransition(from, to, event, guards, actions); err != nil {
 		return b, err
 	}
-	
+
 	return b, nil
 }
 

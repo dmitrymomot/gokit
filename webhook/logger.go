@@ -10,10 +10,10 @@ import (
 
 // LoggerDecorator wraps a WebhookSender and adds logging functionality
 type LoggerDecorator struct {
-	sender        WebhookSender
-	logger        *slog.Logger
-	hideParams    bool
-	maskedFields  map[string]bool // fields to mask with asterisks
+	sender       WebhookSender
+	logger       *slog.Logger
+	hideParams   bool
+	maskedFields map[string]bool // fields to mask with asterisks
 }
 
 // LoggerOption configures the logger decorator
@@ -45,17 +45,17 @@ func NewLoggerDecorator(sender WebhookSender, logger *slog.Logger, opts ...Logge
 	if logger == nil {
 		logger = slog.Default()
 	}
-	
+
 	ld := &LoggerDecorator{
 		sender: sender,
 		logger: logger,
 	}
-	
+
 	// Apply options
 	for _, opt := range opts {
 		opt(ld)
 	}
-	
+
 	return ld
 }
 
@@ -65,12 +65,12 @@ func extractMethodFromOptions(opts []RequestOption) string {
 	o := &requestOptions{
 		Method: "POST", // Default method
 	}
-	
+
 	// Apply all options to determine the method
 	for _, opt := range opts {
 		opt(o)
 	}
-	
+
 	return o.Method
 }
 
@@ -81,7 +81,7 @@ func (l *LoggerDecorator) maskSensitiveParams(params any) any {
 	}
 
 	v := reflect.ValueOf(params)
-	
+
 	// Dereference pointers
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
@@ -99,7 +99,7 @@ func (l *LoggerDecorator) maskSensitiveParams(params any) any {
 			key := iter.Key()
 			keyStr := key.String()
 			value := iter.Value()
-			
+
 			// Check if this field should be masked
 			if l.maskedFields[keyStr] {
 				// Create a masked value of the appropriate type
@@ -110,7 +110,7 @@ func (l *LoggerDecorator) maskSensitiveParams(params any) any {
 			}
 		}
 		return result.Interface()
-		
+
 	case reflect.Struct:
 		// Create a copy of the struct with masked fields
 		result := reflect.New(v.Type()).Elem()
@@ -119,7 +119,7 @@ func (l *LoggerDecorator) maskSensitiveParams(params any) any {
 			if !field.IsExported() {
 				continue
 			}
-			
+
 			fieldName := field.Name
 			// Check for json tag
 			if tag := field.Tag.Get("json"); tag != "" && tag != "-" {
@@ -128,7 +128,7 @@ func (l *LoggerDecorator) maskSensitiveParams(params any) any {
 					fieldName = parts[0]
 				}
 			}
-			
+
 			// Check if this field should be masked
 			if l.maskedFields[fieldName] {
 				// Create a masked value of the appropriate type
@@ -140,7 +140,7 @@ func (l *LoggerDecorator) maskSensitiveParams(params any) any {
 		}
 		return result.Interface()
 	}
-	
+
 	return params
 }
 
@@ -183,13 +183,13 @@ func (l *LoggerDecorator) Send(ctx context.Context, url string, params any, opts
 	method := extractMethodFromOptions(opts)
 
 	startTime := time.Now()
-	
+
 	// Create log attributes
 	logAttrs := []any{
 		slog.String("url", url),
 		slog.String("method", method),
 	}
-	
+
 	// Handle parameters in logs
 	if params != nil {
 		if l.hideParams {
@@ -203,7 +203,7 @@ func (l *LoggerDecorator) Send(ctx context.Context, url string, params any, opts
 			logAttrs = append(logAttrs, slog.Any("params", params))
 		}
 	}
-	
+
 	// Log before sending
 	l.logger.InfoContext(ctx, "Sending webhook request", logAttrs...)
 

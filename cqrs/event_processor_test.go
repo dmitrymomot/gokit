@@ -64,11 +64,11 @@ func TestEventProcessor(t *testing.T) {
 		handlerMutex.Lock()
 		defer handlerMutex.Unlock()
 		handlerExecuted = true
-		
+
 		// Validate event data
 		assert.Equal(t, "test-id", event.ID)
 		assert.Equal(t, "test-name", event.Name)
-		
+
 		return handlerErr
 	})
 
@@ -124,7 +124,7 @@ func TestEventProcessor(t *testing.T) {
 			Name:      "test-name",
 			Timestamp: time.Now().Unix(),
 		}
-		
+
 		// Use the event bus to publish the event
 		eventBus, err := cqrs.NewEventBus(pubSub, logger)
 		require.NoError(t, err)
@@ -166,7 +166,7 @@ func TestEventProcessor(t *testing.T) {
 			Name:      "test-name",
 			Timestamp: time.Now().Unix(),
 		}
-		
+
 		// Use the event bus to publish the event
 		eventBus, err := cqrs.NewEventBus(pubSub, logger)
 		require.NoError(t, err)
@@ -186,7 +186,7 @@ func TestEventProcessor(t *testing.T) {
 			defer errorMutex.Unlock()
 			return errorHandlerCalled && errorReceived != nil
 		}, 5*time.Second, 100*time.Millisecond, "Error handler should have been called with an error")
-		
+
 		errorMutex.Lock()
 		errReceived := errorReceived
 		errorMutex.Unlock()

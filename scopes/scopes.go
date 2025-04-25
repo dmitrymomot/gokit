@@ -9,11 +9,11 @@ var (
 	// ScopeSeparator is used to separate multiple scopes in a string
 	// This can be modified to use a different separator (e.g., ",")
 	ScopeSeparator = " "
-	
+
 	// ScopeWildcard represents a wildcard scope that matches everything
 	// This can be modified to use a different wildcard character (e.g., "?")
 	ScopeWildcard = "*"
-	
+
 	// ScopeDelimiter is used to separate scope parts (e.g., "admin.read")
 	// This can be modified to use a different delimiter (e.g., ":")
 	ScopeDelimiter = "."

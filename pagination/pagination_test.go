@@ -27,7 +27,7 @@ func TestCalculateOffset(t *testing.T) {
 		{"Invalid page (negative)", -1, 10, 0},
 		{"Invalid page (zero)", 0, 10, 0},
 		{"Invalid size (negative)", 2, -5, 10}, // Uses DefaultLimit
-		{"Invalid size (zero)", 3, 0, 20},     // Uses DefaultLimit
+		{"Invalid size (zero)", 3, 0, 20},      // Uses DefaultLimit
 		{"Large page number", 100, 10, 990},
 	}
 

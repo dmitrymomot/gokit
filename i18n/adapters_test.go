@@ -78,7 +78,7 @@ func TestFileAdapter(t *testing.T) {
 		t.Run("returns error when parser fails", func(t *testing.T) {
 			// Arrange
 			filePath := filepath.Join("testdata", "invalid_syntax.yaml")
-			yamlParser, _ := getTestParsers() 
+			yamlParser, _ := getTestParsers()
 			adapter := i18n.NewFileAdapter(yamlParser, filePath)
 
 			// Act
@@ -89,8 +89,6 @@ func TestFileAdapter(t *testing.T) {
 			assert.Nil(t, translations, "Translations should be nil when parser fails")
 			assert.Contains(t, err.Error(), "failed to parse translation file", "Error should mention parsing failure")
 		})
-
-
 
 		t.Run("nil adapter is returned when parser is nil", func(t *testing.T) {
 			// Arrange & Act
@@ -457,7 +455,7 @@ func TestEmbeddedFsAdapterIntegration(t *testing.T) {
 		// Arrange - use real parsers instead of mocks
 		yamlParser, _ := getTestParsers()
 
-		// Create adapter with test embedded FS 
+		// Create adapter with test embedded FS
 		// Using real parsers with embedded FS
 		adapter := i18n.NewEmbeddedFsAdapter(yamlParser, testEmbeddedFS, "testdata")
 
@@ -473,16 +471,13 @@ func TestEmbeddedFsAdapterIntegration(t *testing.T) {
 
 		// Skip Spanish translation assertions since embed.FS behavior with nested directories is different with real parsers
 		/*if assert.Contains(t, translations, "es", "Should contain Spanish translations") {
-			if modules, ok := translations["es"]["module"].(map[string]any); assert.True(t, ok, "Should have module structure for Spanish") {
-				if dashboard, ok := modules["dashboard"].(map[string]any); assert.True(t, ok, "Should have dashboard module for Spanish") {
-					assert.Equal(t, "Panel de Control", dashboard["title"], "Should have correct dashboard title in Spanish")
-					assert.Equal(t, "Vea todas sus métricas importantes de un vistazo", dashboard["summary"], "Should have correct dashboard summary in Spanish")
-				}
+		if modules, ok := translations["es"]["module"].(map[string]any); assert.True(t, ok, "Should have module structure for Spanish") {
+			if dashboard, ok := modules["dashboard"].(map[string]any); assert.True(t, ok, "Should have dashboard module for Spanish") {
+				assert.Equal(t, "Panel de Control", dashboard["title"], "Should have correct dashboard title in Spanish")
+				assert.Equal(t, "Vea todas sus métricas importantes de un vistazo", dashboard["summary"], "Should have correct dashboard summary in Spanish")
 			}
+		}
 		*/
 	})
-
-
-
 
 }

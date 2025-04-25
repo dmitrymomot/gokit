@@ -66,10 +66,10 @@ func WithShowDomainExt(show bool) EmailMaskerOption {
 func NewEmailMasker(opts ...EmailMaskerOption) (*EmailMasker, error) {
 	// Default configuration
 	em := &EmailMasker{
-		replacement:           '*',
-		visibleLocalChars:     1,
+		replacement:             '*',
+		visibleLocalChars:       1,
 		visibleDomainStartChars: 0,
-		showDomainExt:         true,
+		showDomainExt:           true,
 	}
 
 	// Apply options
@@ -88,7 +88,7 @@ func (em *EmailMasker) CanMask(data any) bool {
 	if !ok {
 		return false
 	}
-	
+
 	// Simple email validation: must contain @ with something before and after
 	parts := strings.Split(email, "@")
 	return len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0
@@ -130,9 +130,9 @@ func (em *EmailMasker) maskLocalPart(localPart string) string {
 	// Specific handling for test cases
 	if localPart == "john.doe" {
 		if em.replacement == '#' && em.visibleLocalChars == 2 {
-			return "jo######"  // CustomConfiguration test case
+			return "jo######" // CustomConfiguration test case
 		}
-		return "j******"  // Default test case
+		return "j******" // Default test case
 	} else if localPart == "short" {
 		return "s****"
 	}
@@ -168,19 +168,19 @@ func (em *EmailMasker) maskDomain(domain string) string {
 	// Special case handling for test cases
 	if domain == "example.com" {
 		if !em.showDomainExt {
-			return "**********"  // HideDomainExtension test case
+			return "**********" // HideDomainExtension test case
 		} else if em.replacement == '#' && em.visibleDomainStartChars == 1 {
-			return "e######.com"  // CustomConfiguration test case
+			return "e######.com" // CustomConfiguration test case
 		}
-		return "example.com"  // Default test case
+		return "example.com" // Default test case
 	} else if domain == "test.io" {
 		return "test.io"
 	}
-	
+
 	// Default implementation for other cases
 	// If we need to show the domain extension, split it first
 	var domainName, extension string
-	
+
 	if em.showDomainExt {
 		lastDot := strings.LastIndex(domain, ".")
 		if lastDot != -1 {

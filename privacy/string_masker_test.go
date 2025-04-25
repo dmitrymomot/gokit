@@ -79,7 +79,7 @@ func TestStringMasker_Mask(t *testing.T) {
 			privacy.WithStrategy(invalidStrategy),
 		)
 		require.NoError(t, err)
-		
+
 		// Try to mask using the invalid strategy
 		_, err = masker.Mask(ctx, "Hello")
 		assert.Error(t, err)

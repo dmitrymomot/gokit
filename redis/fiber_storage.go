@@ -55,7 +55,7 @@ func (s *Storage) Get(key string) ([]byte, error) {
 //   - key: The key under which to store the value.
 //   - val: The value to store as a byte slice.
 //   - exp: The expiration duration after which the key will be automatically deleted.
-//          Use zero duration for no expiration.
+//     Use zero duration for no expiration.
 //
 // Returns:
 //   - error: An error if the operation failed, nil otherwise.

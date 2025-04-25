@@ -33,21 +33,21 @@ type mockSender struct {
 
 func (m *mockSender) Send(ctx context.Context, url string, params any, opts ...webhook.RequestOption) (*webhook.Response, error) {
 	count := m.callCount.Add(1) - 1 // get current call index (0-based)
-	
+
 	// Save parameters for inspection
 	m.lastParams = params
 	m.lastURL = url
 	m.lastOpts = opts
-	
+
 	// Return pre-configured response/error for this call
 	if int(count) < len(m.errors) && m.errors[count] != nil {
 		return nil, m.errors[count]
 	}
-	
+
 	if int(count) < len(m.responses) {
 		return m.responses[count], nil
 	}
-	
+
 	// Default successful response
 	return &webhook.Response{StatusCode: http.StatusOK}, nil
 }
@@ -63,19 +63,19 @@ func TestRetryDecorator(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: []byte(`{"success":true}`)},
 			},
 		}
-		
+
 		// Create retry decorator
 		sender := webhook.NewRetryDecorator(mock)
-		
+
 		// Send request
 		resp, err := sender.Send(ctx, "https://api.example.com", map[string]string{"test": "value"})
-		
+
 		// Verify results
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, int32(1), mock.callCount.Load())
 	})
-	
+
 	t.Run("retry_on_network_error", func(t *testing.T) {
 		// Create mock sender that fails with a network error, then succeeds
 		mock := &mockSender{
@@ -88,7 +88,7 @@ func TestRetryDecorator(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: []byte(`{"success":true}`)},
 			},
 		}
-		
+
 		// Create retry decorator
 		sender := webhook.NewRetryDecorator(
 			mock,
@@ -96,16 +96,16 @@ func TestRetryDecorator(t *testing.T) {
 			webhook.WithRetryDelay(10*time.Millisecond),
 			webhook.WithRetryOnNetworkErrors(),
 		)
-		
+
 		// Send request
 		resp, err := sender.Send(ctx, "https://api.example.com", map[string]string{"test": "value"})
-		
+
 		// Verify results
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, int32(2), mock.callCount.Load())
 	})
-	
+
 	t.Run("retry_on_status_code", func(t *testing.T) {
 		// Create mock sender that returns 503, then succeeds
 		mock := &mockSender{
@@ -114,7 +114,7 @@ func TestRetryDecorator(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: []byte(`{"success":true}`)},
 			},
 		}
-		
+
 		// Create retry decorator that retries on 503
 		sender := webhook.NewRetryDecorator(
 			mock,
@@ -122,16 +122,16 @@ func TestRetryDecorator(t *testing.T) {
 			webhook.WithRetryDelay(10*time.Millisecond),
 			webhook.WithRetryOnStatus(http.StatusServiceUnavailable),
 		)
-		
+
 		// Send request
 		resp, err := sender.Send(ctx, "https://api.example.com", map[string]string{"test": "value"})
-		
+
 		// Verify results
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, int32(2), mock.callCount.Load())
 	})
-	
+
 	t.Run("retry_on_server_errors", func(t *testing.T) {
 		// Create mock sender that returns multiple 5xx errors, then succeeds
 		mock := &mockSender{
@@ -141,7 +141,7 @@ func TestRetryDecorator(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: []byte(`{"success":true}`)},
 			},
 		}
-		
+
 		// Create retry decorator that retries on all 5xx errors
 		sender := webhook.NewRetryDecorator(
 			mock,
@@ -149,16 +149,16 @@ func TestRetryDecorator(t *testing.T) {
 			webhook.WithRetryDelay(10*time.Millisecond),
 			webhook.WithRetryOnServerErrors(),
 		)
-		
+
 		// Send request
 		resp, err := sender.Send(ctx, "https://api.example.com", map[string]string{"test": "value"})
-		
+
 		// Verify results
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, int32(3), mock.callCount.Load())
 	})
-	
+
 	t.Run("max_retries_exceeded", func(t *testing.T) {
 		// Create mock sender that always fails
 		errExpected := errors.New("persistent error")
@@ -170,7 +170,7 @@ func TestRetryDecorator(t *testing.T) {
 				errExpected,
 			},
 		}
-		
+
 		// Create retry decorator with max 3 retries
 		sender := webhook.NewRetryDecorator(
 			mock,
@@ -178,16 +178,16 @@ func TestRetryDecorator(t *testing.T) {
 			webhook.WithRetryDelay(10*time.Millisecond),
 			webhook.WithRetryOnNetworkErrors(),
 		)
-		
+
 		// Send request
 		_, err := sender.Send(ctx, "https://api.example.com", map[string]string{"test": "value"})
-		
+
 		// Verify results
 		require.Error(t, err)
 		assert.Equal(t, errExpected, err)
 		assert.Equal(t, int32(4), mock.callCount.Load()) // original + 3 retries
 	})
-	
+
 	t.Run("retry_with_backoff", func(t *testing.T) {
 		// Create mock sender that fails a few times
 		mock := &mockSender{
@@ -202,7 +202,7 @@ func TestRetryDecorator(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: []byte(`{"success":true}`)},
 			},
 		}
-		
+
 		// Create retry decorator with backoff
 		startTime := time.Now()
 		sender := webhook.NewRetryDecorator(
@@ -212,23 +212,23 @@ func TestRetryDecorator(t *testing.T) {
 			webhook.WithRetryBackoff(),
 			webhook.WithRetryOnNetworkErrors(),
 		)
-		
+
 		// Send request
 		resp, err := sender.Send(ctx, "https://api.example.com", map[string]string{"test": "value"})
 		elapsed := time.Since(startTime)
-		
+
 		// Verify results
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, int32(3), mock.callCount.Load())
-		
+
 		// With backoff, we should have waited at least:
 		// 1st retry: 50ms
 		// 2nd retry: 100ms (doubled from first)
 		// Total: ~150ms minimum
 		assert.GreaterOrEqual(t, elapsed.Milliseconds(), int64(140))
 	})
-	
+
 	t.Run("with_logger", func(t *testing.T) {
 		// Setup a buffer to capture log output
 		var logBuffer bytes.Buffer
@@ -236,7 +236,7 @@ func TestRetryDecorator(t *testing.T) {
 			Level: slog.LevelDebug,
 		})
 		logger := slog.New(handler)
-		
+
 		// Create mock sender that fails once then succeeds
 		mock := &mockSender{
 			errors: []error{
@@ -248,7 +248,7 @@ func TestRetryDecorator(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: []byte(`{"success":true}`)},
 			},
 		}
-		
+
 		// Create retry decorator with logger
 		sender := webhook.NewRetryDecorator(
 			mock,
@@ -257,15 +257,15 @@ func TestRetryDecorator(t *testing.T) {
 			webhook.WithRetryLogger(logger),
 			webhook.WithRetryOnNetworkErrors(),
 		)
-		
+
 		// Send request
 		resp, err := sender.Send(ctx, "https://api.example.com", map[string]string{"test": "value"})
-		
+
 		// Verify results
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, int32(2), mock.callCount.Load())
-		
+
 		// Verify logs
 		logs := logBuffer.String()
 		assert.Contains(t, logs, "Retrying webhook request")
@@ -273,18 +273,18 @@ func TestRetryDecorator(t *testing.T) {
 		assert.Contains(t, logs, "attempt=1")
 		assert.Contains(t, logs, "max_retries=3")
 	})
-	
+
 	t.Run("context_cancellation", func(t *testing.T) {
 		// Create a context that will be canceled
 		ctx, cancel := context.WithCancel(context.Background())
-		
+
 		// Create mock sender with long delay and network error
 		mock := &mockSender{
 			errors: []error{
 				errors.New("will retry"),
 			},
 		}
-		
+
 		// Create retry decorator with a delay
 		sender := webhook.NewRetryDecorator(
 			mock,
@@ -292,18 +292,18 @@ func TestRetryDecorator(t *testing.T) {
 			webhook.WithRetryDelay(200*time.Millisecond),
 			webhook.WithRetryOnNetworkErrors(),
 		)
-		
+
 		// Start send operation in a goroutine
 		errCh := make(chan error, 1)
 		go func() {
 			_, err := sender.Send(ctx, "https://api.example.com", map[string]string{"test": "value"})
 			errCh <- err
 		}()
-		
+
 		// Cancel the context after a short time
 		time.Sleep(20 * time.Millisecond)
 		cancel()
-		
+
 		// Get the result
 		var err error
 		select {
@@ -312,7 +312,7 @@ func TestRetryDecorator(t *testing.T) {
 		case <-time.After(500 * time.Millisecond):
 			t.Fatal("Timed out waiting for response")
 		}
-		
+
 		// Verify context cancellation was properly handled
 		require.Error(t, err)
 		assert.ErrorIs(t, err, context.Canceled)

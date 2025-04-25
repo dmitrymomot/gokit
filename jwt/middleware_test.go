@@ -243,7 +243,7 @@ func TestMiddleware(t *testing.T) {
 		// Check the response (should be unauthorized)
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
-	
+
 	t.Run("GetClaimsAs", func(t *testing.T) {
 		// Create a handler that uses GetClaimsAs to parse claims into a struct
 		typedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

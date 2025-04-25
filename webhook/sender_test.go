@@ -45,7 +45,7 @@ func TestWebhookSender_Send(t *testing.T) {
 			// Check headers
 			assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 			assert.Equal(t, "test-value", r.Header.Get("X-Test-Header"))
-			
+
 			// Write response
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"success":true}`))
@@ -58,7 +58,7 @@ func TestWebhookSender_Send(t *testing.T) {
 		// Send webhook
 		ctx := context.Background()
 		params := map[string]string{"key": "value"}
-		resp, err := sender.Send(ctx, server.URL, params, 
+		resp, err := sender.Send(ctx, server.URL, params,
 			webhook.WithHeader("X-Test-Header", "test-value"))
 
 		// Check response
@@ -74,11 +74,11 @@ func TestWebhookSender_Send(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Check method
 			assert.Equal(t, http.MethodGet, r.Method)
-			
+
 			// Check that params were converted to query string
 			assert.Equal(t, "value1", r.URL.Query().Get("key1"))
 			assert.Equal(t, "value2", r.URL.Query().Get("key2"))
-			
+
 			// Write response
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"data":"received"}`))
@@ -94,7 +94,7 @@ func TestWebhookSender_Send(t *testing.T) {
 			"key1": "value1",
 			"key2": "value2",
 		}
-		resp, err := sender.Send(ctx, server.URL, params, 
+		resp, err := sender.Send(ctx, server.URL, params,
 			webhook.WithMethod(http.MethodGet))
 
 		// Check response
@@ -109,11 +109,11 @@ func TestWebhookSender_Send(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Check method
 			assert.Equal(t, http.MethodGet, r.Method)
-			
+
 			// Check that struct fields were converted to query string
 			assert.Equal(t, "123", r.URL.Query().Get("id"))
 			assert.Equal(t, "test user", r.URL.Query().Get("name"))
-			
+
 			// Write response
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"success":true}`))
@@ -132,7 +132,7 @@ func TestWebhookSender_Send(t *testing.T) {
 		// Send webhook with struct params
 		ctx := context.Background()
 		params := User{ID: 123, Name: "test user"}
-		resp, err := sender.Send(ctx, server.URL, params, 
+		resp, err := sender.Send(ctx, server.URL, params,
 			webhook.WithMethod(http.MethodGet))
 
 		// Check response
@@ -147,10 +147,10 @@ func TestWebhookSender_Send(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Check method
 			assert.Equal(t, http.MethodDelete, r.Method)
-			
+
 			// Check that params were converted to query string
 			assert.Equal(t, "123", r.URL.Query().Get("id"))
-			
+
 			// Write response
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"deleted":true}`))
@@ -163,7 +163,7 @@ func TestWebhookSender_Send(t *testing.T) {
 		// Send webhook with params that should be converted to query string
 		ctx := context.Background()
 		params := map[string]int{"id": 123}
-		resp, err := sender.Send(ctx, server.URL, params, 
+		resp, err := sender.Send(ctx, server.URL, params,
 			webhook.WithMethod(http.MethodDelete))
 
 		// Check response
@@ -179,7 +179,7 @@ func TestWebhookSender_Send(t *testing.T) {
 			// Check that both existing and new params are present
 			assert.Equal(t, "existing", r.URL.Query().Get("original"))
 			assert.Equal(t, "new value", r.URL.Query().Get("added"))
-			
+
 			w.WriteHeader(http.StatusOK)
 		}))
 		defer server.Close()
@@ -190,7 +190,7 @@ func TestWebhookSender_Send(t *testing.T) {
 		// Send webhook to URL with existing query params
 		ctx := context.Background()
 		params := map[string]string{"added": "new value"}
-		resp, err := sender.Send(ctx, server.URL+"?original=existing", params, 
+		resp, err := sender.Send(ctx, server.URL+"?original=existing", params,
 			webhook.WithMethod(http.MethodGet))
 
 		require.NoError(t, err)
@@ -200,7 +200,7 @@ func TestWebhookSender_Send(t *testing.T) {
 
 	t.Run("error - invalid URL", func(t *testing.T) {
 		sender := webhook.NewWebhookSender()
-		
+
 		resp, err := sender.Send(context.Background(), "", nil)
 		assert.Error(t, err)
 		assert.Nil(t, resp)
@@ -216,11 +216,11 @@ func TestWebhookSender_Send(t *testing.T) {
 		defer server.Close()
 
 		sender := webhook.NewWebhookSender()
-		
+
 		// Create context with very short timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 		defer cancel()
-		
+
 		resp, err := sender.Send(ctx, server.URL, nil)
 		assert.Error(t, err)
 		assert.Nil(t, resp)
@@ -231,7 +231,7 @@ func TestWebhookSender_Send(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Check that custom headers override defaults
 			assert.Equal(t, "text/plain", r.Header.Get("Content-Type"))
-			
+
 			w.WriteHeader(http.StatusOK)
 		}))
 		defer server.Close()
@@ -245,8 +245,8 @@ func TestWebhookSender_Send(t *testing.T) {
 
 		// Send with custom headers that override defaults
 		resp, err := sender.Send(
-			context.Background(), 
-			server.URL, 
+			context.Background(),
+			server.URL,
 			"plain text",
 			webhook.WithHeader("Content-Type", "text/plain"),
 		)
@@ -258,7 +258,7 @@ func TestWebhookSender_Send(t *testing.T) {
 
 	t.Run("retry on failure", func(t *testing.T) {
 		attempts := 0
-		
+
 		// Create a server that fails on first attempt
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			attempts++
@@ -286,10 +286,10 @@ func TestWebhookSender_Send(t *testing.T) {
 }
 
 func TestResponse_IsSuccessful(t *testing.T) {
-	testCases := []struct{
-		name string
+	testCases := []struct {
+		name       string
 		statusCode int
-		expected bool
+		expected   bool
 	}{
 		{"status 200", 200, true},
 		{"status 201", 201, true},

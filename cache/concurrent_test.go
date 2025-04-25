@@ -110,7 +110,7 @@ func testConcurrentAccess(t *testing.T, ctx context.Context, c cache.Cache) {
 				} else {
 					key = fmt.Sprintf("init-key-%d", j%numOperations)
 				}
-				
+
 				_, _, err := c.Get(ctx, key)
 				if err != nil {
 					t.Errorf("Get failed: %v", err)
@@ -150,7 +150,7 @@ func testConcurrentAccess(t *testing.T, ctx context.Context, c cache.Cache) {
 				} else {
 					key = fmt.Sprintf("nonexistent-key-%d-%d", workerID, j)
 				}
-				
+
 				_, err := c.Delete(ctx, key)
 				if err != nil {
 					t.Errorf("Delete failed: %v", err)
@@ -188,9 +188,9 @@ func TestMixedConcurrentOperations(t *testing.T) {
 				})
 				c, err := cache.NewRedisAdapter(client)
 				require.NoError(t, err)
-				return c, func() { 
+				return c, func() {
 					c.Close()
-					s.Close() 
+					s.Close()
 				}
 			},
 		},
@@ -199,20 +199,20 @@ func TestMixedConcurrentOperations(t *testing.T) {
 			setupCache: func() (cache.Cache, func()) {
 				lru, err := cache.NewLRUAdapter(10000)
 				require.NoError(t, err)
-				
+
 				s := miniredis.RunT(t)
 				client := redis.NewClient(&redis.Options{
 					Addr: s.Addr(),
 				})
 				redis, err := cache.NewRedisAdapter(client)
 				require.NoError(t, err)
-				
+
 				c, err := cache.NewLayeredCache(lru, redis)
 				require.NoError(t, err)
-				
-				return c, func() { 
+
+				return c, func() {
 					c.Close()
-					s.Close() 
+					s.Close()
 				}
 			},
 		},
@@ -222,7 +222,7 @@ func TestMixedConcurrentOperations(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c, cleanup := tc.setupCache()
 			defer cleanup()
-			
+
 			ctx := context.Background()
 			runMixedOperations(t, ctx, c)
 		})
@@ -256,8 +256,8 @@ func runMixedOperations(t *testing.T, ctx context.Context, c cache.Cache) {
 	// Track some statistics
 	var (
 		setOps, getOps, deleteOps, existsOps, flushOps int
-		statsMutex                                      sync.Mutex
-		errorCount                                      int
+		statsMutex                                     sync.Mutex
+		errorCount                                     int
 	)
 
 	// Use a wait group to track all goroutines
@@ -373,9 +373,9 @@ func TestDataConsistency(t *testing.T) {
 				})
 				c, err := cache.NewRedisAdapter(client)
 				require.NoError(t, err)
-				return c, func() { 
+				return c, func() {
 					c.Close()
-					s.Close() 
+					s.Close()
 				}
 			},
 		},
@@ -384,20 +384,20 @@ func TestDataConsistency(t *testing.T) {
 			setupCache: func() (cache.Cache, func()) {
 				lru, err := cache.NewLRUAdapter(10000)
 				require.NoError(t, err)
-				
+
 				s := miniredis.RunT(t)
 				client := redis.NewClient(&redis.Options{
 					Addr: s.Addr(),
 				})
 				redis, err := cache.NewRedisAdapter(client)
 				require.NoError(t, err)
-				
+
 				c, err := cache.NewLayeredCache(lru, redis)
 				require.NoError(t, err)
-				
-				return c, func() { 
+
+				return c, func() {
 					c.Close()
-					s.Close() 
+					s.Close()
 				}
 			},
 		},
@@ -407,7 +407,7 @@ func TestDataConsistency(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c, cleanup := tc.setupCache()
 			defer cleanup()
-			
+
 			ctx := context.Background()
 			testConsistentData(t, ctx, c)
 		})
@@ -424,153 +424,153 @@ func testConsistentData(t *testing.T, ctx context.Context, c cache.Cache) {
 
 	// Use the same key across threads to test concurrent modifications
 	sharedKey := "shared-key"
-	
+
 	// We'll use this to track each thread's last write
 	type writeRecord struct {
-		workerID   int
-		iteration  int
-		timestamp  time.Time
+		workerID  int
+		iteration int
+		timestamp time.Time
 	}
-	
+
 	// Test for a specific amount of time
 	testDuration := 2 * time.Second
 	testEnd := time.Now().Add(testDuration)
-	
+
 	// Start a bunch of goroutines, all writing to the same key
 	var wg sync.WaitGroup
-	
+
 	// Calculate total number of goroutines we'll create to properly size the WaitGroup
-	totalGoroutines := numGoroutines   // For shared key writers
-	totalGoroutines += 1               // For the reader goroutine
-	totalGoroutines += numGoroutines   // For worker-specific keys
-	totalGoroutines += 1               // For the deleter goroutine
-	
+	totalGoroutines := numGoroutines // For shared key writers
+	totalGoroutines += 1             // For the reader goroutine
+	totalGoroutines += numGoroutines // For worker-specific keys
+	totalGoroutines += 1             // For the deleter goroutine
+
 	wg.Add(totalGoroutines)
-	
+
 	for g := 0; g < numGoroutines; g++ {
 		go func(workerID int) {
 			defer wg.Done()
-			
+
 			i := 0
 			for time.Now().Before(testEnd) {
 				// Create a record of this write
 				record := writeRecord{
-					workerID:   workerID,
-					iteration:  i,
-					timestamp:  time.Now(),
+					workerID:  workerID,
+					iteration: i,
+					timestamp: time.Now(),
 				}
-				
+
 				// Convert to bytes
-				value := fmt.Sprintf("worker=%d,iter=%d,time=%d", 
+				value := fmt.Sprintf("worker=%d,iter=%d,time=%d",
 					record.workerID, record.iteration, record.timestamp.UnixNano())
-				
+
 				// Write to the shared key
 				err := c.Set(ctx, sharedKey, []byte(value), time.Minute)
 				require.NoError(t, err)
-				
+
 				// Small sleep to allow other goroutines to run
 				time.Sleep(time.Millisecond)
 				i++
 			}
 		}(g)
 	}
-	
+
 	// Also have a reader goroutine to check consistency
 	go func() {
 		defer wg.Done()
-		
+
 		for time.Now().Before(testEnd) {
 			// Read from the shared key
 			value, found, err := c.Get(ctx, sharedKey)
 			require.NoError(t, err)
-			
+
 			if found {
 				// Just make sure the value is readable
 				require.NotNil(t, value)
 				require.Greater(t, len(value), 0)
-				
+
 				// If using a real database, we could further validate the record here
 			}
-			
+
 			time.Sleep(time.Millisecond)
 		}
 	}()
-	
+
 	// Also test with each worker having its own keys
 	for g := 0; g < numGoroutines; g++ {
 		go func(workerID int) {
 			defer wg.Done()
-			
+
 			// Each worker gets their own keys
 			keys := make([]string, keysPerThread)
 			for i := 0; i < keysPerThread; i++ {
 				keys[i] = fmt.Sprintf("worker-%d-key-%d", workerID, i)
 			}
-			
+
 			// Keep updating values for these keys
 			i := 0
 			for time.Now().Before(testEnd) {
 				// Choose a key in a round-robin fashion
 				key := keys[i%keysPerThread]
 				value := []byte(fmt.Sprintf("value-%d-%d", workerID, i))
-				
+
 				// Set the value
 				err := c.Set(ctx, key, value, time.Minute)
 				require.NoError(t, err)
-				
+
 				// Then immediately read it back to check consistency
 				readValue, found, err := c.Get(ctx, key)
 				require.NoError(t, err)
 				require.True(t, found)
 				assert.Equal(t, value, readValue, "Read value should match just-written value")
-				
+
 				i++
-				
+
 				// Add a small delay between operations to reduce contention
 				time.Sleep(time.Millisecond)
 			}
 		}(g)
 	}
-	
+
 	// Add a dedicated goroutine for controlled deletion tests
 	go func() {
 		defer wg.Done()
-		
+
 		// Use a separate set of keys for deletion testing to avoid interference
 		// with other goroutines' keys
 		deleteTestKeys := make([]string, 50)
 		for i := range deleteTestKeys {
 			deleteTestKeys[i] = fmt.Sprintf("delete-test-key-%d", i)
 		}
-		
+
 		// Run a series of controlled set-delete-check cycles
 		for time.Now().Before(testEnd) {
 			for _, key := range deleteTestKeys {
 				// 1. Set a value
 				err := c.Set(ctx, key, []byte("delete-test-value"), time.Minute)
 				require.NoError(t, err)
-				
+
 				// 2. Verify it exists
 				exists, err := c.Exists(ctx, key)
 				require.NoError(t, err)
 				if !exists {
 					// Skip this key if it somehow doesn't exist - don't fail the test
-					continue 
+					continue
 				}
-				
+
 				// 3. Delete the key
 				deleted, err := c.Delete(ctx, key)
 				require.NoError(t, err)
-				
+
 				// The key should have been deleted successfully
 				if !deleted {
 					// This is acceptable - might happen if another goroutine deleted it
 					continue
 				}
-				
+
 				// 4. Give some time for the deletion to propagate
 				time.Sleep(10 * time.Millisecond)
-				
+
 				// 5. Verify it's gone
 				exists, err = c.Exists(ctx, key)
 				require.NoError(t, err)
@@ -578,10 +578,10 @@ func testConsistentData(t *testing.T, ctx context.Context, c cache.Cache) {
 			}
 		}
 	}()
-	
+
 	// Wait for all operations to complete
 	wg.Wait()
-	
+
 	// If we get here without deadlocks or concurrent map read/write panics,
 	// the implementation is likely thread-safe
 	t.Log("Completed concurrent data consistency test without errors")

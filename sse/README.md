@@ -17,8 +17,8 @@ The `sse` package provides a lightweight, framework-agnostic implementation of S
 - Clean, modular architecture with clear separation of concerns
 - Topic-based subscriptions for targeted event delivery
 - Multiple message bus implementations:
-  - In-memory channel bus for single-server deployments
-  - Redis-backed bus for distributed environments
+    - In-memory channel bus for single-server deployments
+    - Redis-backed bus for distributed environments
 - Configurable heartbeats to maintain long-lived connections
 - Automatic client connection management
 - Horizontal scaling support
@@ -32,7 +32,7 @@ The `sse` package provides a lightweight, framework-agnostic implementation of S
 import (
     "net/http"
     "time"
-    
+
     "github.com/dmitrymomot/gokit/sse"
     "github.com/dmitrymomot/gokit/sse/bus"
 )
@@ -40,39 +40,39 @@ import (
 func main() {
     // Create message bus (in-memory for single server)
     msgBus := bus.NewChannelBus()
-    
+
     // Create SSE server with 15-second heartbeat
     server := sse.NewServer(msgBus, sse.WithHeartbeat(15*time.Second))
     defer server.Close()
-    
+
     // Set up SSE endpoint with topic extraction
     http.HandleFunc("/events", server.Handler(func(r *http.Request) string {
         return r.URL.Query().Get("topic") // Extract topic from query string
     }))
-    
+
     // Set up publish endpoint
     http.HandleFunc("/publish", func(w http.ResponseWriter, r *http.Request) {
         if r.Method != http.MethodPost {
             http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
             return
         }
-        
+
         topic := r.URL.Query().Get("topic")
         message := r.URL.Query().Get("message")
-        
+
         err := server.Publish(r.Context(), topic, sse.Event{
             Event: "message",
             Data:  message,
         })
-        
+
         if err != nil {
             http.Error(w, err.Error(), http.StatusInternalServerError)
             return
         }
-        
+
         w.WriteHeader(http.StatusOK)
     })
-    
+
     http.ListenAndServe(":8080", nil)
 }
 ```
@@ -263,5 +263,5 @@ server {
 
 Full, working examples are available in the package:
 
-- Chat application: `/examples/chat`
-- Real-time updates: `/examples/realtime_update`
+- Chat application: `https://github.com/dmitrymomot/gokit/tree/main/sse/examples/chat`
+- Real-time updates: `https://github.com/dmitrymomot/gokit/tree/main/sse/examples/realtime_update`

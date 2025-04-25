@@ -108,7 +108,7 @@ func TestDeprecatedToSlug(t *testing.T) {
 		input := "Hello World!"
 		oldResult := utils.ToSlug(input)
 		newResult := utils.GenerateSlug(input)
-		
+
 		assert.Equal(t, newResult, oldResult, "Deprecated ToSlug should return same result as GenerateSlug")
 	})
 }

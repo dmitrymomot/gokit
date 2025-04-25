@@ -8,7 +8,7 @@ import (
 var (
 	// ErrInvalidTransition is returned when attempting to add an invalid transition.
 	ErrInvalidTransition = errors.New("invalid transition: from, to, or event cannot be nil")
-	
+
 	// ErrInvalidEvent is returned when attempting to fire a nil event.
 	ErrInvalidEvent = errors.New("invalid event: event cannot be nil")
 )

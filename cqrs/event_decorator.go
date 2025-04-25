@@ -36,7 +36,7 @@ func WithEventDecorators[Event any](
 ) EventHandler {
 	// Apply decorators to handler
 	decoratedHandler := ApplyEventDecorators(handler, decorators...)
-	
+
 	// Create an EventHandler using the decorated handler function
 	return NewEventHandler(decoratedHandler)
 }

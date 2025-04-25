@@ -35,35 +35,35 @@ var (
 	ErrCategoryNotDetected = errors.New("privacy: data category could not be detected")
 
 	// Character count errors
-	
+
 	// ErrNegativeCharCount indicates that a visible character count cannot be negative.
 	ErrNegativeCharCount = errors.New("privacy: visible character count cannot be negative")
-	
+
 	// ErrNegativeDigitCount indicates that a visible digit count cannot be negative.
 	ErrNegativeDigitCount = errors.New("privacy: visible digit count cannot be negative")
-	
+
 	// ErrTooManyVisibleDigits indicates that showing too many digits is a security risk.
 	ErrTooManyVisibleDigits = errors.New("privacy: showing more than 4 digits is not allowed for security reasons")
-	
+
 	// ErrNegativeMinLength indicates that a minimum length cannot be negative.
 	ErrNegativeMinLength = errors.New("privacy: minimum length cannot be negative")
-	
+
 	// ErrPartialMaskRequiresVisibleChars indicates that partial masking requires visible characters.
 	ErrPartialMaskRequiresVisibleChars = errors.New("privacy: partial masking requires at least some visible characters")
-	
+
 	// Format errors
-	
+
 	// ErrInvalidEmailFormat indicates that the email format is invalid.
 	ErrInvalidEmailFormat = errors.New("privacy: invalid email format")
-	
+
 	// ErrInvalidCardNumberLength indicates that a credit card number length is invalid.
 	ErrInvalidCardNumberLength = errors.New("privacy: invalid credit card number length")
-	
+
 	// Registry errors
-	
+
 	// ErrNilMasker indicates that a masker cannot be nil.
 	ErrNilMasker = errors.New("privacy: masker cannot be nil")
-	
+
 	// ErrNilDetectionRule indicates that a detection rule cannot be nil.
 	ErrNilDetectionRule = errors.New("privacy: detection rule cannot be nil")
 )

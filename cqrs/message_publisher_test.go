@@ -29,7 +29,7 @@ func TestGoChannelPublisher(t *testing.T) {
 	// Create a new GoChannelPublisher using the same underlying pubsub
 	publisher := messageBus.PubSub
 	defer publisher.Close()
-	
+
 	// Create a new test message
 	testMsg := message.NewMessage("test-id", []byte(`{"test":"data"}`))
 	testTopic := "test-topic"
@@ -37,7 +37,7 @@ func TestGoChannelPublisher(t *testing.T) {
 	// Subscribe to the test topic BEFORE publishing
 	msgChan, err := messageBus.PubSub.Subscribe(ctx, testTopic)
 	require.NoError(t, err)
-	
+
 	// Wait a moment to ensure the subscription is fully registered
 	time.Sleep(100 * time.Millisecond)
 
@@ -83,14 +83,14 @@ func TestFailingPublisher(t *testing.T) {
 	// Create a failing publisher
 	expectedErr := assert.AnError
 	publisher := &test.FailingPublisher{Err: expectedErr}
-	
+
 	// Create a test message
 	testMsg := message.NewMessage("test-id", []byte(`{"test":"data"}`))
-	
+
 	// Publish should return the error
 	err := publisher.Publish("test-topic", testMsg)
 	assert.ErrorIs(t, err, expectedErr)
-	
+
 	// Close should not return an error
 	err = publisher.Close()
 	assert.NoError(t, err)

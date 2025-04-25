@@ -80,7 +80,7 @@ func createHTTPRequest(req *Request) (*http.Request, error) {
 			parsedURL.RawQuery = q.Encode()
 			baseURL = parsedURL.String()
 		}
-		
+
 		httpReq, err = http.NewRequest(req.Method, baseURL, nil)
 	}
 
@@ -103,7 +103,7 @@ func addParamsToQuery(q url.Values, params any) error {
 	}
 
 	v := reflect.ValueOf(params)
-	
+
 	// Dereference pointers
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
@@ -119,12 +119,12 @@ func addParamsToQuery(q url.Values, params any) error {
 		for iter.Next() {
 			key := iter.Key().String()
 			val := iter.Value()
-			
+
 			// Convert value to string based on type
 			strVal := valueToString(val)
 			q.Add(key, strVal)
 		}
-		
+
 	case reflect.Struct:
 		// For structs, we would ideally use tags to determine field names
 		// This is a simplified version that just uses field names
@@ -143,7 +143,7 @@ func addParamsToQuery(q url.Values, params any) error {
 				q.Add(fieldName, valueToString(fieldValue))
 			}
 		}
-		
+
 	default:
 		// For primitive types or unsupported types, add as single value
 		q.Add("value", valueToString(v))

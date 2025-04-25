@@ -18,8 +18,8 @@ import (
 func TestCacheInterface(t *testing.T) {
 	// Test each implementation separately
 	testImplementations := []struct {
-		name        string
-		setupCache  func() (cache.Cache, func())
+		name       string
+		setupCache func() (cache.Cache, func())
 	}{
 		{
 			name: "LRU",
@@ -38,7 +38,7 @@ func TestCacheInterface(t *testing.T) {
 				})
 				adapter, err := cache.NewRedisAdapter(redisClient)
 				require.NoError(t, err)
-				return adapter, func() { 
+				return adapter, func() {
 					_ = adapter.Close()
 					s.Close()
 				}
@@ -50,20 +50,20 @@ func TestCacheInterface(t *testing.T) {
 				// Create fresh instances for each test
 				lruCache, err := cache.NewLRUAdapter(100)
 				require.NoError(t, err)
-				
+
 				s := miniredis.RunT(t)
 				redisClient := redis.NewClient(&redis.Options{
 					Addr: s.Addr(),
 				})
 				redisCache, err := cache.NewRedisAdapter(redisClient)
 				require.NoError(t, err)
-				
+
 				layeredCache, err := cache.NewLayeredCache(lruCache, redisCache)
 				require.NoError(t, err)
-				
-				return layeredCache, func() { 
+
+				return layeredCache, func() {
 					_ = layeredCache.Close()
-					s.Close() 
+					s.Close()
 				}
 			},
 		},
@@ -73,7 +73,7 @@ func TestCacheInterface(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cache, cleanup := tc.setupCache()
 			defer cleanup()
-			
+
 			testCacheImplementation(t, cache)
 		})
 	}
@@ -118,54 +118,54 @@ func TestCommonCacheOperations(t *testing.T) {
 	// Create a small LRU cache for quick testing
 	c, err := cache.NewLRUAdapter(10)
 	require.NoError(t, err)
-	
+
 	ctx := context.Background()
-	
+
 	t.Run("EmptyValues", func(t *testing.T) {
 		err := c.Set(ctx, "empty_key", []byte{}, time.Minute)
 		require.NoError(t, err)
-		
+
 		val, found, err := c.Get(ctx, "empty_key")
 		require.NoError(t, err)
 		assert.True(t, found)
 		assert.Equal(t, []byte{}, val)
 	})
-	
+
 	t.Run("BinaryData", func(t *testing.T) {
 		binaryData := []byte{0x00, 0xFF, 0x0F, 0xF0, 0x01, 0x02}
 		err := c.Set(ctx, "binary_key", binaryData, time.Minute)
 		require.NoError(t, err)
-		
+
 		val, found, err := c.Get(ctx, "binary_key")
 		require.NoError(t, err)
 		assert.True(t, found)
 		assert.Equal(t, binaryData, val)
 	})
-	
+
 	t.Run("LongKeys", func(t *testing.T) {
 		longKey := "very_long_key_" + string(make([]byte, 100)) // 100-byte suffix
 		err := c.Set(ctx, longKey, []byte("long_key_value"), time.Minute)
 		require.NoError(t, err)
-		
+
 		val, found, err := c.Get(ctx, longKey)
 		require.NoError(t, err)
 		assert.True(t, found)
 		assert.Equal(t, []byte("long_key_value"), val)
 	})
-	
+
 	t.Run("ZeroTTL", func(t *testing.T) {
 		err := c.Set(ctx, "zero_ttl_key", []byte("zero_ttl_value"), 0)
 		require.NoError(t, err)
-		
+
 		// Zero TTL should not expire
 		time.Sleep(10 * time.Millisecond)
-		
+
 		val, found, err := c.Get(ctx, "zero_ttl_key")
 		require.NoError(t, err)
 		assert.True(t, found)
 		assert.Equal(t, []byte("zero_ttl_value"), val)
 	})
-	
+
 	t.Run("FlushOperation", func(t *testing.T) {
 		// Set multiple keys
 		for i := 0; i < 5; i++ {
@@ -173,16 +173,16 @@ func TestCommonCacheOperations(t *testing.T) {
 			err := c.Set(ctx, key, []byte("flush_value"), time.Minute)
 			require.NoError(t, err)
 		}
-		
+
 		// Verify at least one exists
 		exists, err := c.Exists(ctx, "flush_key_0")
 		require.NoError(t, err)
 		assert.True(t, exists)
-		
+
 		// Flush all
 		err = c.Flush(ctx)
 		require.NoError(t, err)
-		
+
 		// Verify keys are gone
 		for i := 0; i < 5; i++ {
 			key := fmt.Sprintf("flush_key_%d", i)

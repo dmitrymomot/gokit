@@ -30,7 +30,7 @@ func NewMemoryProvider(initialFlags ...*Flag) (*MemoryProvider, error) {
 		}
 		// Create a deep copy of the flag
 		flagCopy := *flag
-		
+
 		// Set timestamps if not already set
 		if flagCopy.CreatedAt.IsZero() {
 			flagCopy.CreatedAt = time.Now()
@@ -38,13 +38,13 @@ func NewMemoryProvider(initialFlags ...*Flag) (*MemoryProvider, error) {
 		if flagCopy.UpdatedAt.IsZero() {
 			flagCopy.UpdatedAt = flagCopy.CreatedAt
 		}
-		
+
 		// Make a deep copy of the Tags slice
 		if flag.Tags != nil {
 			flagCopy.Tags = make([]string, len(flag.Tags))
 			copy(flagCopy.Tags, flag.Tags)
 		}
-		
+
 		// Store the copy
 		provider.flags[flag.Name] = &flagCopy
 	}

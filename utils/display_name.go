@@ -9,7 +9,7 @@ import (
 )
 
 // NormalizeDisplayName extracts a username from an email address and normalizes it for use as a name.
-// 
+//
 // Example:
 //
 //	john.doe@example.com -> "John Doe"
@@ -35,9 +35,9 @@ func NormalizeDisplayName(email string) string {
 	username = spaceReg.ReplaceAllString(username, " ")
 
 	// Remove numbers from start and end of username
-	username = regexp.MustCompile(`^\d+`).ReplaceAllString(username, "")  // Remove numbers from start
-	username = regexp.MustCompile(`\d+$`).ReplaceAllString(username, "")  // Remove numbers from end
-	username = strings.TrimSpace(username)  // Trim any spaces that might have been created
+	username = regexp.MustCompile(`^\d+`).ReplaceAllString(username, "") // Remove numbers from start
+	username = regexp.MustCompile(`\d+$`).ReplaceAllString(username, "") // Remove numbers from end
+	username = strings.TrimSpace(username)                               // Trim any spaces that might have been created
 
 	return username
 }

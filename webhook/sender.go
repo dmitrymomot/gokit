@@ -82,19 +82,19 @@ func (s *webhookSender) Send(ctx context.Context, url string, params any, opts .
 	// Execute request with retry logic
 	var resp *Response
 	var err error
-	
+
 	attempts := 0
 	maxAttempts := s.maxRetries + 1 // +1 for the initial attempt
-	
+
 	for attempts < maxAttempts {
 		resp, err = s.doSend(ctx, req)
 		attempts++
-		
+
 		// If no error and successful response, or we've reached max attempts, break the loop
 		if (err == nil && resp.IsSuccessful()) || attempts >= maxAttempts {
 			break
 		}
-		
+
 		// If there was an error or unsuccessful response and we have retries left, wait and retry
 		select {
 		case <-ctx.Done():

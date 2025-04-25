@@ -82,22 +82,23 @@ func Validate(version string) bool {
 func (v Version) String() string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "%d.%d.%d", v.Major, v.Minor, v.Patch)
-	
+
 	if v.Prerelease != "" {
 		fmt.Fprintf(&sb, "-%s", v.Prerelease)
 	}
-	
+
 	if v.Build != "" {
 		fmt.Fprintf(&sb, "+%s", v.Build)
 	}
-	
+
 	return sb.String()
 }
 
 // Compare compares two versions and returns:
-//   -1 if v < other
-//    0 if v == other
-//    1 if v > other
+//
+//	-1 if v < other
+//	 0 if v == other
+//	 1 if v > other
 //
 // Prerelease versions are considered less than the corresponding release version.
 // Build metadata is ignored when comparing versions for precedence.

@@ -13,11 +13,11 @@ import (
 
 // RedisBus implements the MessageBus interface using Redis PubSub.
 type RedisBus struct {
-	client       redis.UniversalClient
-	mu           sync.RWMutex
+	client        redis.UniversalClient
+	mu            sync.RWMutex
 	subscriptions map[string]map[chan sse.Event]struct{}
-	closed       bool
-	bufferSize   int
+	closed        bool
+	bufferSize    int
 }
 
 // NewRedisBus creates a new Redis SSE message bus.

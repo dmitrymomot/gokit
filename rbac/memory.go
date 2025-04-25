@@ -9,7 +9,7 @@ import (
 // MemoryStore is an in-memory implementation of the Store interface.
 type MemoryStore struct {
 	// Maps workspaceID:roleID to Role
-	roles       map[string]Role
+	roles map[string]Role
 	// Maps workspaceID:permissionID to Permission
 	permissions map[string]Permission
 	mu          sync.RWMutex
@@ -32,13 +32,13 @@ func (s *MemoryStore) keyFor(workspaceID, entityID string) string {
 func (s *MemoryStore) workspaceRoleIDs(workspaceID string) []string {
 	result := []string{}
 	prefix := workspaceID + ":"
-	
+
 	for key, role := range s.roles {
 		if len(key) > len(prefix) && key[:len(prefix)] == prefix && role.WorkspaceID == workspaceID {
 			result = append(result, role.ID)
 		}
 	}
-	
+
 	return result
 }
 
@@ -46,13 +46,13 @@ func (s *MemoryStore) workspaceRoleIDs(workspaceID string) []string {
 func (s *MemoryStore) workspacePermissionIDs(workspaceID string) []string {
 	result := []string{}
 	prefix := workspaceID + ":"
-	
+
 	for key, permission := range s.permissions {
 		if len(key) > len(prefix) && key[:len(prefix)] == prefix && permission.WorkspaceID == workspaceID {
 			result = append(result, permission.ID)
 		}
 	}
-	
+
 	return result
 }
 
@@ -133,7 +133,7 @@ func (s *MemoryStore) GetRoles(ctx context.Context, workspaceID string) ([]Role,
 
 	roles := make([]Role, 0)
 	prefix := workspaceID + ":"
-	
+
 	for key, role := range s.roles {
 		if len(key) > len(prefix) && key[:len(prefix)] == prefix && role.WorkspaceID == workspaceID {
 			roles = append(roles, role)
@@ -353,7 +353,7 @@ func (s *MemoryStore) GetRoleChildren(ctx context.Context, workspaceID, roleID s
 
 	children := make([]Role, 0)
 	prefix := workspaceID + ":"
-	
+
 	for key, role := range s.roles {
 		if len(key) > len(prefix) && key[:len(prefix)] == prefix && role.WorkspaceID == workspaceID {
 			for _, parentID := range role.ParentIDs {
@@ -520,7 +520,7 @@ func (s *MemoryStore) GetPermissions(ctx context.Context, workspaceID string) ([
 
 	permissions := make([]Permission, 0)
 	prefix := workspaceID + ":"
-	
+
 	for key, permission := range s.permissions {
 		if len(key) > len(prefix) && key[:len(prefix)] == prefix && permission.WorkspaceID == workspaceID {
 			permissions = append(permissions, permission)
@@ -743,7 +743,7 @@ func (s *MemoryStore) GetPermissionChildren(ctx context.Context, workspaceID, pe
 
 	children := make([]Permission, 0)
 	prefix := workspaceID + ":"
-	
+
 	for key, perm := range s.permissions {
 		if len(key) > len(prefix) && key[:len(prefix)] == prefix && perm.WorkspaceID == workspaceID {
 			for _, parentID := range perm.ParentIDs {

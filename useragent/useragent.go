@@ -70,7 +70,9 @@ func (ua UserAgent) IsTV() bool { return ua.deviceType == DeviceTypeTV }
 func (ua UserAgent) IsConsole() bool { return ua.deviceType == DeviceTypeConsole }
 
 // IsUnknown returns true if the user agent is unknown
-func (ua UserAgent) IsUnknown() bool { return ua.deviceType == DeviceTypeUnknown || ua.deviceType == "" }
+func (ua UserAgent) IsUnknown() bool {
+	return ua.deviceType == DeviceTypeUnknown || ua.deviceType == ""
+}
 
 // Bot name extraction keywords - direct mapping for common bots
 var botNameMap = map[string]string{

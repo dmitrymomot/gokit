@@ -90,22 +90,22 @@ func TestLoad_MissingRequired(t *testing.T) {
 func TestLoad_Singleton(t *testing.T) {
 	// Set environment variables
 	t.Setenv("TEST_STRING_SINGLETON", "first_value")
-	
+
 	// First load
 	firstConfig, err := config.Load[TestConfigSingleton]()
 	require.NoError(t, err, "First load should not return an error")
-	
+
 	// Change environment variable
 	t.Setenv("TEST_STRING_SINGLETON", "second_value")
-	
+
 	// Second load - should return cached version, not new value
 	secondConfig, err := config.Load[TestConfigSingleton]()
 	require.NoError(t, err, "Second load should not return an error")
-	
+
 	// Assert both configs have the same value (the first one)
-	assert.Equal(t, firstConfig.TestString, secondConfig.TestString, 
+	assert.Equal(t, firstConfig.TestString, secondConfig.TestString,
 		"Both configs should have the same value due to singleton pattern")
-	assert.Equal(t, "first_value", secondConfig.TestString, 
+	assert.Equal(t, "first_value", secondConfig.TestString,
 		"Second config should have the first value due to caching")
 }
 
@@ -113,15 +113,15 @@ func TestLoad_DifferentTypes(t *testing.T) {
 	// Set environment variables
 	t.Setenv("VALUE_TYPE1", "test_type1")
 	t.Setenv("VALUE_TYPE2", "test_type2")
-	
+
 	// Load first config type
 	config1, err := config.Load[TestConfigDifferent1]()
 	require.NoError(t, err, "Loading first config type should not error")
-	
+
 	// Load second config type
 	config2, err := config.Load[TestConfigDifferent2]()
 	require.NoError(t, err, "Loading second config type should not error")
-	
+
 	// Assert each has the correct value
 	assert.Equal(t, "test_type1", config1.Value, "First config should have its own value")
 	assert.Equal(t, "test_type2", config2.Value, "Second config should have its own value")

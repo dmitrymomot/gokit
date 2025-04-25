@@ -6,22 +6,22 @@ import "time"
 const (
 	// DefaultMaxFileSize represents the default maximum allowed file size (10MB)
 	DefaultMaxFileSize int64 = 10485760
-	
+
 	// DefaultUploadBasePath is the default base path for uploads
 	DefaultUploadBasePath = "uploads"
-	
+
 	// DefaultFieldName is the default form field name for file uploads
 	DefaultFieldName = "file"
-	
+
 	// DefaultConnectTimeout is the default connection timeout
 	DefaultConnectTimeout = 5 * time.Second
-	
+
 	// DefaultRequestTimeout is the default request timeout
 	DefaultRequestTimeout = 60 * time.Second
-	
+
 	// DefaultMaxRetries is the default number of retry attempts
 	DefaultMaxRetries = 3
-	
+
 	// DefaultRetryBaseDelay is the default delay between retry attempts
 	DefaultRetryBaseDelay = 100 * time.Millisecond
 )

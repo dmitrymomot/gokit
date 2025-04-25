@@ -80,7 +80,7 @@ func Async[T any, U any](ctx context.Context, param T, fn func(context.Context, 
 // if any of the futures returned an error.
 func WaitAll[U any](futures ...*Future[U]) ([]U, error) {
 	results := make([]U, len(futures))
-	
+
 	// Wait for all futures to complete
 	for i, future := range futures {
 		result, err := future.Await()
@@ -89,7 +89,7 @@ func WaitAll[U any](futures ...*Future[U]) ([]U, error) {
 			return results, err
 		}
 	}
-	
+
 	return results, nil
 }
 

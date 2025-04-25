@@ -23,7 +23,7 @@ func TestLoggerDecorator(t *testing.T) {
 
 	// Create a buffer to capture log output
 	var logBuffer bytes.Buffer
-	
+
 	// Create a custom logger that writes to our buffer
 	handler := slog.NewTextHandler(&logBuffer, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -32,7 +32,7 @@ func TestLoggerDecorator(t *testing.T) {
 
 	// Create a webhook sender
 	baseSender := webhook.NewWebhookSender()
-	
+
 	// Create the logger decorator
 	loggerSender := webhook.NewLoggerDecorator(baseSender, logger)
 
@@ -65,7 +65,7 @@ func TestLoggerDecoratorWithHideParams(t *testing.T) {
 
 	// Create a buffer to capture log output
 	var logBuffer bytes.Buffer
-	
+
 	// Create a custom logger that writes to our buffer
 	handler := slog.NewTextHandler(&logBuffer, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -74,13 +74,13 @@ func TestLoggerDecoratorWithHideParams(t *testing.T) {
 
 	// Create a webhook sender
 	baseSender := webhook.NewWebhookSender()
-	
+
 	// Create the logger decorator with hideParams option
 	loggerSender := webhook.NewLoggerDecorator(baseSender, logger, webhook.WithHideParams())
 
 	// Send a request with sensitive data that should be hidden
 	params := map[string]string{
-		"api_key": "secret_api_key_123",
+		"api_key":  "secret_api_key_123",
 		"password": "very_secret_password",
 	}
 	ctx := context.Background()
@@ -97,7 +97,7 @@ func TestLoggerDecoratorWithHideParams(t *testing.T) {
 	assert.Contains(t, logOutput, "Webhook request completed")
 	assert.Contains(t, logOutput, server.URL)
 	assert.Contains(t, logOutput, "status_code=200")
-	
+
 	// Ensure sensitive params are not in the logs
 	assert.NotContains(t, logOutput, "secret_api_key_123")
 	assert.NotContains(t, logOutput, "very_secret_password")
@@ -114,7 +114,7 @@ func TestLoggerDecoratorWithMaskedFields(t *testing.T) {
 
 	// Create a buffer to capture log output
 	var logBuffer bytes.Buffer
-	
+
 	// Create a custom logger that writes to our buffer
 	handler := slog.NewTextHandler(&logBuffer, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -123,20 +123,20 @@ func TestLoggerDecoratorWithMaskedFields(t *testing.T) {
 
 	// Create a webhook sender
 	baseSender := webhook.NewWebhookSender()
-	
+
 	// Create the logger decorator with masked fields
 	loggerSender := webhook.NewLoggerDecorator(
-		baseSender, 
-		logger, 
+		baseSender,
+		logger,
 		webhook.WithMaskedFields("api_key", "password"),
 	)
 
 	// Send a request with some fields that should be masked
 	params := map[string]string{
-		"api_key": "secret_api_key_123",
+		"api_key":  "secret_api_key_123",
 		"password": "very_secret_password",
 		"username": "john_doe",
-		"event": "user.created",
+		"event":    "user.created",
 	}
 	ctx := context.Background()
 	resp, err := loggerSender.Send(ctx, server.URL, params)
@@ -152,7 +152,7 @@ func TestLoggerDecoratorWithMaskedFields(t *testing.T) {
 	assert.Contains(t, logOutput, "Webhook request completed")
 	assert.Contains(t, logOutput, server.URL)
 	assert.Contains(t, logOutput, "status_code=200")
-	
+
 	// Ensure sensitive data is masked but non-sensitive is not
 	assert.NotContains(t, logOutput, "secret_api_key_123")
 	assert.NotContains(t, logOutput, "very_secret_password")
@@ -172,7 +172,7 @@ func TestLoggerDecoratorWithMaskedFieldsStruct(t *testing.T) {
 
 	// Create a buffer to capture log output
 	var logBuffer bytes.Buffer
-	
+
 	// Create a custom logger that writes to our buffer
 	handler := slog.NewTextHandler(&logBuffer, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -181,11 +181,11 @@ func TestLoggerDecoratorWithMaskedFieldsStruct(t *testing.T) {
 
 	// Create a webhook sender
 	baseSender := webhook.NewWebhookSender()
-	
+
 	// Create the logger decorator with masked fields
 	loggerSender := webhook.NewLoggerDecorator(
-		baseSender, 
-		logger, 
+		baseSender,
+		logger,
 		webhook.WithMaskedFields("api_key", "password"),
 	)
 
@@ -218,7 +218,7 @@ func TestLoggerDecoratorWithMaskedFieldsStruct(t *testing.T) {
 	assert.Contains(t, logOutput, "Webhook request completed")
 	assert.Contains(t, logOutput, server.URL)
 	assert.Contains(t, logOutput, "status_code=200")
-	
+
 	// Ensure sensitive data is masked but non-sensitive is not
 	assert.NotContains(t, logOutput, "secret_api_key_123")
 	assert.NotContains(t, logOutput, "very_secret_password")
@@ -231,7 +231,7 @@ func TestLoggerDecoratorWithMaskedFieldsStruct(t *testing.T) {
 func TestLoggerDecoratorWithError(t *testing.T) {
 	// Create a buffer to capture log output
 	var logBuffer bytes.Buffer
-	
+
 	// Create a custom logger that writes to our buffer
 	handler := slog.NewTextHandler(&logBuffer, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -240,7 +240,7 @@ func TestLoggerDecoratorWithError(t *testing.T) {
 
 	// Create a webhook sender
 	baseSender := webhook.NewWebhookSender()
-	
+
 	// Create the logger decorator
 	loggerSender := webhook.NewLoggerDecorator(baseSender, logger)
 
@@ -262,7 +262,7 @@ func TestLoggerDecoratorWithError(t *testing.T) {
 func TestLoggerDecoratorWithNilLogger(t *testing.T) {
 	// Create a webhook sender
 	baseSender := webhook.NewWebhookSender()
-	
+
 	// Create the logger decorator with nil logger (should use default)
 	loggerSender := webhook.NewLoggerDecorator(baseSender, nil)
 

@@ -161,7 +161,7 @@ func TestParseDeviceType(t *testing.T) {
 		{
 			name:     "Smart TV",
 			ua:       "mozilla/5.0 (linux; android tv; sm-t970) applewebkit/537.36 (khtml, like gecko) chrome/91.0.4472.120 safari/537.36",
-			expected: useragent.DeviceTypeTablet,  // It's being detected as a tablet based on current implementation
+			expected: useragent.DeviceTypeTablet, // It's being detected as a tablet based on current implementation
 		},
 		{
 			name:     "Game Console",

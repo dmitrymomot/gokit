@@ -309,7 +309,7 @@ func BenchmarkLayeredCache_GetWithL2Fill(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create Layered cache: %v", err)
 	}
-	
+
 	defer func() {
 		_ = layeredCache.Close()
 		s.Close()
@@ -321,7 +321,7 @@ func BenchmarkLayeredCache_GetWithL2Fill(b *testing.B) {
 	for i := 0; i < 1000; i++ {
 		key := fmt.Sprintf("key-%d", i)
 		value := fmt.Sprintf("value-%d", i)
-		
+
 		// Set directly in Redis
 		err := s.Set(key, value)
 		if err != nil {

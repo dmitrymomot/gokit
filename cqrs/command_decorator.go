@@ -36,7 +36,7 @@ func WithDecorators[Command any](
 ) CommandHandler {
 	// Apply decorators to handler
 	decoratedHandler := ApplyCommandDecorators(handler, decorators...)
-	
+
 	// Create a CommandHandler using the decorated handler function
 	return NewCommandHandler(decoratedHandler)
 }

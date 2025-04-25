@@ -48,7 +48,7 @@ func TestQualifiedFuncName(t *testing.T) {
 func TestFullyQualifiedFuncName(t *testing.T) {
 	result := utils.FullyQualifiedFuncName(utils.QualifiedFuncName)
 	expected := "utils.QualifiedFuncName"
-	
+
 	if result != expected {
 		t.Errorf("FullyQualifiedFuncName: got %s, want %s", result, expected)
 	}

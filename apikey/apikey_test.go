@@ -14,16 +14,16 @@ func TestGenerateRandom(t *testing.T) {
 	t.Run("successful generation", func(t *testing.T) {
 		apiKey, err := apikey.GenerateRandom()
 		require.NoError(t, err)
-		
+
 		// Verify key properties
 		assert.Len(t, apiKey, apikey.APIKeyLength*2) // hex encoded, so length is doubled
 		assert.Regexp(t, "^[0-9a-f]{64}$", apiKey)   // hex encoded string pattern
-		
+
 		// Verify uniqueness of generated keys
 		anotherKey, err := apikey.GenerateRandom()
 		require.NoError(t, err)
 		assert.NotEqual(t, apiKey, anotherKey, "Random keys should be unique")
-		
+
 		// Verify it's valid hex
 		_, err = hex.DecodeString(apiKey)
 		assert.NoError(t, err, "Generated key should be valid hex")
@@ -35,7 +35,7 @@ func TestGenerateTimeOrdered(t *testing.T) {
 		key, err := apikey.GenerateTimeOrdered()
 		require.NoError(t, err)
 		assert.NotEmpty(t, key)
-		
+
 		// Ensure we get a different key on the second call
 		time.Sleep(1 * time.Millisecond) // Ensure clock advances
 		key2, err := apikey.GenerateTimeOrdered()
@@ -95,8 +95,8 @@ func TestHashKey(t *testing.T) {
 			got2, err := apikey.HashKey(tt.apiKey, tt.secretKey)
 			assert.NoError(t, err)
 			assert.Equal(t, got, got2)
-			
-			// Verify it's valid hex 
+
+			// Verify it's valid hex
 			_, err = hex.DecodeString(got)
 			assert.NoError(t, err, "Hash should be valid hex")
 		})

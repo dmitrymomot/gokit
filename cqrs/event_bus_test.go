@@ -34,7 +34,7 @@ func TestEventBus_Publish(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	logger := slog.Default()
-	
+
 	// Create test message bus using the new util
 	bus, _ := test.NewChannelMessageBus(t, ctx, test.TestBusConfig{
 		Logger: logger,
@@ -42,7 +42,7 @@ func TestEventBus_Publish(t *testing.T) {
 
 	// Subscribe to events for verification
 	eventChan := bus.SubscribeToEvents(t, ctx, "TestEvent")
-	
+
 	// Create the event bus
 	eventBus, err := cqrs.NewEventBus(bus.PubSub, logger)
 	require.NoError(t, err)
@@ -59,7 +59,7 @@ func TestEventBus_Publish(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	
+
 	// Verify the published message
 	msg := test.WaitForMessage(t, ctx, eventChan, 1*time.Second)
 	test.VerifyEventMessage(t, msg, event)
@@ -71,7 +71,7 @@ func TestEventBus_PublishWithDelay(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	logger := slog.Default()
-	
+
 	// Create test message bus using the new util
 	bus, _ := test.NewChannelMessageBus(t, ctx, test.TestBusConfig{
 		Logger: logger,
@@ -79,7 +79,7 @@ func TestEventBus_PublishWithDelay(t *testing.T) {
 
 	// Subscribe to events for verification
 	eventChan := bus.SubscribeToEvents(t, ctx, "TestEvent")
-	
+
 	// Create the event bus
 	eventBus, err := cqrs.NewEventBus(bus.PubSub, logger)
 	require.NoError(t, err)
@@ -96,17 +96,17 @@ func TestEventBus_PublishWithDelay(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	
+
 	// Verify the published message
 	msg := test.WaitForMessage(t, ctx, eventChan, 1*time.Second)
 	test.VerifyEventMessage(t, msg, event)
-	
-	// Check that message context contains delay information 
+
+	// Check that message context contains delay information
 	// Note: In this test approach, we can't directly verify the delay mechanism
 	// since the gochannel doesn't actually implement delayed delivery
 	msgCtx := msg.Context()
 	require.NotNil(t, msgCtx)
-	
+
 	msg.Ack()
 }
 
@@ -115,10 +115,10 @@ func TestEventBus_PublishWithError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	logger := slog.Default()
-	
+
 	// Create a failing publisher by using the test utility
 	failingPublisher := &test.FailingPublisher{Err: assert.AnError}
-	
+
 	// Create the event bus with the failing publisher
 	bus, err := cqrs.NewEventBus(failingPublisher, logger)
 	require.NoError(t, err)
@@ -142,10 +142,10 @@ func TestEventBus_PublishWithDelayError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	logger := slog.Default()
-	
+
 	// Create a failing publisher by using the test utility
 	failingPublisher := &test.FailingPublisher{Err: assert.AnError}
-	
+
 	// Create the event bus with the failing publisher
 	bus, err := cqrs.NewEventBus(failingPublisher, logger)
 	require.NoError(t, err)

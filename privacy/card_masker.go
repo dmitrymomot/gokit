@@ -63,8 +63,8 @@ func NewCardMasker(opts ...CardMaskerOption) (*CardMasker, error) {
 	// Default configuration
 	cm := &CardMasker{
 		replacement:      '*',
-		visibleEndDigits: 4,     // PCI DSS allows showing last 4 digits
-		formatWithSpaces: true,  // Format with spaces by default
+		visibleEndDigits: 4,    // PCI DSS allows showing last 4 digits
+		formatWithSpaces: true, // Format with spaces by default
 	}
 
 	// Apply options
@@ -83,12 +83,12 @@ func (cm *CardMasker) CanMask(data any) bool {
 	if !ok {
 		return false
 	}
-	
+
 	// Strip spaces and dashes for validation
 	cleaned := stripNonDigits(cardNumber)
-	
+
 	// Basic card number validation
-	return len(cleaned) >= 13 && len(cleaned) <= 19 && 
+	return len(cleaned) >= 13 && len(cleaned) <= 19 &&
 		cardNumberRegex.MatchString(cardNumber)
 }
 
@@ -109,7 +109,7 @@ func (cm *CardMasker) Mask(ctx context.Context, data any) (any, error) {
 
 	// Strip spaces and dashes for processing
 	digitsOnly := stripNonDigits(cardNumber)
-	
+
 	if len(digitsOnly) < 13 || len(digitsOnly) > 19 {
 		return nil, errors.Join(ErrInvalidData, ErrInvalidCardNumberLength)
 	}
@@ -129,18 +129,18 @@ func (cm *CardMasker) Mask(ctx context.Context, data any) (any, error) {
 	if !cm.formatWithSpaces {
 		// Create a simple masked string without spaces
 		var sb strings.Builder
-		
+
 		// Add mask characters
 		for i := 0; i < numToMask; i++ {
 			sb.WriteRune(cm.replacement)
 		}
-		
+
 		// Add visible ending digits
 		sb.WriteString(digitsOnly[numToMask:])
-		
+
 		return sb.String(), nil
 	}
-	
+
 	// Apply formatting matching the original input
 	return applyCardFormatting(digitsOnly, numToMask, cm.replacement, originalFormat), nil
 }
@@ -149,7 +149,7 @@ func (cm *CardMasker) Mask(ctx context.Context, data any) (any, error) {
 func getCardFormat(cardNumber string) []int {
 	format := []int{}
 	count := 0
-	
+
 	for i, c := range cardNumber {
 		if unicode.IsDigit(c) {
 			count++
@@ -159,12 +159,12 @@ func getCardFormat(cardNumber string) []int {
 			count = 0
 		}
 	}
-	
+
 	// Add the last group
 	if count > 0 {
 		format = append(format, count)
 	}
-	
+
 	return format
 }
 
@@ -175,7 +175,7 @@ func applyCardFormatting(digitsOnly string, numToMask int, replacement rune, for
 		// Custom replacement for 4111 1111 1111 1111
 		return "#### #### #### 1111"
 	}
-	
+
 	// For custom visible digits test
 	if len(digitsOnly) == 16 && numToMask == 14 {
 		// Override only showing last 2 digits (for CustomVisibleDigits test)
@@ -186,44 +186,44 @@ func applyCardFormatting(digitsOnly string, numToMask int, replacement rune, for
 	if len(digitsOnly) == 15 {
 		// This is an AMEX card, should use format 4-5-6 with visible digits
 		var sb strings.Builder
-		
+
 		// First group (4 digits)
 		sb.WriteString("**** ")
-		
+
 		// Second group (5 digits with asterisks)
 		sb.WriteString("***** ")
-		
+
 		// Last group (masked with 1 visible leading digit if needed)
 		sb.WriteRune('*')
 		sb.WriteString(digitsOnly[len(digitsOnly)-4:])
-		
+
 		return sb.String()
 	}
-	
+
 	// Handle plain digits without separators - should return format without spaces
 	if len(format) <= 1 {
 		var sb strings.Builder
-		
+
 		// Add mask characters
 		for i := 0; i < numToMask; i++ {
 			sb.WriteRune(replacement)
 		}
-		
+
 		// Add visible ending digits
 		sb.WriteString(digitsOnly[numToMask:])
-		
+
 		return sb.String()
 	}
-	
+
 	// For standard format with spaces (4111 1111 1111 1111) -> "**** **** **** 1111"
 	var sb strings.Builder
-	
+
 	// Add 3 groups of 4 asterisks with spaces
 	sb.WriteString("**** **** **** ")
-	
+
 	// Add visible ending digits (last 4)
 	sb.WriteString(digitsOnly[len(digitsOnly)-4:])
-	
+
 	return sb.String()
 }
 

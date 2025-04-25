@@ -192,21 +192,21 @@ func ExampleWithDecorators() {
 		return func(ctx context.Context, cmd *TestCommand) error {
 			// Log before handling
 			println("Handling command:", cmd.ID)
-			
+
 			// Execute handler
 			err := next(ctx, cmd)
-			
+
 			// Log after handling
 			if err != nil {
 				println("Command handling failed:", err.Error())
 			} else {
 				println("Command handled successfully")
 			}
-			
+
 			return err
 		}
 	}
-	
+
 	// Create a validation decorator
 	validationDecorator := func(next cqrs.CommandHandlerFunc[TestCommand]) cqrs.CommandHandlerFunc[TestCommand] {
 		return func(ctx context.Context, cmd *TestCommand) error {
@@ -214,30 +214,30 @@ func ExampleWithDecorators() {
 			if cmd.ID == "" {
 				return errors.New("command ID is required")
 			}
-			
+
 			// Proceed with execution if valid
 			return next(ctx, cmd)
 		}
 	}
-	
+
 	// Create a timeout decorator
 	timeoutDecorator := func(next cqrs.CommandHandlerFunc[TestCommand]) cqrs.CommandHandlerFunc[TestCommand] {
 		return func(ctx context.Context, cmd *TestCommand) error {
 			// Create a timeout context
 			timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			
+
 			// Execute with timeout context
 			return next(timeoutCtx, cmd)
 		}
 	}
-	
+
 	// Base handler implementation
 	baseHandler := func(ctx context.Context, cmd *TestCommand) error {
 		// Actual command handling logic
 		return nil
 	}
-	
+
 	// Create a command handler with decorators
 	handler := cqrs.WithDecorators(
 		baseHandler,
@@ -245,7 +245,7 @@ func ExampleWithDecorators() {
 		validationDecorator,
 		timeoutDecorator,
 	)
-	
+
 	// Use it with the CQRS framework
 	_ = handler
 }

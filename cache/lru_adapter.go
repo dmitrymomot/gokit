@@ -38,7 +38,7 @@ func NewLRUAdapter(size int) (*LRUAdapter, error) {
 // Get retrieves an item from the LRU cache, checking for expiration.
 func (l *LRUAdapter) Get(ctx context.Context, key string) ([]byte, bool, error) {
 	_ = ctx // Context is not used for in-memory operations but part of the interface
-	
+
 	// First try with read lock
 	l.mu.RLock()
 	item, found := l.cache.Get(key)
@@ -69,7 +69,7 @@ func (l *LRUAdapter) Get(ctx context.Context, key string) ([]byte, bool, error) 
 	valueBytes := make([]byte, len(item.value))
 	copy(valueBytes, item.value) // Make a copy to avoid potential concurrent modification
 	l.mu.RUnlock()
-	
+
 	return valueBytes, true, nil
 }
 
@@ -99,7 +99,7 @@ func (l *LRUAdapter) Delete(ctx context.Context, key string) (bool, error) {
 	_ = ctx // Context is not used
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	
+
 	// Use Peek and Remove to check existence before removal
 	_, exists := l.cache.Peek(key)
 	if exists {

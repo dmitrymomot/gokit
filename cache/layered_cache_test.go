@@ -79,7 +79,7 @@ func TestLayeredCache_Get(t *testing.T) {
 
 	// 4. Verify the value is now in L1 by disconnecting Redis
 	s.Close()
-	
+
 	// Value should still be retrievable from L1
 	value, found, err = layeredCache.Get(ctx, testKey)
 	require.NoError(t, err)
@@ -142,7 +142,7 @@ func TestLayeredCache_Delete(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, found)
 	assert.Equal(t, testValue, value)
-	
+
 	storedValue, err := s.Get(testKey)
 	require.NoError(t, err)
 	assert.Equal(t, string(testValue), storedValue)
@@ -156,7 +156,7 @@ func TestLayeredCache_Delete(t *testing.T) {
 	_, found, err = l1.Get(ctx, testKey)
 	require.NoError(t, err)
 	assert.False(t, found)
-	
+
 	assert.False(t, s.Exists(testKey))
 
 	// 5. Test Delete with non-existent key
@@ -169,9 +169,9 @@ func TestLayeredCache_Delete(t *testing.T) {
 	err = l1.Set(ctx, testKey, testValue, time.Minute)
 	require.NoError(t, err)
 	s.Set(testKey, string(testValue))
-	
+
 	s.Close() // Close Redis connection
-	
+
 	// Delete should fail because L2 is down
 	_, err = layeredCache.Delete(ctx, testKey)
 	require.Error(t, err)
@@ -251,9 +251,9 @@ func TestLayeredCache_Flush(t *testing.T) {
 	// 5. Test Flush with L2 error
 	err = layeredCache.Set(ctx, "key3", []byte("val3"), time.Minute)
 	require.NoError(t, err)
-	
+
 	s.Close() // Close Redis connection
-	
+
 	// Flush should fail because L2 is down
 	err = layeredCache.Flush(ctx)
 	require.Error(t, err)

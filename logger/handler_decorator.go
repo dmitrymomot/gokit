@@ -8,7 +8,7 @@ import (
 // ContextExtractor is a function that extracts a value from context and returns an attribute.
 type ContextExtractor func(ctx context.Context) (slog.Attr, bool)
 
-// LogHandlerDecorator decorates a slog.Handler with additional functionality 
+// LogHandlerDecorator decorates a slog.Handler with additional functionality
 // like adding context values as log attributes.
 type LogHandlerDecorator struct {
 	next       slog.Handler
@@ -21,11 +21,11 @@ func NewLogHandlerDecorator(next slog.Handler, opts ...LogHandlerOption) *LogHan
 		next:       next,
 		extractors: []ContextExtractor{},
 	}
-	
+
 	for _, opt := range opts {
 		opt(h)
 	}
-	
+
 	return h
 }
 
