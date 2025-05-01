@@ -10,16 +10,16 @@ go get github.com/dmitrymomot/gokit/pagination
 
 ## Overview
 
-The pagination package provides utilities for implementing pagination in Go applications, particularly in REST APIs. It offers both request parameter parsing and response formatting to standardize pagination across your services.
+The pagination package provides utilities for implementing pagination in Go applications, particularly in REST APIs. It offers both request parameter parsing and response formatting to standardize pagination across your services. The package is thread-safe and designed for use in concurrent applications.
 
 ## Features
 
-- Offset/Limit pagination with configurable defaults
-- HTTP request parameter parsing (page, size)
+- Offset/limit pagination with configurable defaults
+- HTTP request parameter parsing for `page` and `size` query parameters
 - Response metadata generation (current page, total pages, etc.)
-- Validation of pagination parameters
-- Helpful error types for parameter validation
-- Support for maximum limits to prevent excessive queries
+- Validation of pagination parameters with helpful error types
+- Maximum limit enforcement to prevent excessive queries
+- Thread-safe operations with no shared mutable state
 
 ## Usage
 
@@ -69,11 +69,6 @@ func ListHandler(w http.ResponseWriter, r *http.Request) {
 		"pagination": pageInfo,
 	})
 }
-
-func fetchItems(ctx context.Context, offset, limit int) ([]Item, int, error) {
-	// Implementation of database query with pagination
-	// ...
-}
 ```
 
 ### Manual Pagination Parameter Extraction
@@ -90,12 +85,12 @@ offset := pagination.CalculateOffset(page, size)
 items, totalCount, err := fetchItems(ctx, offset, size)
 ```
 
-### Structuring Paginated Responses
+### Creating Pagination Response Metadata
 
 ```go
 // Define your response structure
 type PaginatedResponse struct {
-	Items      []Item            `json:"items"`
+	Items      []Item             `json:"items"`
 	Pagination pagination.PageInfo `json:"pagination"`
 }
 
@@ -107,116 +102,103 @@ func createResponse(items []Item, page, size, total int) PaginatedResponse {
 	}
 }
 
-// Example usage in handler
-func ListHandler(w http.ResponseWriter, r *http.Request) {
-	page := pagination.GetPageFromRequest(r)
-	size := pagination.GetSizeFromRequest(r)
-	offset := pagination.CalculateOffset(page, size)
-	
-	items, total, err := repository.FindItems(r.Context(), offset, size)
-	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
-		return
-	}
-	
-	response := createResponse(items, page, size, total)
-	renderJSON(w, response)
-}
+// Example response format:
+// {
+//   "items": [
+//     { "id": 1, "name": "Item 1" },
+//     { "id": 2, "name": "Item 2" }
+//   ],
+//   "pagination": {
+//     "page": 2,
+//     "size": 10,
+//     "total_items": 58,
+//     "total_pages": 6
+//   }
+// }
 ```
 
-### Example Response Structure
+## Best Practices
 
-```json
-{
-  "items": [
-    { "id": 1, "name": "Item 1" },
-    { "id": 2, "name": "Item 2" }
-  ],
-  "pagination": {
-    "page": 2,
-    "size": 10,
-    "total_items": 58,
-    "total_pages": 6
-  }
-}
-```
+1. **Validation**:
+   - Always validate pagination parameters before executing database queries
+   - Use `errors.Is()` to check for specific pagination errors
+   - Apply sensible defaults for missing parameters
+
+2. **Performance**:
+   - Consider adding database indexes on fields used for sorting in paginated queries
+   - For large data sets, use keyset/cursor pagination instead of offset/limit
+   - Limit maximum page size to prevent excessive resource usage
+
+3. **API Design**:
+   - Use consistent parameter names across your APIs (`page`, `size`)
+   - Include pagination metadata in responses to help clients navigate
+   - Provide documentation on pagination limits and defaults
 
 ## API Reference
+
+### Constants
+
+```go
+var DefaultLimit = 10 // Default number of items per page
+var MaxLimit = 100    // Maximum allowed items per page
+var DefaultPage = 1   // Default page number
+```
 
 ### Types
 
 ```go
 // OffsetLimit represents offset and limit pagination parameters
 type OffsetLimit struct {
-	Offset int
-	Limit  int
+	Offset int // Starting position for database query
+	Limit  int // Number of items to retrieve
 }
 
 // PageInfo contains pagination metadata for responses
 type PageInfo struct {
-	Page       int `json:"page"`
-	Size       int `json:"size"`
-	TotalItems int `json:"total_items"`
-	TotalPages int `json:"total_pages"`
+	Page       int `json:"page"`       // Current page number
+	Size       int `json:"size"`       // Number of items per page
+	TotalItems int `json:"total_items"` // Total number of items
+	TotalPages int `json:"total_pages"` // Total number of pages
 }
 ```
 
 ### Functions
 
 ```go
-// Parse pagination from HTTP request
 func ParseOffsetLimitFromRequest(r *http.Request) (OffsetLimit, error)
-
-// Get individual parameters with defaults applied
-func GetPageFromRequest(r *http.Request) int
-func GetSizeFromRequest(r *http.Request) int
-
-// Calculate offset from page and size
-func CalculateOffset(page, size int) int
-
-// Create pagination metadata for responses
-func NewPageInfo(page, size, totalItems int) PageInfo
 ```
-
-### Configuration Constants
+Parses page and size parameters from an HTTP request and returns calculated offset and limit values.
 
 ```go
-// Default values (can be modified)
-var DefaultPage = 1
-var DefaultLimit = 10
-var MaxLimit = 100
+func GetPageFromRequest(r *http.Request) int
 ```
+Retrieves the page parameter from request with validation and default handling.
+
+```go
+func GetSizeFromRequest(r *http.Request) int
+```
+Retrieves the size parameter from request with validation, default handling, and maximum enforcement.
+
+```go
+func CalculateOffset(page, size int) int
+```
+Calculates the database offset based on page number and size.
+
+```go
+func CalculateTotalPages(totalItems, size int) int
+```
+Calculates the total number of pages based on total items and page size.
+
+```go
+func NewPageInfo(page, size, totalItems int) PageInfo
+```
+Creates a new PageInfo struct with calculated total pages.
 
 ### Error Types
 
 ```go
-// Error types for validation
-var ErrInvalidPage = errors.New("invalid page parameter")
-var ErrInvalidSize = errors.New("invalid size parameter")
-```
-
-## Error Handling
-
-- Use `errors.Is()` to check for specific pagination errors (e.g., `ErrInvalidPage`, `ErrInvalidSize`)
-- Always validate pagination parameters before executing database queries
-- Return appropriate HTTP status codes for pagination errors (usually HTTP 400 Bad Request)
-
-## Best Practices
-
-1. **Parameter Validation**:
-   - Always validate pagination parameters before executing expensive database queries
-   - Use the provided error types to return specific error messages
-
-2. **Performance**:
-   - Enforce a reasonable `MaxLimit` to prevent excessive database load
-   - Use database-specific pagination techniques (e.g., keyset pagination for large datasets)
-   - Consider adding caching for frequently accessed pages
-
-3. **API Design**:
-   - Keep parameter names consistent across endpoints (`page`, `size`)
-   - Include pagination metadata in all paginated responses
-   - Document pagination behavior in your API documentation
-
-4. **Context Usage**:
-   - Pass context to database queries to enable timeout and cancellation
-   - Consider using context for additional pagination parameters if needed
+var ErrInvalidPage = errors.New("invalid page number")
+var ErrInvalidSize = errors.New("invalid page size")
+var ErrInvalidLimit = errors.New("invalid limit value")
+var ErrInvalidOffset = errors.New("invalid offset value")
+var ErrInvalidCursor = errors.New("invalid cursor value")
