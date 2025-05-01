@@ -15,9 +15,9 @@ The `statemachine` package provides a clean, flexible implementation of the stat
 ## Features
 
 - Fluent builder pattern for intuitive state machine construction
-- Type-safe implementation using Go interfaces and generics
-- Built-in support for guards (transition conditions) and actions (side effects)
-- Thread-safe operation with mutex locks for concurrent access
+- Type-safe implementation using Go interfaces
+- Support for guards (transition conditions) and actions (side effects)
+- Thread-safe operation for concurrent access
 - String-based or custom state/event implementations
 - Comprehensive error handling with specific error types
 - Simple API with minimal boilerplate
@@ -29,59 +29,58 @@ The `statemachine` package provides a clean, flexible implementation of the stat
 ```go
 import (
 	"context"
-	"fmt"
 	"github.com/dmitrymomot/gokit/statemachine"
 )
 
-func main() {
-	// Define states using string constants
-	const (
-		Draft     = statemachine.StringState("draft")
-		InReview  = statemachine.StringState("in_review")
-		Approved  = statemachine.StringState("approved")
-		Published = statemachine.StringState("published")
-		Rejected  = statemachine.StringState("rejected")
-	)
+// Define states using string constants
+const (
+	Draft     = statemachine.StringState("draft")
+	InReview  = statemachine.StringState("in_review")
+	Approved  = statemachine.StringState("approved")
+	Published = statemachine.StringState("published")
+	Rejected  = statemachine.StringState("rejected")
+)
 
-	// Define events
-	const (
-		Submit   = statemachine.StringEvent("submit")
-		Approve  = statemachine.StringEvent("approve")
-		Reject   = statemachine.StringEvent("reject")
-		Publish  = statemachine.StringEvent("publish")
-		Withdraw = statemachine.StringEvent("withdraw")
-	)
+// Define events
+const (
+	Submit   = statemachine.StringEvent("submit")
+	Approve  = statemachine.StringEvent("approve")
+	Reject   = statemachine.StringEvent("reject")
+	Publish  = statemachine.StringEvent("publish")
+	Withdraw = statemachine.StringEvent("withdraw")
+)
 
-	// Create and configure the state machine using the fluent builder API
-	builder := statemachine.NewBuilder(Draft)
-	builder.From(Draft).When(Submit).To(InReview).Add()
-	builder.From(InReview).When(Approve).To(Approved).Add()
-	builder.From(InReview).When(Reject).To(Rejected).Add()
-	builder.From(Approved).When(Publish).To(Published).Add()
-	builder.From(Approved).When(Withdraw).To(Draft).Add()
-	builder.From(Rejected).When(Submit).To(InReview).Add()
+// Create and configure the state machine using the fluent builder API
+builder := statemachine.NewBuilder(Draft)
+builder.From(Draft).When(Submit).To(InReview).Add()
+builder.From(InReview).When(Approve).To(Approved).Add()
+builder.From(InReview).When(Reject).To(Rejected).Add()
+builder.From(Approved).When(Publish).To(Published).Add()
+builder.From(Approved).When(Withdraw).To(Draft).Add()
+builder.From(Rejected).When(Submit).To(InReview).Add()
 
-	machine := builder.Build()
+machine := builder.Build()
 
-	// Use the state machine
-	ctx := context.Background()
-	fmt.Printf("Current state: %s\n", machine.Current().Name()) 
-	// Output: Current state: draft
+// Use the state machine
+ctx := context.Background()
+// Current state: "draft"
 
-	// Trigger transitions
-	machine.Fire(ctx, Submit, nil)
-	fmt.Printf("Current state: %s\n", machine.Current().Name()) 
-	// Output: Current state: in_review
-	
-	machine.Fire(ctx, Approve, nil)
-	fmt.Printf("Current state: %s\n", machine.Current().Name()) 
-	// Output: Current state: approved
-}
+// Trigger transitions
+machine.Fire(ctx, Submit, nil)
+// Current state: "in_review"
+
+machine.Fire(ctx, Approve, nil)
+// Current state: "approved"
 ```
 
 ### Guards and Actions
 
 ```go
+import (
+	"context"
+	"github.com/dmitrymomot/gokit/statemachine"
+)
+
 // Add conditional transition with a guard
 isAuthorized := func(ctx context.Context, from statemachine.State, event statemachine.Event, data any) bool {
 	userData, ok := data.(map[string]any)
@@ -90,43 +89,42 @@ isAuthorized := func(ctx context.Context, from statemachine.State, event statema
 
 // Add a side effect with an action
 logTransition := func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data any) error {
-	fmt.Printf("Transition: %s -> %s via %s\n", from.Name(), to.Name(), event.Name())
+	// Log transition details
 	return nil
 }
 
-// Define states and events
-const (
-	Idle    = statemachine.StringState("idle")
-	Running = statemachine.StringState("running")
-	Start   = statemachine.StringEvent("start")
-)
-
 // Create builder
-builder := statemachine.NewBuilder(Idle)
+builder := statemachine.NewBuilder(statemachine.StringState("idle"))
 
 // Add a transition with guard and action
-builder.From(Idle).When(Start).To(Running)
-	.WithGuard(isAuthorized)
-	.WithAction(logTransition)
-	.Add()
+builder.From(statemachine.StringState("idle")).
+	When(statemachine.StringEvent("start")).
+	To(statemachine.StringState("running")).
+	WithGuard(isAuthorized).
+	WithAction(logTransition).
+	Add()
 
 machine := builder.Build()
 
 // Fire event with context data
 userData := map[string]any{"is_authorized": true, "user_id": 123}
-err := machine.Fire(ctx, Start, userData)
-// Output: Transition: idle -> running via start
-// Current state is now "running"
+err := machine.Fire(context.Background(), statemachine.StringEvent("start"), userData)
+// If authorized, state changes to "running" and action is executed
 
 // Try with unauthorized data
 unauthorizedData := map[string]any{"is_authorized": false, "user_id": 456}
-err = machine.Fire(ctx, Start, unauthorizedData)
-// err will be a TransitionRejectedError and state remains "running"
+err = machine.Fire(context.Background(), statemachine.StringEvent("start"), unauthorizedData)
+// err will be a TransitionRejectedError and state remains unchanged
 ```
 
 ### Custom State and Event Types
 
 ```go
+import (
+	"context"
+	"github.com/dmitrymomot/gokit/statemachine"
+)
+
 // Define custom state type
 type OrderState struct {
 	code        string
@@ -147,34 +145,23 @@ func (e OrderEvent) Name() string {
 	return e.code
 }
 
-// Create state machine with custom types
-states := struct {
-	New        OrderState
-	Processing OrderState
-	Shipped    OrderState
-}{
-	New:        OrderState{code: "new", description: "Order created"},
-	Processing: OrderState{code: "processing", description: "In process"},
-	Shipped:    OrderState{code: "shipped", description: "Shipped"},
-}
+// Create states and events
+new := OrderState{code: "new", description: "Order created"}
+processing := OrderState{code: "processing", description: "In process"}
+shipped := OrderState{code: "shipped", description: "Shipped"}
 
-events := struct {
-	Process OrderEvent
-	Ship    OrderEvent
-}{
-	Process: OrderEvent{code: "process"},
-	Ship:    OrderEvent{code: "ship"},
-}
+process := OrderEvent{code: "process"}
+ship := OrderEvent{code: "ship"}
 
-// Configure state machine
-machine := statemachine.NewSimpleStateMachine(states.New)
-machine.AddTransition(states.New, states.Processing, events.Process, nil, nil)
-machine.AddTransition(states.Processing, states.Shipped, events.Ship, nil, nil)
+// Configure state machine using standard API
+machine := statemachine.NewSimpleStateMachine(new)
+machine.AddTransition(new, processing, process, nil, nil)
+machine.AddTransition(processing, shipped, ship, nil, nil)
 
 // Use the state machine
-fmt.Println(machine.Current().Name()) // Output: new
-machine.Fire(ctx, events.Process, nil)
-fmt.Println(machine.Current().Name()) // Output: processing
+// Current state: "new"
+machine.Fire(context.Background(), process, nil)
+// Current state: "processing"
 ```
 
 ### Error Handling
@@ -182,9 +169,6 @@ fmt.Println(machine.Current().Name()) // Output: processing
 ```go
 import (
 	"context"
-	"errors"
-	"fmt"
-	
 	"github.com/dmitrymomot/gokit/statemachine"
 )
 
@@ -199,56 +183,29 @@ const (
 builder := statemachine.NewBuilder(Initial)
 machine := builder.Build()
 
-// Case 1: Try an invalid event (no transition defined)
-err := machine.Fire(ctx, InvalidEvent, nil)
+// Try an invalid event (no transition defined)
+err := machine.Fire(context.Background(), InvalidEvent, nil)
 if err != nil {
-	switch {
-	case statemachine.IsNoTransitionAvailableError(err):
-		fmt.Printf("Error: %v\n", err) 
-		// Output: Error: no transition available for event 'invalid' from state 'initial'
-	default:
-		fmt.Printf("Unexpected error: %v\n", err)
+	if statemachine.IsNoTransitionAvailableError(err) {
+		// Handle "no transition available" error
+		// Error message: "no transition available from state 'initial' for event 'invalid'"
 	}
 }
 
-// Case 2: Add a transition with a guard that rejects
+// Add a transition with a guard that always rejects
 alwaysFalse := func(ctx context.Context, from statemachine.State, event statemachine.Event, data any) bool {
-	return false // Always reject the transition
+	return false
 }
 
 builder.From(Initial).When(Event).To(Final).WithGuard(alwaysFalse).Add()
 machine = builder.Build()
 
 // Try a transition that will be rejected by the guard
-err = machine.Fire(ctx, Event, nil)
+err = machine.Fire(context.Background(), Event, nil)
 if err != nil {
-	switch {
-	case statemachine.IsTransitionRejectedError(err):
-		fmt.Printf("Error: %v\n", err)
-		// Output: Error: transition rejected by guard from 'initial' to 'final' via 'event'
-	default:
-		fmt.Printf("Unexpected error: %v\n", err)
-	}
-}
-
-// Case 3: Action that fails
-failingAction := func(ctx context.Context, from, to statemachine.State, event statemachine.Event, data any) error {
-	return errors.New("action failed")
-}
-
-builder = statemachine.NewBuilder(Initial)
-builder.From(Initial).When(Event).To(Final).WithAction(failingAction).Add()
-machine = builder.Build()
-
-// Try a transition with a failing action
-err = machine.Fire(ctx, Event, nil)
-if err != nil {
-	switch {
-	case statemachine.IsActionExecutionError(err):
-		fmt.Printf("Error: %v\n", err)
-		// Output: Error: action execution failed: action failed
-	default:
-		fmt.Printf("Unexpected error: %v\n", err)
+	if statemachine.IsTransitionRejectedError(err) {
+		// Handle "transition rejected" error
+		// Error message: "transition from state 'initial' for event 'event' was rejected by guards"
 	}
 }
 ```
@@ -258,7 +215,8 @@ if err != nil {
 1. **State Machine Design**:
    - Keep your state machines small and focused on a single responsibility
    - Use descriptive names for states and events
-   - Document the allowed transitions in comments or diagrams
+   - Document the allowed transitions in your code
+   - Consider using a diagram tool to visualize complex state machines
 
 2. **Guards and Actions**:
    - Keep guards simple - they should only check conditions, not modify state
@@ -356,20 +314,14 @@ func IsTransitionRejectedError(err error) bool
 ```
 Checks if an error is a "transition rejected by guard" error.
 
-```go
-func IsInvalidTransitionError(err error) bool
-```
-Checks if an error is an "invalid transition" error.
-
-```go
-func IsActionExecutionError(err error) bool
-```
-Checks if an error is an "action execution failed" error.
-
 ### Error Types
 
 ```go
-var ErrNoTransitionAvailable = errors.New("no transition available")
-var ErrTransitionRejected = errors.New("transition rejected by guard")
-var ErrInvalidTransition = errors.New("invalid transition")
-var ErrActionExecutionFailed = errors.New("action execution failed")
+var ErrInvalidTransition = errors.New("invalid transition: from, to, or event cannot be nil")
+var ErrInvalidEvent = errors.New("invalid event: event cannot be nil")
+```
+Errors returned when attempting to add invalid transitions or fire invalid events.
+
+Custom error types:
+- `ErrNoTransitionAvailable` - when there's no transition for the current state and event
+- `ErrTransitionRejected` - when all transitions are rejected by their guards
