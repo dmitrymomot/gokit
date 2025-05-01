@@ -10,7 +10,7 @@ go get github.com/dmitrymomot/gokit/useragent
 
 ## Overview
 
-The `useragent` package provides a fast, memory-efficient way to parse User-Agent strings from HTTP requests, extracting detailed information about browsers, operating systems, and devices with minimal allocations.
+The `useragent` package provides a fast, memory-efficient way to parse User-Agent strings from HTTP requests. It extracts detailed information about browsers, operating systems, and devices with minimal allocations. The package is designed to be thread-safe with no shared mutable state.
 
 ## Features
 
@@ -20,7 +20,7 @@ The `useragent` package provides a fast, memory-efficient way to parse User-Agen
 - Operating system detection with version extraction
 - Browser identification with version parsing
 - Human-readable session identifiers for logging
-- Minimal memory allocations and zero external dependencies
+- Zero external dependencies (except for Go standard library)
 
 ## Usage
 
@@ -32,19 +32,28 @@ import "github.com/dmitrymomot/gokit/useragent"
 // Parse the User-Agent string from an HTTP request
 ua, err := useragent.Parse(r.Header.Get("User-Agent"))
 if err != nil {
-    // Handle invalid or empty user agent
-    return
+    // Handle error cases
+    switch {
+    case errors.Is(err, useragent.ErrEmptyUserAgent):
+        // Handle empty user agent
+    case errors.Is(err, useragent.ErrMalformedUserAgent):
+        // Handle malformed user agent
+    case errors.Is(err, useragent.ErrUnknownDevice):
+        // Handle unknown device
+    default:
+        // Handle general error
+    }
 }
 
 // Access parsed information
-fmt.Println("Device Type:", ua.DeviceType())        // "mobile", "desktop", "tablet", etc.
-fmt.Println("Device Model:", ua.DeviceModel())      // "iphone", "samsung", "huawei", etc.
-fmt.Println("OS:", ua.OS())                         // "ios", "android", "windows", etc.
-fmt.Println("Browser:", ua.BrowserName())           // "chrome", "safari", "firefox", etc.
-fmt.Println("Browser Version:", ua.BrowserVer())    // "91.0.4472.124", "15.0", etc.
+deviceType := ua.DeviceType()    // "mobile", "desktop", "tablet", etc.
+deviceModel := ua.DeviceModel()  // "iphone", "samsung", "huawei", etc.
+os := ua.OS()                    // "ios", "android", "windows", etc.
+browserName := ua.BrowserName()  // "chrome", "safari", "firefox", etc.
+browserVer := ua.BrowserVer()    // "91.0.4472.124", "15.0", etc.
 
 // Get a concise identifier for logging
-fmt.Println("Session:", ua.GetShortIdentifier())    // "Chrome/91.0 (Windows, desktop)"
+sessionID := ua.GetShortIdentifier()  // "Chrome/91.0 (Windows, desktop)"
 ```
 
 ### Device Type Detection
@@ -65,7 +74,7 @@ if ua.IsMobile() {
     // Handle gaming console logic
 }
 
-// Use the device type string
+// Use the device type string with constants
 switch ua.DeviceType() {
 case useragent.DeviceTypeMobile:
     // Mobile device
@@ -79,6 +88,8 @@ case useragent.DeviceTypeTV:
     // Smart TV
 case useragent.DeviceTypeConsole:
     // Gaming console
+case useragent.DeviceTypeUnknown:
+    // Unknown device type
 }
 ```
 
@@ -95,16 +106,16 @@ deviceType := useragent.ParseDeviceType(lowerUA)
 // Get the device model when applicable
 if deviceType == useragent.DeviceTypeMobile || deviceType == useragent.DeviceTypeTablet {
     deviceModel := useragent.GetDeviceModel(lowerUA, deviceType)
-    fmt.Println("Model:", deviceModel) // "iphone", "samsung", etc.
+    // Returns: "iphone", "samsung", etc.
 }
 
 // Get just the operating system
 os := useragent.ParseOS(lowerUA)
-fmt.Println("OS:", os) // "windows", "ios", "android", etc.
+// Returns: "windows", "ios", "android", etc.
 
 // Get just the browser information
 browser := useragent.ParseBrowser(lowerUA)
-fmt.Println("Browser:", browser.Name, browser.Version)
+// Returns: Browser{Name: "chrome", Version: "91.0.4472.124"}
 ```
 
 ### Custom User Agents
@@ -121,32 +132,38 @@ customUA := useragent.New(
 )
 
 // Use the custom user agent
-fmt.Println(customUA.String())           // Original string
-fmt.Println(customUA.GetShortIdentifier()) // Short identifier
+originalString := customUA.String()           // Original string
+identifier := customUA.GetShortIdentifier()   // Short identifier
 ```
+
+## Best Practices
+
+1. **Performance Optimization**:
+   - Convert the user agent string to lowercase only once
+   - Use individual component parsers when you only need specific information
+   - Reuse the UserAgent object when making multiple checks
+
+2. **Context Usage**:
+   - Store the UserAgent in the request context for reuse across handlers
+   - Include the short identifier in logs for easy session tracking
+
+3. **Error Handling**:
+   - Always check for errors when parsing user agent strings
+   - Handle the different error types appropriately (ErrEmptyUserAgent, ErrMalformedUserAgent)
+   - Have fallback behaviors for unknown device types
+
+4. **Device Detection**:
+   - Combine device type with OS information for the most accurate device detection
+   - For responsive design, make decisions based on device type rather than specific models
 
 ## API Reference
 
-### Core Types
+### Types
 
 ```go
 // UserAgent represents a parsed user agent string
 type UserAgent struct {
-    // String representation of the user agent
-    UserAgentString string
-    
-    // Device information
-    deviceType  string
-    deviceModel string
-    
-    // OS information
-    os string
-    
-    // Browser information
-    browser struct {
-        Name    string
-        Version string
-    }
+    // Private fields not directly accessible
 }
 
 // Browser represents browser information
@@ -156,14 +173,14 @@ type Browser struct {
 }
 ```
 
-### Main Functions
+### Functions
 
 ```go
 // Parse a user agent string into a UserAgent struct
-func Parse(userAgent string) (*UserAgent, error)
+func Parse(userAgent string) (UserAgent, error)
 
-// Create a new UserAgent with specified attributes
-func New(userAgent, deviceType, deviceModel, os, browserName, browserVer string) *UserAgent
+// Create a new UserAgent with the specified attributes
+func New(ua, deviceType, deviceModel, os, browserName, browserVer string) UserAgent
 
 // Parse only the device type from a lowercase user agent string
 func ParseDeviceType(lowerUA string) string
@@ -176,51 +193,71 @@ func ParseOS(lowerUA string) string
 
 // Parse only the browser information from a lowercase user agent string
 func ParseBrowser(lowerUA string) Browser
-
-// Get a short, human-readable identifier for the user agent
-func (ua *UserAgent) GetShortIdentifier() string
 ```
 
-### User Agent Methods
+### UserAgent Methods
 
 ```go
+// Get the original user agent string
+func (ua UserAgent) String() string
+func (ua UserAgent) UserAgent() string
+
 // Get the device type (mobile, desktop, tablet, bot, tv, console)
-func (ua *UserAgent) DeviceType() string
+func (ua UserAgent) DeviceType() string
 
 // Get the device model (iphone, samsung, etc.)
-func (ua *UserAgent) DeviceModel() string
+func (ua UserAgent) DeviceModel() string
 
 // Get the operating system name
-func (ua *UserAgent) OS() string
+func (ua UserAgent) OS() string
 
 // Get the browser name
-func (ua *UserAgent) BrowserName() string
+func (ua UserAgent) BrowserName() string
 
 // Get the browser version
-func (ua *UserAgent) BrowserVer() string
+func (ua UserAgent) BrowserVer() string
+
+// Get the browser information as a Browser struct
+func (ua UserAgent) BrowserInfo() Browser
 
 // Check if the device is mobile
-func (ua *UserAgent) IsMobile() bool
+func (ua UserAgent) IsMobile() bool
 
 // Check if the device is a tablet
-func (ua *UserAgent) IsTablet() bool
+func (ua UserAgent) IsTablet() bool
 
 // Check if the device is a desktop computer
-func (ua *UserAgent) IsDesktop() bool
+func (ua UserAgent) IsDesktop() bool
 
 // Check if the device is a bot/crawler
-func (ua *UserAgent) IsBot() bool
+func (ua UserAgent) IsBot() bool
 
 // Check if the device is a smart TV
-func (ua *UserAgent) IsTV() bool
+func (ua UserAgent) IsTV() bool
 
 // Check if the device is a gaming console
-func (ua *UserAgent) IsConsole() bool
+func (ua UserAgent) IsConsole() bool
+
+// Check if the device is unknown
+func (ua UserAgent) IsUnknown() bool
+
+// Get a short, human-readable identifier for the user agent
+func (ua UserAgent) GetShortIdentifier() string
+```
+
+### Error Types
+
+```go
+// Error variables for specific error conditions
+var ErrEmptyUserAgent     = errors.New("empty user agent string")
+var ErrMalformedUserAgent = errors.New("malformed user agent string")
+var ErrUnsupportedBrowser = errors.New("unsupported browser")
+var ErrUnsupportedOS      = errors.New("unsupported operating system")
+var ErrUnknownDevice      = errors.New("unknown device type")
+var ErrParsingFailed      = errors.New("failed to parse user agent")
 ```
 
 ### Constants
-
-The package defines constants for device types, device models, browsers, and operating systems:
 
 ```go
 // Device types
@@ -241,7 +278,7 @@ const (
     MobileDeviceSamsung  = "samsung"
     MobileDeviceHuawei   = "huawei"
     MobileDeviceXiaomi   = "xiaomi"
-    // ...and many more
+    // And many more...
 )
 
 // Browser names
@@ -250,7 +287,8 @@ const (
     BrowserFirefox = "firefox"
     BrowserSafari  = "safari"
     BrowserEdge    = "edge"
-    // ...and many more
+    BrowserUnknown = "unknown"
+    // And many more...
 )
 
 // Operating systems
@@ -261,25 +299,6 @@ const (
     OSAndroid    = "android"
     OSLinux      = "linux"
     OSHarmonyOS  = "harmonyos"
-    // ...and many more
+    OSUnknown    = "unknown"
+    // And many more...
 )
-```
-
-## Best Practices
-
-1. **Performance Optimization**:
-   - Convert the user agent string to lowercase only once
-   - Use individual component parsers if you only need specific information
-   - Reuse the UserAgent object when making multiple checks
-
-2. **Context Usage**:
-   - Store the UserAgent in the request context for reuse across handlers
-   - Include the short identifier in logs for easy session tracking
-
-3. **Error Handling**:
-   - Always check for errors when parsing user agent strings
-   - Handle the case of empty or invalid user agent strings
-
-4. **Device Detection**:
-   - Combine device type with OS information for the most accurate device detection
-   - For responsive design, make decisions based on device type rather than specific models
