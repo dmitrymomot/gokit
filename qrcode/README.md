@@ -2,18 +2,6 @@
 
 Simple QR code generation for Go applications with PNG and base64 output formats.
 
-## Table of Contents
-- [Installation](#installation)
-- [Overview](#overview)
-- [Features](#features)
-- [Usage](#usage)
-  - [Generate QR Code as PNG](#generate-qr-code-as-png)
-  - [Generate QR Code for HTML](#generate-qr-code-for-html)
-  - [Using with HTTP Handlers](#using-with-http-handlers)
-- [API Reference](#api-reference)
-- [Error Handling](#error-handling)
-- [Best Practices](#best-practices)
-
 ## Installation
 
 ```bash
