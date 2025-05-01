@@ -27,10 +27,16 @@ The `apikey` package provides tools for creating and managing secure API keys fo
 ### Generating API Keys
 
 ```go
+import (
+    "errors"
+    "github.com/dmitrymomot/gokit/apikey"
+)
+
 // Generate a random API key (256 bits, hex-encoded)
 apiKey, err := apikey.GenerateRandom()
 if err != nil {
     // Handle error
+    // Returns 64-character hexadecimal string or error
 }
 // apiKey = "a1b2c3d4..." (64-character hexadecimal string)
 
@@ -53,7 +59,7 @@ hash, err := apikey.HashKey(apiKey, secretKey)
 if err != nil {
     // Handle error
 }
-// hash = "sha256:..." (storable hash string)
+// hash = "a1b2c3..." (hex-encoded hash string)
 
 // Store the hash in your database, not the API key itself
 ```
@@ -84,12 +90,12 @@ equal := apikey.SecureCompare(string1, string2)
 apiKey, err := apikey.GenerateRandom()
 if err != nil {
     switch {
-    case errors.Is(err, apikey.ErrInsufficientEntropy):
-        // Handle insufficient system entropy
-        log.Fatal("System has insufficient entropy for secure key generation")
+    case errors.Is(err, apikey.ErrGeneration):
+        // Handle generation error
+    case errors.Is(err, apikey.ErrEmptyInput):
+        // Handle empty input error (unlikely in this case)
     default:
         // Handle other errors
-        log.Fatalf("Failed to generate API key: %v", err)
     }
 }
 ```
@@ -109,17 +115,12 @@ if err != nil {
    - Always check for errors when generating keys
    - Implement appropriate logging for failed validation attempts
 
-4. **Implementation**:
-   - Store key metadata separately (creation time, expiration, permissions)
-   - Associate scopes or permissions with each API key
-   - Implement key revocation mechanisms
-
 ## API Reference
 
-### Configuration Variables
+### Constants
 
 ```go
-var DefaultKeyLength = 32 // Default length of random API keys in bytes
+const APIKeyLength = 32 // 256 bits - length of random API keys in bytes
 ```
 
 ### Functions
@@ -127,30 +128,31 @@ var DefaultKeyLength = 32 // Default length of random API keys in bytes
 ```go
 func GenerateRandom() (string, error)
 ```
-Creates a new API key with a secure random value.
+Creates a new API key with a secure random value. Returns a hex-encoded string of 64 characters (32 bytes) or an error if generation fails.
 
 ```go
 func GenerateTimeOrdered() (string, error)
 ```
-Creates a time-ordered API key using UUID V7 format.
+Creates a time-ordered API key using UUID V7 format. Returns the encoded API key as a string or an error if generation or encoding fails.
 
 ```go
 func HashKey(apiKey, secretKey string) (string, error)
 ```
-Creates a secure hash of the API key for storage.
+Hashes the API key using HMAC-SHA256 with a secret key. Both apiKey and secretKey must be non-empty strings. Returns the hex-encoded hash string or an error if inputs are invalid.
 
 ```go
 func ValidateKey(apiKey, hash, secretKey string) bool
 ```
-Checks if the API key matches the hash using the secret key.
+Checks if the API key matches the hash using the secret key. Returns true if the API key matches the hash, false otherwise.
 
 ```go
 func SecureCompare(a, b string) bool
 ```
-Performs a constant-time comparison of two strings to prevent timing attacks.
+Performs a constant-time comparison of two strings to prevent timing attacks. Returns true if the strings are equal, false otherwise.
 
 ### Error Types
 
 ```go
-var ErrInsufficientEntropy = errors.New("insufficient system entropy")
-var ErrInvalidKeyFormat = errors.New("invalid API key format")
+var ErrEmptyInput = errors.New("empty api key or secret key")
+var ErrGeneration = errors.New("failed to generate api key")
+var ErrInvalidHash = errors.New("invalid hash format")
