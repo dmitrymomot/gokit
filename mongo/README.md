@@ -185,8 +185,6 @@ var ErrHealthcheckFailed = errors.New("mongo healthcheck failed")
 
 ## Known Issues
 
-1. The package uses MongoDB driver v2 which may not be fully stable yet. Consider testing thoroughly in your environment before production use.
+1. The retry logic implementation in the `New` function uses a range loop on an integer which is not the recommended approach in modern Go. Future versions will update this to use a more idiomatic approach.
 
-2. The retry logic implementation in the `New` function uses a range loop on an integer which is not the recommended approach in modern Go. Future versions will update this to use a more idiomatic approach.
-
-3. There's currently no dedicated function for properly disconnecting from MongoDB, although you can use the standard `client.Disconnect(ctx)` method from the MongoDB driver.
+2. There's currently no dedicated function for properly disconnecting from MongoDB, although you can use the standard `client.Disconnect(ctx)` method from the MongoDB driver.
