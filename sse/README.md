@@ -10,19 +10,16 @@ go get github.com/dmitrymomot/gokit/sse
 
 ## Overview
 
-The `sse` package provides a lightweight, framework-agnostic implementation of Server-Sent Events (SSE) that enables real-time communication from server to client. It supports both single-server and distributed architectures with pluggable message bus implementations.
+The `sse` package provides a lightweight, thread-safe implementation of Server-Sent Events (SSE) that enables real-time communication from server to client. It supports both single-server and distributed architectures with pluggable message bus implementations, making it suitable for applications of any scale.
 
 ## Features
 
-- Clean, modular architecture with clear separation of concerns
 - Topic-based subscriptions for targeted event delivery
-- Multiple message bus implementations:
-    - In-memory channel bus for single-server deployments
-    - Redis-backed bus for distributed environments
-- Configurable heartbeats to maintain long-lived connections
-- Automatic client connection management
-- Horizontal scaling support
-- Compatible with any Go HTTP router
+- Multiple message bus implementations (in-memory, Redis)
+- Automatic client connection management with configurable heartbeats
+- Support for structured data with automatic JSON serialization
+- Compatible with any Go HTTP router or framework
+- Thread-safe for concurrent operations
 
 ## Usage
 
@@ -77,7 +74,7 @@ func main() {
 }
 ```
 
-### With Redis Message Bus (for distributed setups)
+### Distributed Setup with Redis Message Bus
 
 ```go
 import (
@@ -124,6 +121,16 @@ dataEvent := sse.Event{
 
 // Publish to a topic
 err := server.Publish(ctx, "user:123", dataEvent)
+if err != nil {
+    // Handle error
+    if errors.Is(err, sse.ErrTopicEmpty) {
+        log.Println("Topic cannot be empty")
+    } else if errors.Is(err, sse.ErrServerClosed) {
+        log.Println("Server is closed")
+    } else {
+        log.Printf("Failed to publish event: %v", err)
+    }
+}
 ```
 
 ### Client-Side JavaScript
@@ -153,26 +160,45 @@ eventSource.addEventListener("error", (error) => {
 // eventSource.close();
 ```
 
+## Best Practices
+
+1. **Topic Design**:
+   - Use hierarchical topics (e.g., `user:123`, `chat:room1`) for organization
+   - Keep topic names concise but descriptive
+   - Consider using namespaces to prevent collisions
+
+2. **Security and Authentication**:
+   - Validate user authentication in your topic extractor function
+   - Only allow clients to subscribe to topics they have access to
+   - Sanitize and validate all topic names and event data
+
+3. **Performance Optimization**:
+   - Adjust message bus buffer sizes based on expected throughput
+   - Keep event data compact; use notifications + REST for large data
+   - Limit concurrent connections based on your server capacity
+   - Choose heartbeat interval to balance connection stability and traffic
+
+4. **Load Balancer Configuration**:
+   - Use sticky sessions (client affinity) in production with multiple instances
+   - Configure appropriate timeouts for long-lived connections
+   - Use Redis message bus for distributed deployments
+
 ## API Reference
 
 ### Server
 
 ```go
 // Create a new SSE server
-server := sse.NewServer(messageBus, [options...])
+func NewServer(bus MessageBus, opts ...ServerOption) *Server
 
-// Available options
-sse.WithHeartbeat(duration)  // Set heartbeat interval (default: 30s)
-sse.WithHostname(hostname)   // Set hostname for event IDs
+// Server options
+func WithHeartbeat(d time.Duration) ServerOption  // Set heartbeat interval (default: 30s)
+func WithHostname(hostname string) ServerOption   // Set hostname for event IDs
 
-// Get an HTTP handler for SSE connections
-handler := server.Handler(topicExtractorFunc)
-
-// Publish an event to a topic
-err := server.Publish(ctx, topic, event)
-
-// Close the server
-err := server.Close()
+// Server methods
+func (s *Server) Handler(topicExtractor func(r *http.Request) string) http.HandlerFunc
+func (s *Server) Publish(ctx context.Context, topic string, event Event) error
+func (s *Server) Close() error
 ```
 
 ### Event Structure
@@ -184,80 +210,47 @@ type Event struct {
     Data  any         // Event data (string, map, struct, etc.)
     Retry int         // Reconnection time in milliseconds (optional)
 }
+
+// Event methods
+func (e Event) String() string
+func (e Event) Write(w io.Writer) error
+```
+
+### Message Bus Interface
+
+```go
+type MessageBus interface {
+    Publish(ctx context.Context, topic string, event Event) error
+    Subscribe(ctx context.Context, topic string) (<-chan Event, error)
+    Unsubscribe(ctx context.Context, topic string, ch <-chan Event) error
+    Close() error
+}
 ```
 
 ### Message Bus Implementations
 
 ```go
 // In-memory (single server)
-bus := bus.NewChannelBus()
+func NewChannelBus() MessageBus
 
 // Redis-backed (distributed)
-bus, err := bus.NewRedisBus(redisClient)
-// or with custom buffer size:
-bus, err := bus.NewRedisBusWithConfig(redisClient, 200)
+func NewRedisBus(redisClient *redis.Client) (MessageBus, error)
+func NewRedisBusWithConfig(redisClient *redis.Client, bufferSize int) (MessageBus, error)
 ```
 
-## Error Handling
-
-The package provides predefined errors for specific failure cases:
+### Error Types
 
 ```go
-// Common errors to check for
-if errors.Is(err, sse.ErrTopicEmpty) {
-    // Handle empty topic error
-}
-if errors.Is(err, sse.ErrServerClosed) {
-    // Handle server closed error
-}
-if errors.Is(err, sse.ErrClientClosed) {
-    // Handle client closed error
-}
+var (
+    ErrClientClosed    = errors.New("client is closed")
+    ErrServerClosed    = errors.New("server is closed")
+    ErrTopicEmpty      = errors.New("topic cannot be empty")
+    ErrMessageEmpty    = errors.New("message cannot be empty")
+    ErrInvalidEventID  = errors.New("invalid event ID")
+    ErrMessageBusClosed = errors.New("message bus is closed")
+    ErrNoFlusher       = errors.New("response writer does not implement http.Flusher")
+)
 ```
-
-## Scaling and Production Considerations
-
-### Load Balancer Configuration
-
-For production deployments with multiple instances:
-
-1. Use the Redis message bus implementation
-2. Configure sticky sessions (client affinity) in your load balancer
-3. Set appropriate timeouts for long-lived connections
-
-Example nginx configuration:
-
-```nginx
-upstream sse_servers {
-    ip_hash;  // Enable sticky sessions
-    server app1:8080;
-    server app2:8080;
-}
-
-server {
-    location /events {
-        proxy_pass http://sse_servers;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
-        proxy_buffering off;
-        proxy_read_timeout 3600s;
-    }
-}
-```
-
-### Security Best Practices
-
-1. **Authentication**: Validate user authentication in your topic extractor function
-2. **Authorization**: Only allow clients to subscribe to topics they have access to
-3. **Input validation**: Sanitize and validate all topic names and event data
-4. **Rate limiting**: Implement rate limiting for publish endpoints
-
-### Performance Optimization
-
-1. **Buffer sizing**: Adjust message bus buffer sizes based on expected throughput
-2. **Message size**: Keep event data compact; use notifications + REST for large data
-3. **Connection pooling**: Monitor and limit concurrent connections
-4. **Heartbeat interval**: Balance between connection stability and network traffic
 
 ## Examples
 
