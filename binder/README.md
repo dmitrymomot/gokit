@@ -10,7 +10,7 @@ go get github.com/dmitrymomot/gokit/binder
 
 ## Overview
 
-The `binder` package provides utilities for binding HTTP request data to Go structs. It automatically handles different content types including JSON, form data, and query parameters with minimal configuration.
+The `binder` package provides utilities for binding HTTP request data to Go structs. It automatically handles different content types including JSON, form data, and query parameters with minimal configuration. This package is thread-safe and designed for high-performance web applications.
 
 ## Features
 
@@ -68,18 +68,21 @@ var jsonData User
 if err := binder.BindJSON(r, &jsonData); err != nil {
     // Handle error
 }
+// jsonData contains the parsed JSON data
 
 // Form data binding
 var formData User
 if err := binder.BindForm(r, &formData); err != nil {
     // Handle error
 }
+// formData contains the parsed form data
 
 // Query parameter binding
 var queryParams User
 if err := binder.BindQuery(r, &queryParams); err != nil {
     // Handle error
 }
+// queryParams contains the parsed query parameters
 ```
 
 ### Nested Struct Binding
@@ -120,34 +123,103 @@ type Event struct {
 // - "2023-04-25"
 ```
 
+### Error Handling
+
+```go
+import (
+    "errors"
+    "fmt"
+    "net/http"
+    
+    "github.com/dmitrymomot/gokit/binder"
+)
+
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+    var data User
+    
+    err := binder.Bind(r, &data)
+    if err != nil {
+        switch {
+        case errors.Is(err, binder.ErrInvalidContentType):
+            http.Error(w, "Unsupported content type", http.StatusUnsupportedMediaType)
+            return
+            
+        case errors.Is(err, binder.ErrEmptyBody):
+            http.Error(w, "Request body is empty", http.StatusBadRequest)
+            return
+            
+        case errors.Is(err, binder.ErrInvalidJSON):
+            http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+            return
+            
+        case errors.Is(err, binder.ErrInvalidFormData):
+            http.Error(w, "Invalid form data", http.StatusBadRequest)
+            return
+            
+        case errors.Is(err, binder.ErrUnsupportedType):
+            http.Error(w, "Target type not supported", http.StatusInternalServerError)
+            return
+            
+        default:
+            http.Error(w, "Bad request", http.StatusBadRequest)
+            return
+        }
+    }
+    
+    // Process valid data...
+}
+```
+
+## Best Practices
+
+1. **Struct Design**:
+   - Use consistent field naming conventions
+   - Always include both `json` and `form` tags to support multiple content types
+   - Add validation tags if using with a validation package
+
+2. **Error Handling**:
+   - Check for specific error types to provide meaningful error messages
+   - Consider wrapping errors with context information
+   - Return appropriate HTTP status codes based on error types
+
+3. **Performance**:
+   - Pre-define your struct types rather than using map[string]interface{}
+   - For very large requests, consider binding only the needed fields
+
+4. **Security**:
+   - Always validate and sanitize bound data before use
+   - Set appropriate size limits for request bodies
+
 ## API Reference
 
 ### Functions
 
-#### `Bind(r *http.Request, v any) error`
+```go
+func Bind(r *http.Request, v any) error
+```
+Automatically selects the binding method based on the request's Content-Type header. For GET requests, it binds from query parameters.
 
-Automatically selects the binding method based on the request's Content-Type header. 
-For GET requests, it binds from query parameters.
-
-#### `BindJSON(r *http.Request, v any) error`
-
+```go
+func BindJSON(r *http.Request, v any) error
+```
 Binds JSON request body to the provided struct.
 
-#### `BindForm(r *http.Request, v any) error`
-
+```go
+func BindForm(r *http.Request, v any) error
+```
 Binds form data from the request to the provided struct. Handles both regular and multipart forms.
 
-#### `BindQuery(r *http.Request, v any) error`
-
+```go
+func BindQuery(r *http.Request, v any) error
+```
 Binds query parameters from the request to the provided struct.
 
-## Error Handling
+### Error Types
 
-The package defines several error types to help identify binding issues:
-
-- `ErrInvalidRequest`: The request is nil or invalid
-- `ErrInvalidContentType`: Unsupported content type
-- `ErrEmptyBody`: The request body is empty
-- `ErrInvalidJSON`: Failed to parse JSON data
-- `ErrInvalidFormData`: Failed to parse form data
-- `ErrUnsupportedType`: The target type is not supported
+```go
+var ErrInvalidRequest = errors.New("invalid request")
+var ErrInvalidContentType = errors.New("invalid content type")
+var ErrEmptyBody = errors.New("empty body")
+var ErrInvalidJSON = errors.New("invalid JSON")
+var ErrInvalidFormData = errors.New("invalid form data")
+var ErrUnsupportedType = errors.New("unsupported type")
