@@ -53,7 +53,7 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	// Process the user data...
-	log.Printf("User: %+v", user)
+	// User now contains the parsed request data
 	
 	// Respond with success
 	w.WriteHeader(http.StatusCreated)
@@ -128,7 +128,6 @@ type Event struct {
 ```go
 import (
     "errors"
-    "fmt"
     "net/http"
     
     "github.com/dmitrymomot/gokit/binder"
@@ -152,12 +151,20 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
             http.Error(w, "Invalid JSON format", http.StatusBadRequest)
             return
             
+        case errors.Is(err, binder.ErrInvalidQueryParams):
+            http.Error(w, "Invalid query parameters", http.StatusBadRequest)
+            return
+            
         case errors.Is(err, binder.ErrInvalidFormData):
             http.Error(w, "Invalid form data", http.StatusBadRequest)
             return
             
         case errors.Is(err, binder.ErrUnsupportedType):
             http.Error(w, "Target type not supported", http.StatusInternalServerError)
+            return
+            
+        case errors.Is(err, binder.ErrUnsupportedTimeFormat):
+            http.Error(w, "Unsupported time format", http.StatusBadRequest)
             return
             
         default:
@@ -220,6 +227,9 @@ Binds query parameters from the request to the provided struct.
 var ErrInvalidRequest = errors.New("invalid request")
 var ErrInvalidContentType = errors.New("invalid content type")
 var ErrEmptyBody = errors.New("empty body")
-var ErrInvalidJSON = errors.New("invalid JSON")
+var ErrInvalidJSON = errors.New("invalid JSON format")
+var ErrInvalidQueryParams = errors.New("invalid query parameters")
 var ErrInvalidFormData = errors.New("invalid form data")
-var ErrUnsupportedType = errors.New("unsupported type")
+var ErrUnsupportedType = errors.New("unsupported target type")
+var ErrUnsupportedTimeFormat = errors.New("unsupported time format")
+var ErrInvalidMapKey = errors.New("invalid map key, only string keys are supported")
