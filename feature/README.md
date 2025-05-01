@@ -1,4 +1,4 @@
-# Feature Flags Package
+# Feature Flags
 
 A flexible and extensible feature flagging system for Go applications.
 
@@ -10,29 +10,23 @@ go get github.com/dmitrymomot/gokit/feature
 
 ## Overview
 
-The `feature` package provides a robust feature flagging system to control feature rollouts in your application. It supports various strategies including percentage-based rollouts, targeted users/groups, environment-based flags, and composite conditions.
+The `feature` package provides a robust feature flagging system to control feature rollouts in your Go applications. It supports various strategies including percentage-based rollouts, targeted users/groups, environment-based flags, and composite conditions. The package is designed to be thread-safe and suitable for concurrent usage across your application.
 
 ## Features
 
-- Generic `Provider` interface with pluggable storage backends
-- In-memory implementation for quick setup and testing
-- Flexible rollout strategies:
-  - Always on/off flags
-  - Targeted user/group flags
-  - Percentage-based progressive rollouts
-  - Environment-based flags 
-  - Composite strategies (AND/OR logic)
-- Context-based evaluation for user-specific flags
-- Tag-based flag organization
-- Thread-safe implementations
+- Pluggable storage backends with a generic `Provider` interface
+- Ready-to-use in-memory implementation for quick setup and testing
+- Multiple rollout strategies (always on/off, targeted, percentage-based, environment-based)
+- Support for composite conditions with logical AND/OR operations
+- Context-based evaluation for user-specific and environment-specific flags
+- Tag-based flag organization for easier management
+- Thread-safe implementations for concurrent usage
 
 ## Usage
 
 ### Basic Setup
 
 ```go
-package main
-
 import (
 	"context"
 	"log"
@@ -87,6 +81,7 @@ ctx = context.WithValue(ctx, feature.UserGroupsKey, []string{"beta-users"})
 
 // Check if beta features are enabled for this user
 betaEnabled, err := provider.IsEnabled(ctx, "beta-features")
+// Returns: true if user is in "beta-users" group, false otherwise
 ```
 
 ### Rollout Strategies
@@ -136,6 +131,9 @@ err = provider.CreateFlag(ctx, newFlag)
 
 // Update an existing flag
 flag, err := provider.GetFlag(ctx, "new-feature")
+if err != nil {
+	// Handle error
+}
 flag.Strategy = feature.NewTargetedStrategy(feature.TargetCriteria{
 	Percentage: intPtr(50), // Increase to 50% rollout
 })
@@ -155,9 +153,69 @@ allFlags, err := provider.ListFlags(ctx)
 uiFlags, err := provider.ListFlags(ctx, "ui", "theme")
 ```
 
-## Custom Providers
+## Best Practices
 
-Implement the `Provider` interface to create custom storage backends:
+1. **Configuration Management**:
+   - Keep flag definitions in a central location for easier maintenance
+   - Document the purpose of each flag in its description field
+   - Use meaningful names and consistent naming conventions
+
+2. **Rollout Strategy**:
+   - Start with small percentage rollouts for risky features
+   - Use environment-based strategies for proper staging
+   - Leverage allow-lists for internal testing before wider rollout
+
+3. **Context Usage**:
+   - Add all required data to the context early in your request lifecycle
+   - Standardize how user IDs and groups are populated in your application
+   - Consider creating middleware to automatically enrich context with user data
+
+4. **Error Handling**:
+   - Always check errors from feature flag operations
+   - Implement graceful fallbacks when flags cannot be evaluated
+   - Log flag evaluation failures for debugging
+
+## API Reference
+
+### Types
+
+```go
+type Flag struct {
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	Enabled     bool      `json:"enabled"`
+	Strategy    Strategy  `json:"strategy,omitempty"`
+	Tags        []string  `json:"tags,omitempty"`
+	CreatedAt   time.Time `json:"created_at,omitempty"`
+	UpdatedAt   time.Time `json:"updated_at,omitempty"`
+}
+
+type Strategy interface {
+	Evaluate(ctx context.Context) (bool, error)
+}
+
+type TargetCriteria struct {
+	UserIDs    []string `json:"user_ids,omitempty"`
+	Groups     []string `json:"groups,omitempty"`
+	Percentage *int     `json:"percentage,omitempty"`
+	AllowList  []string `json:"allow_list,omitempty"`
+	DenyList   []string `json:"deny_list,omitempty"`
+}
+```
+
+### Context Keys
+
+```go
+type ContextKey string
+
+const (
+	UserIDKey      ContextKey = "user_id"
+	UserGroupsKey  ContextKey = "user_groups"
+	EnvironmentKey ContextKey = "environment"
+)
+```
+
+### Provider Interface
 
 ```go
 type Provider interface {
@@ -171,24 +229,24 @@ type Provider interface {
 }
 ```
 
-## Error Handling
+### Factory Functions
 
 ```go
-enabled, err := provider.IsEnabled(ctx, "my-flag")
-if err != nil {
-	if errors.Is(err, feature.ErrFlagNotFound) {
-		// Handle flag not found case
-	} else {
-		// Handle other errors
-	}
-}
+func NewMemoryProvider(flags ...*Flag) (Provider, error)
+func NewAlwaysOnStrategy() Strategy
+func NewAlwaysOffStrategy() Strategy
+func NewTargetedStrategy(criteria TargetCriteria) Strategy
+func NewEnvironmentStrategy(environments ...string) Strategy
+func NewAndStrategy(strategies ...Strategy) Strategy
+func NewOrStrategy(strategies ...Strategy) Strategy
 ```
 
-The package defines the following errors:
+### Error Types
 
-- `ErrFlagNotFound`: Flag doesn't exist
-- `ErrInvalidFlag`: Invalid flag parameters 
-- `ErrProviderNotInitialized`: Provider not ready
-- `ErrInvalidContext`: Missing required context values
-- `ErrInvalidStrategy`: Invalid rollout strategy
-- `ErrOperationFailed`: General operation failure
+```go
+var ErrFlagNotFound = errors.New("feature: flag not found")
+var ErrInvalidFlag = errors.New("feature: invalid flag parameters")
+var ErrProviderNotInitialized = errors.New("feature: provider not initialized")
+var ErrInvalidContext = errors.New("feature: invalid context")
+var ErrInvalidStrategy = errors.New("feature: invalid rollout strategy")
+var ErrOperationFailed = errors.New("feature: operation failed")
