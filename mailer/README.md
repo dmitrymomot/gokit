@@ -135,6 +135,77 @@ if err != nil {
 }
 ```
 
+### Creating Custom Templates
+
+You can create your own email templates using the `templ` library. Here's an example of creating a welcome email template:
+
+1. Create a file named `welcome_email.templ`:
+
+```go
+package templates
+
+import (
+	"github.com/dmitrymomot/gokit/mailer/templates/components"
+)
+
+// WelcomeEmail creates a welcome email template with user's name and confirmation link
+templ WelcomeEmail(userName, confirmationLink string) {
+	@components.Layout() {
+		@components.Header("Welcome to Our Service") 
+		@components.Text("Hello " + userName + ",") 
+		@components.Text("Thank you for joining our service! We're excited to have you on board.") 
+		@components.Text("Please confirm your account to get started:") 
+		@components.ButtonGroup() {
+			@components.PrimaryButton("Confirm Account", confirmationLink) 
+		}
+		@components.Text("If you have any questions, feel free to contact our support team.") 
+		@components.Footer(" 2025 Our Company") 
+	}
+}
+```
+
+2. After saving the template, run the `templ generate` command to generate the Go code:
+
+```bash
+templ generate
+```
+
+3. Use the template in your application code:
+
+```go
+import (
+	"context"
+	
+	"github.com/dmitrymomot/gokit/mailer"
+	"github.com/dmitrymomot/gokit/mailer/templates"
+	"your-package-path/templates" // Import your custom templates package
+)
+
+func sendWelcomeEmail(ctx context.Context, client mailer.EmailSender, userEmail, userName string) error {
+	// Create the template with user-specific data
+	emailTemplate := mytemplates.WelcomeEmail(
+		userName,
+		"https://example.com/confirm?token=abc123",
+	)
+	
+	// Render the template to HTML
+	htmlBody, err := templates.Render(ctx, emailTemplate)
+	if err != nil {
+		return err
+	}
+	
+	// Send the email with the rendered HTML
+	return client.SendEmail(ctx, mailer.SendEmailParams{
+		SendTo:   userEmail,
+		Subject:  "Welcome to Our Service!",
+		BodyHTML: htmlBody,
+		Tag:      "welcome",
+	})
+}
+```
+
+This pattern allows you to create reusable, type-safe email templates with strong separation of concerns between the template design and the email sending logic.
+
 ## Template Components
 
 The package includes reusable email template components built with the `templ` library:
