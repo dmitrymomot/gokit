@@ -1,4 +1,4 @@
-# Randomname Package
+# Randomname
 
 Thread-safe random name generator for workspace, project, and resource naming.
 
@@ -10,18 +10,18 @@ go get github.com/dmitrymomot/gokit/randomname
 
 ## Overview
 
-The `randomname` package generates human-readable, memorable names in either "adjective-noun" or "adjective-noun-suffix" format. It's designed for creating workspace, project, or resource identifiers with built-in collision prevention.
+The `randomname` package generates human-readable, memorable names in either "adjective-noun" or "adjective-noun-suffix" format. It's designed for creating workspace, project, or resource identifiers with built-in collision prevention. This package is thread-safe and suitable for concurrent use in applications where unique identifiers are needed.
 
 ## Features
 
 - Thread-safe implementation with mutex protection
-- Session-based uniqueness tracking
+- Session-based uniqueness tracking to prevent duplicates
 - Support for custom validation callbacks (e.g., database checks)
-- Two name formats:
+- Two name formats with varied collision probability:
   - "adjective-noun" (brave-tiger)
   - "adjective-noun-xxxxxx" (brave-tiger-1a2b3c)
-- Rich word variety: 42 adjectives × 44 nouns (1,848 base combinations)
-- With 24-bit suffix: ~31 billion unique combinations
+- Rich word variety with 42 adjectives × 44 nouns (1,848 base combinations)
+- With 24-bit suffix: ~16.7 million unique combinations per base name
 
 ## Usage
 
@@ -32,9 +32,11 @@ import "github.com/dmitrymomot/gokit/randomname"
 
 // Generate name with suffix (e.g., "brave-tiger-1a2b3c")
 name := randomname.Generate(nil)
+// Returns: "brave-tiger-1a2b3c" (unique across session)
 
 // Generate a simple name without suffix (e.g., "brave-tiger")
 simpleName := randomname.GenerateSimple(nil)
+// Returns: "brave-tiger" (only unique if it hasn't been used before)
 ```
 
 ### With Custom Validation
@@ -49,74 +51,63 @@ name := randomname.Generate(func(name string) bool {
     }
     return !exists // Accept only if name doesn't exist
 })
+// Returns: A name that's both session-unique and database-unique
 ```
 
 ### Managing Used Names
 
 ```go
 // Clear the internal cache of used names when no longer needed
+// Useful when starting a new naming session
 randomname.Reset()
 ```
 
-### HTTP Handler Example
+## Best Practices
 
-```go
-http.HandleFunc("/api/generate-project-name", func(w http.ResponseWriter, r *http.Request) {
-    // Generate a name with an optional database check
-    name := randomname.Generate(func(name string) bool {
-        // Check if name exists in your datastore
-        exists, _ := projectStore.Exists(name)
-        return !exists
-    })
-    
-    // Return the generated name
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]string{"name": name})
-})
-```
+1. **Session Management**:
+   - Call `Reset()` when starting a new naming session
+   - Consider session boundaries (e.g., application restart, user session)
+
+2. **Validation Handling**:
+   - Implement proper error handling in validation callbacks
+   - Return `false` from callbacks on validation error to reject the name
+   - Keep validation functions lightweight and non-blocking
+
+3. **Format Selection**:
+   - Use `Generate()` (with suffix) when uniqueness is critical
+   - Use `GenerateSimple()` for better readability when namespace is large enough
+   - Consider the potential for collisions with `GenerateSimple()` (limited to 1,848 combinations)
+
+4. **Concurrency**:
+   - The package is thread-safe, but external validation must also be thread-safe
+   - Avoid long-running operations in validation callbacks while holding name reservations
 
 ## API Reference
 
-### Name Generation
+### Functions
 
-- `Generate(check func(name string) bool) string`: Generate a name with suffix
-- `GenerateSimple(check func(name string) bool) string`: Generate a name without suffix
-- `Reset()`: Clear the internal cache of used names
+```go
+func Generate(check func(name string) bool) string
+```
+Generates a random name in the format "adjective-noun-xxxxxx" with a 6-character hexadecimal suffix. Ensures uniqueness within the current session and accepts an optional validation callback.
 
-### Name Validation
+```go
+func GenerateSimple(check func(name string) bool) string
+```
+Generates a random name in the format "adjective-noun" without the hexadecimal suffix. Has a higher chance of collisions due to the smaller namespace.
 
-The `check` callback function allows for custom validation:
+```go
+func Reset()
+```
+Clears the internal cache of used names, allowing previously generated names to be used again.
+
+### Validation Callback
 
 ```go
 type ValidateFunc func(name string) bool
 ```
-
-The callback should:
+Function signature for the validation callback:
 - Return `true` to accept the name
 - Return `false` to reject the name and generate a new one
 
-## Thread Safety
-
-The package provides thread-safe operation:
-
-- Uses sync.Mutex for synchronization
-- Prevents race conditions with immediate name reservation
-- Executes validation outside the lock to avoid deadlocks
-- Automatically cleans up rejected names
-
-## Customization
-
-The package includes carefully selected word lists:
-- 42 descriptive adjectives (brave, swift, gentle, etc.)
-- 44 animal nouns (tiger, eagle, panda, etc.)
-
-These create memorable, friendly, and professional resource names.
-
-## Best Practices
-
-1. **Reset when appropriate**: Clear the name cache when starting a new session
-2. **Handle validation errors**: Always properly handle errors in validation callbacks
-3. **Choose the right format**:
-   - Use `Generate()` (with suffix) when uniqueness is critical
-   - Use `GenerateSimple()` when readability is more important than uniqueness
-4. **Consider namespace size**: With only 1,848 base combinations, `GenerateSimple()` has higher collision probability
+The callback is executed after a name is reserved but before it's returned to the caller. If the callback rejects the name, the reservation is released and a new name is generated.
