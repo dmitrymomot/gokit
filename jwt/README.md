@@ -2,6 +2,26 @@
 
 A simple, high-performance JWT (JSON Web Token) implementation for Go applications.
 
+## Table of Contents
+
+* [Installation](#installation)
+* [Overview](#overview)
+* [Features](#features)
+* [Usage](#usage)
+	+ [Basic Token Generation and Parsing](#basic-token-generation-and-parsing)
+	+ [Custom Claims](#custom-claims)
+	+ [Error Handling](#error-handling)
+	+ [HTTP Middleware](#http-middleware)
+	+ [Type-Safe Claims in Handlers](#type-safe-claims-in-handlers)
+	+ [Custom Token Extraction](#custom-token-extraction)
+	+ [Skip Middleware for Public Routes](#skip-middleware-for-public-routes)
+* [Best Practices](#best-practices)
+* [API Reference](#api-reference)
+	+ [Types](#types)
+	+ [Functions](#functions)
+	+ [Methods](#methods)
+	+ [Error Types](#error-types)
+
 ## Installation
 
 ```bash
@@ -126,7 +146,6 @@ import (
     "errors"
     "fmt"
     "github.com/dmitrymomot/gokit/jwt"
-    "net/http"
     "time"
 )
 
@@ -168,31 +187,6 @@ if err != nil {
         fmt.Printf("Unknown error: %v\n", err)
     }
 }
-
-// Example 3: Comprehensive error handling function
-func validateUserToken(tokenString string) (*UserClaims, error) {
-    var claims UserClaims
-    err := jwtService.Parse(tokenString, &claims)
-    if err != nil {
-        switch {
-        case errors.Is(err, jwt.ErrExpiredToken):
-            return nil, fmt.Errorf("session expired: %w", err)
-        case errors.Is(err, jwt.ErrInvalidSignature):
-            return nil, fmt.Errorf("invalid token signature: %w", err)
-        case errors.Is(err, jwt.ErrInvalidToken):
-            return nil, fmt.Errorf("malformed token: %w", err)
-        default:
-            return nil, fmt.Errorf("token validation failed: %w", err)
-        }
-    }
-    
-    // Additional validation if needed
-    if len(claims.Roles) == 0 {
-        return nil, errors.New("token has no roles assigned")
-    }
-    
-    return &claims, nil
-}
 ```
 
 ### HTTP Middleware
@@ -203,18 +197,20 @@ import (
     "github.com/dmitrymomot/gokit/jwt"
 )
 
-const JWTContextKey jwt.ContextKey = "user_claims"
-
 // Create JWT middleware
-jwtMiddleware := jwt.Middleware(jwt.MiddlewareConfig{
-    Service:    jwtService,
-    ContextKey: JWTContextKey,
-})
+jwtMiddleware := jwt.Middleware(jwtService)
 
 // Create a protected handler
 protectedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+    // Get token from context
+    token, ok := jwt.GetToken(r.Context())
+    if !ok {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+    
     // Get claims from context
-    claims, ok := jwt.GetClaims(r.Context(), JWTContextKey)
+    claims, ok := jwt.GetClaims[map[string]any](r.Context())
     if !ok {
         http.Error(w, "Unauthorized", http.StatusUnauthorized)
         return
@@ -242,7 +238,7 @@ type UserClaims struct {
 // In your handler
 func handler(w http.ResponseWriter, r *http.Request) {
     var userClaims UserClaims
-    if err := jwt.GetClaimsAs(r.Context(), JWTContextKey, &userClaims); err != nil {
+    if err := jwt.GetClaimsAs(r.Context(), &userClaims); err != nil {
         http.Error(w, "Unauthorized", http.StatusUnauthorized)
         return
     }
@@ -262,58 +258,45 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 ```go
 // From a cookie
-middleware := jwt.Middleware(jwt.MiddlewareConfig{
-    Service:    jwtService,
-    ContextKey: JWTContextKey,
-    Extractor:  jwt.CookieTokenExtractor("auth_token"),
+middleware := jwt.MiddlewareWithConfig(jwt.MiddlewareConfig{
+    Service:   jwtService,
+    Extractor: jwt.CookieTokenExtractor("auth_token"),
 })
 // Extracts token from the "auth_token" cookie
 
 // From a query parameter
-middleware := jwt.Middleware(jwt.MiddlewareConfig{
-    Service:    jwtService,
-    ContextKey: JWTContextKey,
-    Extractor:  jwt.QueryTokenExtractor("token"),
+middleware := jwt.MiddlewareWithConfig(jwt.MiddlewareConfig{
+    Service:   jwtService,
+    Extractor: jwt.QueryTokenExtractor("token"),
 })
 // Extracts token from the "token" query parameter (e.g., ?token=xyz)
 
 // From a custom header
-middleware := jwt.Middleware(jwt.MiddlewareConfig{
-    Service:    jwtService,
-    ContextKey: JWTContextKey,
-    Extractor:  jwt.HeaderTokenExtractor("X-API-Token"),
+middleware := jwt.MiddlewareWithConfig(jwt.MiddlewareConfig{
+    Service:   jwtService,
+    Extractor: jwt.HeaderTokenExtractor("X-API-Token"),
 })
 // Extracts token from the "X-API-Token" HTTP header
+
+// From the Authorization header (default)
+middleware := jwt.MiddlewareWithConfig(jwt.MiddlewareConfig{
+    Service:   jwtService,
+    Extractor: jwt.BearerTokenExtractor,
+})
+// Extracts token from the "Authorization" header with "Bearer " prefix
 ```
 
 ### Skip Middleware for Public Routes
 
 ```go
-middleware := jwt.Middleware(jwt.MiddlewareConfig{
-    Service:    jwtService,
-    ContextKey: JWTContextKey,
+middleware := jwt.MiddlewareWithConfig(jwt.MiddlewareConfig{
+    Service: jwtService,
     Skip: func(r *http.Request) bool {
         // Skip auth for public endpoints
         return r.URL.Path == "/api/public" || r.URL.Path == "/health"
     },
 })
 // The middleware will not check for tokens on /api/public or /health paths
-```
-
-### Helper Functions
-
-```go
-// Type-safe middleware with generics
-middleware := jwt.WithClaims[UserClaims](jwtService, JWTContextKey)
-// Creates middleware that strongly types the claims as UserClaims
-
-// With custom extractor
-middleware := jwt.WithClaimsAndExtractor[UserClaims](
-    jwtService, 
-    JWTContextKey,
-    jwt.CookieTokenExtractor("auth"),
-)
-// Creates middleware with typed claims and custom token extraction
 ```
 
 ## Best Practices
@@ -337,112 +320,136 @@ middleware := jwt.WithClaimsAndExtractor[UserClaims](
    - Provide user-friendly messages without exposing internal details
 
 4. **Performance**:
-   - Cache parsed tokens in high-traffic scenarios
-   - Use the WithClaims generic helper for type safety without runtime overhead
    - Keep claims minimal - tokens are passed with every request
+   - Use type-safe claim extraction with generics
+   - Implement caching strategies for frequently used tokens
 
 ## API Reference
 
 ### Types
 
 ```go
-type Service interface {
-    Generate(claims interface{}) (string, error)
-    Parse(tokenString string, claims interface{}) error
+type Service struct {
+    signingKey []byte
 }
 ```
-Interface for the JWT service with methods for generating and parsing tokens.
+Implementation of the JWT service for token generation and parsing.
 
 ```go
 type StandardClaims struct {
+    ID        string `json:"jti,omitempty"`
+    Subject   string `json:"sub,omitempty"`
+    Issuer    string `json:"iss,omitempty"`
     Audience  string `json:"aud,omitempty"`
     ExpiresAt int64  `json:"exp,omitempty"`
-    ID        string `json:"jti,omitempty"`
-    IssuedAt  int64  `json:"iat,omitempty"`
-    Issuer    string `json:"iss,omitempty"`
     NotBefore int64  `json:"nbf,omitempty"`
-    Subject   string `json:"sub,omitempty"`
+    IssuedAt  int64  `json:"iat,omitempty"`
 }
 ```
 Standard claims structure as per JWT specification.
 
 ```go
-type ContextKey string
-```
-Type for JWT context keys.
-
-```go
 type MiddlewareConfig struct {
-    Service    Service
-    ContextKey ContextKey
-    Extractor  TokenExtractor
-    Skip       func(*http.Request) bool
+    Service   *Service
+    Extractor TokenExtractorFunc
+    Skip      SkipFunc
 }
 ```
 Configuration for JWT middleware.
 
 ```go
-type TokenExtractor func(*http.Request) string
+type TokenExtractorFunc func(*http.Request) (string, error)
 ```
 Function type for extracting JWT tokens from HTTP requests.
+
+```go
+type SkipFunc func(*http.Request) bool
+```
+Function type for determining whether to skip middleware.
 
 ### Functions
 
 ```go
-func New(signingKey []byte) (Service, error)
+func New(signingKey []byte) (*Service, error)
 ```
 Creates a new JWT service with the given signing key.
 
 ```go
-func Middleware(config MiddlewareConfig) func(http.Handler) http.Handler
+func NewFromString(signingKey string) (*Service, error)
 ```
-Creates HTTP middleware for JWT authentication.
+Creates a new JWT service from a string signing key.
 
 ```go
-func WithClaims[T any](service Service, contextKey ContextKey) func(http.Handler) http.Handler
+func Middleware(service *Service) func(http.Handler) http.Handler
 ```
-Creates type-safe JWT middleware with generics.
+Creates HTTP middleware for JWT authentication with default configuration.
 
 ```go
-func WithClaimsAndExtractor[T any](service Service, contextKey ContextKey, extractor TokenExtractor) func(http.Handler) http.Handler
+func MiddlewareWithConfig(config MiddlewareConfig) func(http.Handler) http.Handler
 ```
-Creates type-safe JWT middleware with custom token extractor.
+Creates HTTP middleware for JWT authentication with custom configuration.
 
 ```go
-func GetClaims(ctx context.Context, key ContextKey) (map[string]interface{}, bool)
+func GetToken(ctx context.Context) (string, bool)
 ```
-Gets claims from context as a map.
+Gets the JWT token string from the context.
 
 ```go
-func GetClaimsAs(ctx context.Context, key ContextKey, claims interface{}) error
+func GetClaims[T any](ctx context.Context) (T, bool)
+```
+Gets claims from context as a strongly typed structure using generics.
+
+```go
+func GetClaimsAs[T any](ctx context.Context, claims *T) error
 ```
 Gets claims from context as a strongly typed structure.
 
 ```go
-func HeaderTokenExtractor(header string) TokenExtractor
+func BearerTokenExtractor(r *http.Request) (string, error)
 ```
-Creates a token extractor that gets tokens from an HTTP header.
+Extracts a JWT token from the Authorization header with "Bearer " prefix.
 
 ```go
-func AuthHeaderTokenExtractor() TokenExtractor
-```
-Creates a token extractor that gets tokens from the Authorization header.
-
-```go
-func CookieTokenExtractor(cookieName string) TokenExtractor
+func CookieTokenExtractor(cookieName string) TokenExtractorFunc
 ```
 Creates a token extractor that gets tokens from an HTTP cookie.
 
 ```go
-func QueryTokenExtractor(paramName string) TokenExtractor
+func QueryTokenExtractor(paramName string) TokenExtractorFunc
 ```
 Creates a token extractor that gets tokens from a query parameter.
+
+```go
+func HeaderTokenExtractor(headerName string) TokenExtractorFunc
+```
+Creates a token extractor that gets tokens from an HTTP header.
+
+### Methods
+
+```go
+func (s *Service) Generate(claims any) (string, error)
+```
+Generates a JWT token with the given claims.
+
+```go
+func (s *Service) Parse(tokenString string, claims any) error
+```
+Parses a JWT token and returns the claims.
+
+```go
+func (c StandardClaims) Valid() error
+```
+Checks if the standard claims are valid (expiration, etc.).
 
 ### Error Types
 
 ```go
 var ErrInvalidToken = errors.New("invalid token")
-var ErrInvalidSignature = errors.New("invalid token signature")
-var ErrExpiredToken = errors.New("token has expired")
+var ErrExpiredToken = errors.New("token is expired")
+var ErrInvalidSigningMethod = errors.New("invalid signing method")
+var ErrMissingSigningKey = errors.New("missing signing key")
+var ErrInvalidSigningKey = errors.New("invalid signing key")
 var ErrInvalidClaims = errors.New("invalid claims")
-var ErrMissingToken = errors.New("missing token")
+var ErrMissingClaims = errors.New("missing claims")
+var ErrInvalidSignature = errors.New("invalid signature")
+var ErrUnexpectedSigningMethod = errors.New("unexpected signing method")
