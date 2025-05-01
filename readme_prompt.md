@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Create a concise, informative README.md file that clearly explains your package's purpose, features, and usage to other developers. A well-structured README serves as an excellent context source for IDE AI assistants to provide accurate code suggestions.
+Create a concise, informative README.md file that clearly explains your package's purpose, features, and usage to other developers. A well-structured README serves as an excellent context source for providing accurate code suggestions.
+
+**IMPORTANT: ALWAYS examine the codebase FIRST. ONLY document functionality that EXISTS in the code and NEVER include speculative or planned features.**
 
 ## README Structure Template
 
@@ -158,7 +160,28 @@ var ErrSpecificError = errors.New("specific error description")
    - Prefer short sentences and active voice
    - Keep the entire README under 300 lines
    - Include code fences with `go` language identifier
-   - Use hierarchical organization with clear section headers
+   - ENSURE all documented functions and types ACTUALLY EXIST in the codebase
+   - VERIFY all function signatures MATCH the actual implementation
+
+7. **Accuracy Verification**
+   - ALWAYS verify the existence of functions, types, or variables before documenting them
+   - DOUBLE-CHECK all function signatures against their actual implementation
+   - DO NOT document planned or future functionality that doesn't yet exist
+   - ONLY document features that are implemented and working in the current version
+
+## Anti-Hallucination Checklist
+
+BEFORE finalizing any README, VERIFY the following:
+
+1. **EXISTENCE CHECK**: CONFIRM every function, method, type, and variable mentioned actually exists in the code
+2. **SIGNATURE CHECK**: VERIFY all function signatures exactly match what's in the code
+3. **BEHAVIOR CHECK**: VALIDATE that code examples match the actual implementation behavior
+4. **ERROR CHECK**: ENSURE all documented error types and values exist in the code
+5. **CONSISTENCY CHECK**: VERIFY parameter names and types are consistent throughout documentation
+6. **EXAMPLE CHECK**: TEST all code examples against the current implementation
+7. **CLAIM CHECK**: CONFIRM all performance, security, and thread-safety claims are supported by the code
+
+NEVER document features based solely on function names or comments without verifying the implementation.
 
 ## Example README
 
@@ -304,4 +327,4 @@ var ErrInsufficientEntropy = errors.New("insufficient system entropy")
 var ErrInvalidKeyFormat = errors.New("invalid API key format")
 ```
 
-Remember to adjust the README to match your package's complexity and specific needs. The best READMEs for IDE AI assistants are comprehensive yet structured, with clear sections, code examples with comments showing expected outputs, and detailed API documentation including error types and configuration options.
+Remember to adjust the README to match your package's complexity and specific needs. The best READMEs are comprehensive yet structured, with clear sections, code examples with comments showing expected outputs, and detailed API documentation including error types and configuration options.
