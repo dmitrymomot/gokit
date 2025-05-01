@@ -83,14 +83,37 @@ hasAny := scopes.HasAnyScopes(userScopes, requiredForPartialAccess)
 ### Error Handling
 
 ```go
-// When validating scopes in your application logic
+// Handling scope validation in your application
+userScopes := []string{"read", "delete"}
+validScopes := []string{"read", "write", "admin.*"}
+
 if !scopes.ValidateScopes(userScopes, validScopes) {
+    // Handle invalid scopes scenario
+    // You can create or wrap errors based on the result
+    return fmt.Errorf("invalid scope provided: %w", scopes.ErrScopeNotAllowed)
+}
+
+// When implementing your own scope validation with custom errors
+func validateUserScopes(userScopes, validScopes []string) error {
+    for _, scope := range userScopes {
+        if !scopes.HasScope(validScopes, scope) {
+            if !isValidScopeFormat(scope) {
+                return fmt.Errorf("%s: %w", scope, scopes.ErrInvalidScope)
+            }
+            return fmt.Errorf("%s: %w", scope, scopes.ErrScopeNotAllowed)
+        }
+    }
+    return nil
+}
+
+// Using the custom validator
+if err := validateUserScopes(userScopes, validScopes); err != nil {
     switch {
     case errors.Is(err, scopes.ErrInvalidScope):
-        // Handle invalid scope error
-        return fmt.Errorf("invalid scope provided: %w", err)
+        // Handle invalid scope format
+        return fmt.Errorf("invalid scope format: %w", err)
     case errors.Is(err, scopes.ErrScopeNotAllowed):
-        // Handle scope not allowed error
+        // Handle unauthorized scope
         return fmt.Errorf("scope not allowed: %w", err)
     default:
         // Handle unexpected errors
@@ -203,10 +226,4 @@ Removes duplicate scopes and sorts them alphabetically.
 
 ```go
 var ErrInvalidScope = errors.New("invalid scope")
-```
-Returned when a scope is not valid.
-
-```go
 var ErrScopeNotAllowed = errors.New("scope not allowed")
-```
-Returned when a scope is not in the list of allowed scopes.
