@@ -1,6 +1,6 @@
 # Webhook Package
 
-A flexible, configurable client for sending webhook HTTP requests with retry and logging support.
+A flexible, thread-safe client for sending webhook HTTP requests with retry and logging capabilities.
 
 ## Installation
 
@@ -10,18 +10,18 @@ go get github.com/dmitrymomot/gokit/webhook
 
 ## Overview
 
-The `webhook` package provides a robust client for sending HTTP webhook requests to external services with support for various configuration options, automatic retries, and comprehensive logging capabilities.
+The `webhook` package provides a robust client for sending HTTP webhook requests to external services with configurable retry logic and structured logging. It follows a clean decorator pattern, allowing you to add capabilities like automatic retries and comprehensive logging to a base webhook sender. All components are designed to be thread-safe for concurrent usage.
 
 ## Features
 
-- Flexible request configuration with sensible defaults
-- Multiple HTTP methods (GET, POST, PUT, DELETE, etc.)
-- Automatic parameter handling (JSON for request bodies, query strings for GET/DELETE)
-- Configurable retry mechanism with exponential backoff
-- Detailed request/response logging with privacy controls
-- Context support for cancellation and timeouts
-- Decorator pattern for extensibility
-- Thread-safe implementation
+- Flexible HTTP webhook sending with support for all common HTTP methods
+- Automatic parameter handling (JSON body or query parameters based on HTTP method)
+- Configurable retry mechanism with exponential backoff and custom retry conditions
+- Structured logging with privacy controls for sensitive data
+- Thread-safe implementation for concurrent webhook requests
+- Decorator pattern for modular extension of functionality
+- Context support for timeouts and cancellation
+- Zero external dependencies beyond the Go standard library
 
 ## Usage
 
@@ -38,9 +38,6 @@ func main() {
 	// Create a new webhook sender
 	sender := webhook.NewWebhookSender()
 	
-	// Create a context
-	ctx := context.Background()
-	
 	// Send a POST request with JSON payload
 	params := map[string]any{
 		"event": "user.created",
@@ -49,7 +46,7 @@ func main() {
 	}
 	
 	// Send the webhook request
-	resp, err := sender.Send(ctx, "https://api.example.com/webhook", params)
+	resp, err := sender.Send(context.Background(), "https://api.example.com/webhook", params)
 	if err != nil {
 		// Handle error
 		fmt.Printf("Failed to send webhook: %v\n", err)
@@ -58,33 +55,21 @@ func main() {
 	
 	// Check response status
 	if !resp.IsSuccessful() {
-		fmt.Printf("Request failed with status %d: %s\n", resp.StatusCode, resp.Body)
+		fmt.Printf("Request failed with status %d\n", resp.StatusCode)
 		return
 	}
 	
-	fmt.Println("Webhook sent successfully!")
+	// Response body is available as resp.Body ([]byte)
+	// Headers are available as resp.Headers (http.Header)
+	// Request duration is available as resp.Duration (time.Duration)
 }
 ```
 
-### Custom HTTP Method and Headers
+### Using Different HTTP Methods
 
 ```go
-// Send with custom HTTP method and headers
-resp, err := sender.Send(
-	ctx, 
-	"https://api.example.com/webhook", 
-	params,
-	webhook.WithMethod("PUT"),
-	webhook.WithHeader("Authorization", "Bearer token123"),
-	webhook.WithHeader("X-Custom-Header", "value"),
-)
-```
-
-### GET Request with Query Parameters
-
-```go
-// Parameters are automatically converted to query string for GET requests
-// This will make a request to: https://api.example.com/search?term=golang&limit=10
+// GET request with query parameters
+// Parameters are automatically converted to a query string
 params := map[string]any{
 	"term": "golang",
 	"limit": 10,
@@ -96,72 +81,40 @@ resp, err := sender.Send(
 	params,
 	webhook.WithMethod("GET"),
 )
-```
+// Sends request to: https://api.example.com/search?term=golang&limit=10
 
-### Using Structs as Parameters
-
-```go
-// Define a struct with JSON tags
-type SearchParams struct {
-	Term     string `json:"term"`
-	Limit    int    `json:"limit"`
-	Page     int    `json:"page"`
-	SortBy   string `json:"sort_by,omitempty"`
-}
-
-// Create search parameters
-params := SearchParams{
-	Term:   "golang",
-	Limit:  10,
-	Page:   1,
-	SortBy: "relevance",
-}
-
-// For GET, parameters are converted to query string
-// For POST/PUT, parameters are marshaled to JSON
-resp, err := sender.Send(ctx, "https://api.example.com/search", params, webhook.WithMethod("GET"))
-```
-
-### Configuring a Sender
-
-```go
-// Create a sender with custom configuration
-sender := webhook.NewWebhookSender(
-	webhook.WithDefaultMethod("POST"),
-	webhook.WithDefaultHeaders(map[string]string{
-		"Authorization": "Bearer token123",
-		"X-API-Version": "1.0",
-		"User-Agent": "GoKit/1.0",
-	}),
-	webhook.WithDefaultTimeout(10 * time.Second),
-	webhook.WithMaxRetries(3),
-	webhook.WithRetryInterval(500 * time.Millisecond),
+// PUT request with custom headers
+resp, err := sender.Send(
+	ctx, 
+	"https://api.example.com/users/123", 
+	userDataMap,
+	webhook.WithMethod("PUT"),
+	webhook.WithHeader("Authorization", "Bearer token123"),
+	webhook.WithHeader("X-Custom-Header", "value"),
 )
-
-// Use the configured sender
-resp, err := sender.Send(ctx, "https://api.example.com/webhook", params)
 ```
 
-### Adding Retry Capability
+### Retry Decorator
 
 ```go
 // Create a base webhook sender
 baseSender := webhook.NewWebhookSender()
 
-// Add retry capabilities with configuration
-sender := webhook.NewRetryDecorator(
+// Add retry capabilities
+retrySender := webhook.NewRetryDecorator(
 	baseSender,
-	webhook.WithRetryCount(5),            // Retry up to 5 times
-	webhook.WithRetryDelay(1 * time.Second), // Wait 1 second between retries
-	webhook.WithRetryBackoff(),           // Use exponential backoff
-	webhook.WithRetryOnServerErrors(),    // Retry on 5xx errors
+	webhook.WithRetryCount(3),                // Retry up to 3 times
+	webhook.WithRetryDelay(1 * time.Second),  // Start with 1 second delay
+	webhook.WithRetryBackoff(),               // Use exponential backoff
+	webhook.WithRetryOnServerErrors(),        // Retry on 5xx errors
+	webhook.WithRetryOnNetworkErrors(),       // Retry on network failures
 )
 
-// Send with automatic retries for failures
-resp, err := sender.Send(ctx, "https://api.example.com/webhook", params)
+// Use the retry-enabled sender
+resp, err := retrySender.Send(ctx, "https://api.example.com/webhook", params)
 ```
 
-### Adding Logging Capability
+### Logging Decorator
 
 ```go
 import (
@@ -178,30 +131,31 @@ logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 baseSender := webhook.NewWebhookSender()
 
 // Add logging capability with masked sensitive fields
-sender := webhook.NewLoggerDecorator(
+loggedSender := webhook.NewLoggerDecorator(
 	baseSender, 
 	logger,
 	webhook.WithMaskedFields("api_key", "password", "token"),
 )
 
 // Use the logging-enabled sender
-resp, err := sender.Send(ctx, "https://api.example.com/webhook", params)
+resp, err := loggedSender.Send(ctx, "https://api.example.com/webhook", params)
+// Logs request details (with sensitive fields masked) and response details
 ```
 
-### Combining Multiple Decorators
+### Combined Decorators
 
 ```go
 // Create a base webhook sender
 baseSender := webhook.NewWebhookSender()
 
-// Add logging capability first
+// Add logging capability first (inner decorator)
 loggedSender := webhook.NewLoggerDecorator(
 	baseSender,
 	logger,
 	webhook.WithMaskedFields("password", "token"),
 )
 
-// Add retry capability on top of logging
+// Add retry capability (outer decorator)
 sender := webhook.NewRetryDecorator(
 	loggedSender,
 	webhook.WithRetryCount(3),
@@ -211,98 +165,156 @@ sender := webhook.NewRetryDecorator(
 
 // Use the fully decorated sender
 resp, err := sender.Send(ctx, "https://api.example.com/webhook", params)
+// The request will be logged both before sending and after receiving a response
+// If the request fails, it will be retried up to 3 times with logging for each attempt
 ```
 
-## API Reference
-
-### Core Interface
+### Error Handling
 
 ```go
-// WebhookSender defines the interface for sending webhook requests
-type WebhookSender interface {
-	Send(ctx context.Context, url string, params any, opts ...RequestOption) (*Response, error)
+resp, err := sender.Send(ctx, "https://api.example.com/webhook", params)
+if err != nil {
+	switch {
+	case errors.Is(err, webhook.ErrInvalidURL):
+		// Handle invalid URL error
+	case errors.Is(err, webhook.ErrMarshalParams):
+		// Handle parameter marshaling error
+	case errors.Is(err, webhook.ErrSendRequest):
+		// Handle network or connection error
+	case errors.Is(err, webhook.ErrResponseTimeout):
+		// Handle timeout error
+	default:
+		// Handle other errors
+	}
+	return
 }
-```
 
-### Response Type
-
-```go
-// Response contains the HTTP response details
-type Response struct {
-	StatusCode int           // HTTP status code
-	Body       []byte        // Response body
-	Headers    http.Header   // Response headers
-	Duration   time.Duration // Request duration
-	Request    *Request      // Original request details
+// Check response status
+if !resp.IsSuccessful() {
+	// Handle unsuccessful HTTP status code (non 2xx)
+	fmt.Printf("Request failed with status %d: %s\n", resp.StatusCode, resp.Body)
+	return
 }
-
-// Check if response status code indicates success (2xx)
-func (r *Response) IsSuccessful() bool
-```
-
-### Configuration Options
-
-#### Sender Options
-
-```go
-// Configure the base webhook sender
-WithHTTPClient(client *http.Client) SenderOption
-WithDefaultTimeout(timeout time.Duration) SenderOption
-WithDefaultHeaders(headers map[string]string) SenderOption
-WithDefaultMethod(method string) SenderOption
-WithMaxRetries(retries int) SenderOption
-WithRetryInterval(interval time.Duration) SenderOption
-```
-
-#### Request Options
-
-```go
-// Configure individual requests
-WithMethod(method string) RequestOption
-WithHeader(key, value string) RequestOption
-WithHeaders(headers map[string]string) RequestOption
-WithRequestTimeout(timeout time.Duration) RequestOption
-```
-
-#### Retry Options
-
-```go
-// Configure retry behavior
-WithRetryCount(max int) RetryOption
-WithRetryDelay(interval time.Duration) RetryOption
-WithRetryBackoff() RetryOption
-WithRetryOnStatus(statusCodes ...int) RetryOption
-WithRetryOnServerErrors() RetryOption
-WithRetryOnNetworkErrors() RetryOption
-WithRetryLogger(logger *slog.Logger) RetryOption
-```
-
-#### Logger Options
-
-```go
-// Configure logging behavior
-WithHideParams() LoggerOption
-WithMaskedFields(fields ...string) LoggerOption
 ```
 
 ## Best Practices
 
 1. **Error Handling**:
-   - Always check for errors returned from `Send`
-   - Verify response success with `resp.IsSuccessful()`
-   - Log failed requests and response bodies for debugging
+   - Always check both the error return value and the response status code
+   - Use `errors.Is()` to check for specific error types
+   - Implement proper logging for failed requests for troubleshooting
 
 2. **Security**:
-   - Use `WithMaskedFields` to protect sensitive data in logs
-   - Store authentication tokens securely, not in code
-   - Use HTTPS URLs for all webhook endpoints
+   - Use `WithMaskedFields()` to protect sensitive data in logs
+   - Always use HTTPS URLs for webhook endpoints
+   - Avoid hardcoding authentication tokens in your code
 
-3. **Performance**:
-   - Configure appropriate timeouts based on endpoint responsiveness
-   - Use retry with backoff for unreliable endpoints
-   - Consider using context with timeout for long-running operations
+3. **Reliability**:
+   - Use the retry decorator for important webhooks or unreliable endpoints
+   - Configure reasonable timeout values based on the expected response time
+   - Consider implementing circuit breakers for consistently failing endpoints
 
-4. **Reliability**:
-   - Set reasonable retry counts for important webhooks
-   - Use exponential backoff for retry intervals
-   - Implement circuit breaker patterns for consistently failing endpoints
+4. **Performance**:
+   - Reuse webhook sender instances instead of creating new ones for each request
+   - For high-volume webhook sending, consider using goroutines for concurrent requests
+   - Use context timeouts to avoid waiting indefinitely for slow endpoints
+
+## API Reference
+
+### Core Interfaces and Types
+
+```go
+// WebhookSender defines the core interface for sending webhooks
+type WebhookSender interface {
+	Send(ctx context.Context, url string, params any, opts ...RequestOption) (*Response, error)
+}
+
+// Request represents a webhook request
+type Request struct {
+	URL     string
+	Method  string
+	Headers map[string]string
+	Params  any
+	Timeout time.Duration
+}
+
+// Response contains the HTTP response details
+type Response struct {
+	StatusCode int
+	Body       []byte
+	Headers    http.Header
+	Duration   time.Duration
+	Request    *Request
+}
+```
+
+### Functions
+
+```go
+func NewWebhookSender(opts ...SenderOption) WebhookSender
+```
+Creates a new webhook sender with the specified options.
+
+```go
+func NewRetryDecorator(sender WebhookSender, opts ...RetryOption) WebhookSender
+```
+Wraps a webhook sender with retry capabilities.
+
+```go
+func NewLoggerDecorator(sender WebhookSender, logger *slog.Logger, opts ...LoggerOption) WebhookSender
+```
+Wraps a webhook sender with logging capabilities.
+
+### Methods
+
+```go
+func (r *Response) IsSuccessful() bool
+```
+Returns true if the response status code is in the 2xx range.
+
+### Configuration Options
+
+#### Sender Options
+```go
+func WithHTTPClient(client *http.Client) SenderOption
+func WithDefaultTimeout(timeout time.Duration) SenderOption
+func WithDefaultHeaders(headers map[string]string) SenderOption
+func WithDefaultMethod(method string) SenderOption
+func WithMaxRetries(retries int) SenderOption
+func WithRetryInterval(interval time.Duration) SenderOption
+```
+
+#### Request Options
+```go
+func WithMethod(method string) RequestOption
+func WithHeader(key, value string) RequestOption
+func WithHeaders(headers map[string]string) RequestOption
+func WithRequestTimeout(timeout time.Duration) RequestOption
+```
+
+#### Retry Options
+```go
+func WithRetryCount(max int) RetryOption
+func WithRetryDelay(interval time.Duration) RetryOption
+func WithRetryBackoff() RetryOption
+func WithRetryOnStatus(statusCodes ...int) RetryOption
+func WithRetryOnServerErrors() RetryOption
+func WithRetryOnNetworkErrors() RetryOption
+func WithRetryLogger(logger *slog.Logger) RetryOption
+```
+
+#### Logger Options
+```go
+func WithHideParams() LoggerOption
+func WithMaskedFields(fields ...string) LoggerOption
+```
+
+### Error Types
+```go
+var ErrInvalidURL = errors.New("invalid webhook URL")
+var ErrInvalidMethod = errors.New("invalid HTTP method")
+var ErrMarshalParams = errors.New("failed to marshal request parameters")
+var ErrCreateRequest = errors.New("failed to create HTTP request")
+var ErrSendRequest = errors.New("failed to send HTTP request")
+var ErrReadResponse = errors.New("failed to read HTTP response")
+var ErrResponseTimeout = errors.New("webhook request timed out")
