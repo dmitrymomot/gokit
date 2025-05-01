@@ -10,18 +10,17 @@ go get github.com/dmitrymomot/gokit/privacy
 
 ## Overview
 
-The `privacy` package provides tools for masking sensitive data in Go applications. It includes specialized maskers for common data types (emails, credit cards, phone numbers, etc.) with configurable masking behaviors, category-based registry, and auto-detection capabilities.
+The `privacy` package provides tools for masking sensitive data in Go applications. It offers a comprehensive set of strategies for data masking, including specialized implementations for common sensitive data types (emails, credit cards, phones) and a registry system for easy management of masking rules. The package is designed to be thread-safe, flexible, and easy to integrate into existing applications.
 
 ## Features
 
-- Multiple masking strategies (redaction, partial visibility)
-- Type-specific maskers for common sensitive data types
-- Category registry for organized masking rules
+- Multiple masking strategies (redaction, partial visibility, tokenization, pseudonymization)
+- Type-specific maskers for common sensitive data types (emails, credit cards, phones)
+- Category-based registry for organized masking rules
 - Auto-detection of sensitive data patterns
 - Flexible configuration via functional options
-- Context support for cancellation and timeouts
-- Thread-safe implementation
-- Comprehensive error handling
+- Thread-safe implementation for concurrent usage
+- Comprehensive error handling with specific error types
 
 ## Usage
 
@@ -71,6 +70,7 @@ if err != nil {
 }
 
 // Mask an email address
+ctx := context.Background()
 result, err := masker.Mask(ctx, "john.doe@example.com")
 if err != nil {
 	panic(err)
@@ -93,6 +93,7 @@ if err != nil {
 }
 
 // Mask a credit card number
+ctx := context.Background()
 result, err := masker.Mask(ctx, "4111 1111 1111 1111")
 if err != nil {
 	panic(err)
@@ -103,29 +104,6 @@ fmt.Println(result) // Output: **** **** **** 1111
 // Also handles special formats like AMEX
 amexResult, _ := masker.Mask(ctx, "3782 822463 10005")
 fmt.Println(amexResult) // Output: **** ***** *0005
-```
-
-### Phone Number Masking
-
-```go
-// Create a phone number masker
-masker, err := privacy.NewPhoneMasker(
-	privacy.WithPhoneReplacement('*'),      // Character for masking
-	privacy.WithVisiblePhoneDigits(4),      // Show last 4 digits
-	privacy.WithPreserveFormat(true),       // Keep formatting
-	privacy.WithPreserveCountryCode(true),  // Keep country code visible
-)
-if err != nil {
-	panic(err)
-}
-
-// Mask a phone number
-result, err := masker.Mask(ctx, "+1 (555) 123-4567")
-if err != nil {
-	panic(err)
-}
-
-fmt.Println(result) // Output: +1 (***) ***-4567
 ```
 
 ### Using the Masking Registry
@@ -147,17 +125,14 @@ registry.RegisterMasker(privacy.CategoryCreditCard, cardMasker)
 registry.RegisterMasker(privacy.CategoryPhone, phoneMasker)
 
 // Mask data by category
+ctx := context.Background()
 emailResult, _ := registry.MaskByCategory(ctx, privacy.CategoryEmail, "user@example.com")
 cardResult, _ := registry.MaskByCategory(ctx, privacy.CategoryCreditCard, "4111 1111 1111 1111")
 phoneResult, _ := registry.MaskByCategory(ctx, privacy.CategoryPhone, "(555) 123-4567")
 
-fmt.Println(emailResult)  // Output: u***@example.com
-fmt.Println(cardResult)   // Output: **** **** **** 1111
-fmt.Println(phoneResult)  // Output: (***) ***-4567
-
-// Fallback to default masker for unregistered categories
-nameResult, _ := registry.MaskByCategory(ctx, privacy.CategoryName, "John Smith")
-fmt.Println(nameResult)  // Output: [REDACTED]
+fmt.Println(emailResult)  // Masked email output
+fmt.Println(cardResult)   // Masked card output
+fmt.Println(phoneResult)  // Masked phone output
 ```
 
 ### Auto-Detection and Masking
@@ -192,6 +167,7 @@ registry.RegisterDetectionRule(privacy.CategoryEmail, func(data any) bool {
 // Define and register other detection rules...
 
 // Auto-detect and mask data
+ctx := context.Background()
 email := "user@example.com"
 card := "4111 1111 1111 1111"
 phone := "+1 (555) 123-4567"
@@ -205,6 +181,32 @@ fmt.Println(cardResult)   // Auto-detected and masked as credit card
 fmt.Println(phoneResult)  // Auto-detected and masked as phone number
 ```
 
+## Best Practices
+
+1. **Security Considerations**:
+   - Always sanitize logs and outputs containing sensitive information
+   - Choose appropriate masking strategies based on data sensitivity
+   - Don't rely solely on masking for highly sensitive data (consider encryption)
+   - Regularly review and update detection patterns for evolving data formats
+
+2. **Performance Optimization**:
+   - Cache masker instances for reuse across requests
+   - Consider using the registry pattern to organize maskers for complex applications
+   - For high-volume applications, limit auto-detection to essential cases
+   - Pre-register all required maskers during application initialization
+
+3. **Error Handling**:
+   - Always check for errors when masking sensitive data
+   - Use the predefined error types to handle specific failure cases
+   - Log masking failures appropriately without revealing sensitive data
+   - Implement graceful fallbacks when masking fails
+
+4. **Configuration Best Practices**:
+   - Use default maskers for simple cases
+   - Customize maskers based on your application's security requirements
+   - Follow industry standards (e.g., PCI-DSS for credit cards)
+   - Document which masking strategies are used for different data types
+
 ## API Reference
 
 ### Masker Interface
@@ -212,52 +214,9 @@ fmt.Println(phoneResult)  // Auto-detected and masked as phone number
 ```go
 // Masker defines the interface for all masking operations
 type Masker interface {
-	Mask(ctx context.Context, data any) (string, error)
+	Mask(ctx context.Context, data any) (any, error)
+	CanMask(data any) bool
 }
-```
-
-### Available Maskers
-
-```go
-// Create specialized maskers with their configuration options
-StringMasker   // General purpose string masking
-EmailMasker    // Email-specific masking
-CardMasker     // Credit card number masking (PCI-DSS compliant)
-PhoneMasker    // Phone number masking
-```
-
-### Masking Registry
-
-```go
-// MaskingRegistry manages multiple maskers by category
-type MaskingRegistry interface {
-	RegisterMasker(category Category, masker Masker)
-	MaskByCategory(ctx context.Context, category Category, data any) (string, error)
-	GetMasker(category Category) Masker
-}
-
-// AutoMaskingRegistry extends MaskingRegistry with detection capabilities
-type AutoMaskingRegistry interface {
-	MaskingRegistry
-	RegisterDetectionRule(category Category, rule DetectionRule)
-	AutoMask(ctx context.Context, data any) (string, error)
-}
-```
-
-### Available Categories
-
-```go
-// Predefined data categories
-const (
-	CategoryEmail      Category = "email"
-	CategoryCreditCard Category = "credit_card"
-	CategoryPhone      Category = "phone"
-	CategoryName       Category = "name"
-	CategoryAddress    Category = "address"
-	CategoryPassword   Category = "password"
-	CategorySSN        Category = "ssn"
-	CategoryCustom     Category = "custom"
-)
 ```
 
 ### Masking Strategies
@@ -265,9 +224,58 @@ const (
 ```go
 // Available masking strategies
 const (
-	StrategyRedact      Strategy = "redact"       // Complete replacement
-	StrategyPartialMask Strategy = "partial_mask" // Show portions of data
+	StrategyRedact      MaskingStrategy = "redact"       // Complete replacement
+	StrategyPartialMask MaskingStrategy = "partial"      // Show portions of data
+	StrategyTokenize    MaskingStrategy = "tokenize"     // Replace with token
+	StrategyPseudonymize MaskingStrategy = "pseudonymize" // Replace with pseudonym
+	StrategyEncrypt     MaskingStrategy = "encrypt"      // Encrypt the data
+	StrategyNoise       MaskingStrategy = "noise"        // Add statistical noise
 )
+```
+
+### Data Categories
+
+```go
+// Predefined data categories
+const (
+	// General categories
+	CategoryPII           DataCategory = "pii"
+	CategoryFinancial     DataCategory = "financial"
+	CategoryHealth        DataCategory = "health"
+	CategoryCredentials   DataCategory = "credentials"
+	CategoryLocation      DataCategory = "location"
+	CategoryCommunication DataCategory = "communication"
+	
+	// Specific data categories
+	CategoryCreditCard    DataCategory = "credit_card"
+	CategoryEmail         DataCategory = "email"
+	CategoryPhone         DataCategory = "phone"
+	CategorySSN           DataCategory = "ssn"
+	CategoryName          DataCategory = "name"
+	CategoryAddress       DataCategory = "address"
+	CategoryPassport      DataCategory = "passport"
+	CategoryDriverLicense DataCategory = "driver_license"
+)
+```
+
+### Registry Interfaces
+
+```go
+// MaskerRegistry manages multiple maskers by category
+type MaskerRegistry interface {
+	RegisterMasker(category DataCategory, masker Masker) error
+	GetMasker(category DataCategory) (Masker, error)
+	MaskByCategory(ctx context.Context, category DataCategory, data any) (any, error)
+}
+
+// AutoMaskingRegistry extends MaskingRegistry with detection capabilities
+type AutoMaskingRegistry struct {
+	*MaskingRegistry
+	detectionRules map[DataCategory]DetectionRule
+}
+
+// DetectionRule is used to detect if data belongs to a specific category
+type DetectionRule func(data any) bool
 ```
 
 ### Error Types
@@ -275,51 +283,41 @@ const (
 ```go
 // Common error types for precise error handling
 var (
-	ErrInvalidData      = errors.New("invalid data")
-	ErrUnsupportedType  = errors.New("unsupported type")
-	ErrInvalidMask      = errors.New("invalid mask configuration")
-	ErrInvalidCategory  = errors.New("invalid category")
-	ErrMaskerNotFound   = errors.New("masker not found")
+	// General masking errors
+	ErrInvalidData         = errors.New("privacy: invalid data for masking")
+	ErrInvalidMask         = errors.New("privacy: invalid mask configuration")
+	ErrUnsupportedType     = errors.New("privacy: unsupported data type")
+	ErrMaskingFailed       = errors.New("privacy: masking operation failed")
+	
+	// Registry errors
+	ErrMaskerNotFound      = errors.New("privacy: masker not found for category")
+	ErrInvalidMasker       = errors.New("privacy: invalid masker")
+	ErrInvalidRule         = errors.New("privacy: invalid detection rule")
+	ErrRuleNotFound        = errors.New("privacy: detection rule not found")
+	ErrCategoryNotDetected = errors.New("privacy: data category could not be detected")
+	
+	// Configuration errors
+	ErrInvalidRegex        = errors.New("privacy: invalid regex pattern")
+	ErrNegativeCharCount   = errors.New("privacy: visible character count cannot be negative")
+	ErrNegativeDigitCount  = errors.New("privacy: visible digit count cannot be negative")
+	ErrTooManyVisibleDigits = errors.New("privacy: showing more than 4 digits is not allowed for security reasons")
+	ErrNegativeMinLength   = errors.New("privacy: minimum length cannot be negative")
 )
 ```
 
-## Error Handling
+### Available Maskers
 
 ```go
-// Handle masking errors appropriately
-result, err := masker.Mask(ctx, data)
-if err != nil {
-	switch {
-	case errors.Is(err, privacy.ErrInvalidData):
-		// Handle invalid data error
-	case errors.Is(err, privacy.ErrUnsupportedType):
-		// Handle unsupported type error
-	case errors.Is(err, privacy.ErrInvalidMask):
-		// Handle invalid mask configuration
-	default:
-		// Handle other errors
-	}
-}
+// Create specialized maskers with their configuration options
+func NewStringMasker(options ...Option) (*StringMasker, error)
+func NewEmailMasker(options ...Option) (*EmailMasker, error)
+func NewCardMasker(options ...Option) (*CardMasker, error)
+func NewPhoneMasker(options ...Option) (*PhoneMasker, error)
 ```
 
-## Best Practices
+### Registry Creation
 
-1. **Security**:
-   - Always sanitize logs and outputs containing sensitive information
-   - Choose appropriate masking strategies based on data sensitivity
-   - Don't rely solely on masking for highly sensitive data (consider encryption)
-
-2. **Performance**:
-   - Cache masker instances for reuse across requests
-   - Consider using the registry pattern to organize maskers for complex applications
-   - For high-volume applications, limit auto-detection to essential cases
-
-3. **Error Handling**:
-   - Always check for errors when masking sensitive data
-   - Use the predefined error types to handle specific failure cases
-   - Log masking failures appropriately without revealing sensitive data
-
-4. **Configuration**:
-   - Use default maskers for simple cases
-   - Customize maskers based on your application's security requirements
-   - Follow industry standards (e.g., PCI-DSS for credit cards)
+```go
+// Create new registries
+func NewMaskingRegistry(defaultMasker Masker) *MaskingRegistry
+func NewAutoMaskingRegistry(defaultMasker Masker) *AutoMaskingRegistry
