@@ -147,7 +147,7 @@ func TestContainsScope(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := scopes.ContainsScope(tt.scopes, tt.scope)
+			result := scopes.HasScope(tt.scopes, tt.scope)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -499,7 +499,7 @@ func TestCustomDelimitersWithGlobalVars(t *testing.T) {
 		scopes.ScopeWildcard = "?"
 
 		// Test wildcard matching
-		hasScope := scopes.ContainsScope([]string{"admin:?"}, "admin:read")
+		hasScope := scopes.HasScope([]string{"admin:?"}, "admin:read")
 		assert.True(t, hasScope)
 
 		// Test hierarchical scopes with custom delimiter
@@ -512,7 +512,7 @@ func TestCustomDelimitersWithGlobalVars(t *testing.T) {
 		// Test validation with custom delimiter and wildcard
 		isValid := scopes.ValidateScopes(
 			[]string{"admin:read", "user:write"},
-			[]string{"admin:?", "user:?"}, // Added comma here
+			[]string{"admin:?", "user:?"}, 
 		)
 		assert.True(t, isValid)
 	})
@@ -613,7 +613,7 @@ func TestMatchScope(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := scopes.MatchScope(tt.scope, tt.pattern)
+			result := scopes.ScopeMatches(tt.scope, tt.pattern)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -654,7 +654,7 @@ func TestValidateScopesPerformance(t *testing.T) {
 		{
 			name:        "small collections all valid",
 			scopes:      []string{"scopea", "scopeb", "scopec"},
-			validScopes: []string{"scopea", "scopeb", "scopec", "scoped", "*"},
+			validScopes: []string{"scopea", "scopeb", "scopec", "*"},
 			expected:    true,
 		},
 		{

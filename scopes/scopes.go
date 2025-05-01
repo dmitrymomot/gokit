@@ -73,14 +73,14 @@ func JoinScopes(scopes []string) string {
 	return strings.Join(scopes, ScopeSeparator)
 }
 
-// MatchScope checks if a single scope matches a pattern.
+// ScopeMatches checks if a single scope matches a pattern.
 // It supports wildcards (*) and hierarchical scopes (scope1.scope2).
 //
 // Pattern matching rules:
 // - Direct match: "read" matches "read"
 // - Global wildcard: "*" matches any scope
 // - Namespace wildcard: "admin.*" matches any scope starting with "admin."
-func MatchScope(scope, pattern string) bool {
+func ScopeMatches(scope, pattern string) bool {
 	// Direct match or full wildcard
 	if scope == pattern || pattern == ScopeWildcard {
 		return true
@@ -96,17 +96,17 @@ func MatchScope(scope, pattern string) bool {
 	return false
 }
 
-// ContainsScope checks if scopes contain a specific scope.
+// HasScope checks if scopes contain a specific scope.
 //
 // Supports wildcards and hierarchical scope matching.
 //
 // Example:
 //
-//	hasScope := scopes.ContainsScope([]string{"admin.*", "read"}, "admin.users")
+//	hasScope := scopes.HasScope([]string{"admin.*", "read"}, "admin.users")
 //	// Returns: true (because "admin.*" matches "admin.users")
-func ContainsScope(scopes []string, scope string) bool {
+func HasScope(scopes []string, scope string) bool {
 	for _, s := range scopes {
-		if MatchScope(scope, s) {
+		if ScopeMatches(scope, s) {
 			return true
 		}
 	}
@@ -152,7 +152,7 @@ func HasAllScopes(scopes, required []string) bool {
 	}
 
 	for _, req := range required {
-		if !ContainsScope(scopes, req) {
+		if !HasScope(scopes, req) {
 			return false
 		}
 	}
@@ -187,7 +187,7 @@ func HasAnyScopes(scopes, required []string) bool {
 	}
 
 	for _, req := range required {
-		if ContainsScope(scopes, req) {
+		if HasScope(scopes, req) {
 			return true
 		}
 	}
@@ -284,7 +284,7 @@ func ValidateScopes(scopes, validScopes []string) bool {
 	for _, scope := range scopes {
 		isValid := false
 		for _, validScope := range validScopes {
-			if MatchScope(scope, validScope) {
+			if ScopeMatches(scope, validScope) {
 				isValid = true
 				break
 			}
@@ -321,7 +321,7 @@ func validateScopesWithMap(scopes, validScopes []string) bool {
 		// Then check for wildcard patterns (more expensive)
 		isValid := false
 		for _, pattern := range wildcardPatterns {
-			if MatchScope(scope, pattern) {
+			if ScopeMatches(scope, pattern) {
 				isValid = true
 				break
 			}
