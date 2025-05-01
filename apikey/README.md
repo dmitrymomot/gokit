@@ -27,16 +27,10 @@ The `apikey` package provides tools for creating and managing secure API keys fo
 ### Generating API Keys
 
 ```go
-import (
-    "github.com/dmitrymomot/gokit/apikey"
-    "fmt"
-)
-
 // Generate a random API key (256 bits, hex-encoded)
 apiKey, err := apikey.GenerateRandom()
 if err != nil {
     // Handle error
-    return fmt.Errorf("failed to generate API key: %w", err)
 }
 // apiKey = "a1b2c3d4..." (64-character hexadecimal string)
 
@@ -45,7 +39,6 @@ if err != nil {
 orderedKey, err := apikey.GenerateTimeOrdered()
 if err != nil {
     // Handle error
-    return fmt.Errorf("failed to generate time-ordered key: %w", err)
 }
 // orderedKey = "0188f8e8-..." (UUID v7 format)
 ```
@@ -59,7 +52,6 @@ secretKey := "your-secret-key" // Store this securely
 hash, err := apikey.HashKey(apiKey, secretKey)
 if err != nil {
     // Handle error
-    return fmt.Errorf("failed to hash key: %w", err)
 }
 // hash = "sha256:..." (storable hash string)
 
