@@ -180,6 +180,9 @@ BEFORE finalizing any README, VERIFY the following:
 5. **CONSISTENCY CHECK**: VERIFY parameter names and types are consistent throughout documentation
 6. **EXAMPLE CHECK**: TEST all code examples against the current implementation
 7. **CLAIM CHECK**: CONFIRM all performance, security, and thread-safety claims are supported by the code
+8. **ERROR HANDLING CHECK**: NEVER include error handling code for functions that don't return errors
+
+IMPORTANT: DO NOT show error handling examples for functions that don't return errors. ALWAYS check if a function returns an error before adding error handling code in examples.
 
 NEVER document features based solely on function names or comments without verifying the implementation.
 
@@ -225,7 +228,6 @@ import (
 apiKey, err := apikey.GenerateRandom()
 if err != nil {
     // Handle error
-    return fmt.Errorf("failed to generate API key: %w", err)
 }
 // apiKey = "a1b2c3d4..." (64-character hexadecimal string)
 
@@ -234,7 +236,6 @@ if err != nil {
 orderedKey, err := apikey.GenerateTimeOrdered()
 if err != nil {
     // Handle error
-    return fmt.Errorf("failed to generate time-ordered key: %w", err)
 }
 // orderedKey = "0188f8e8-..." (UUID v7 format)
 
@@ -242,7 +243,6 @@ if err != nil {
 hash, err := apikey.HashKey(apiKey, secretKey)
 if err != nil {
     // Handle error
-    return fmt.Errorf("failed to hash key: %w", err)
 }
 // hash = "sha256:..." (storable hash string)
 ```
@@ -267,10 +267,8 @@ if err != nil {
     switch {
     case errors.Is(err, apikey.ErrInsufficientEntropy):
         // Handle insufficient system entropy
-        log.Fatal("System has insufficient entropy for secure key generation")
     default:
         // Handle other errors
-        log.Fatalf("Failed to generate API key: %v", err)
     }
 }
 ```
