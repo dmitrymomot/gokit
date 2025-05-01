@@ -276,3 +276,4 @@ To run the examples:
 cd cqrs/examples/distributed
 make docker  # Start Redis
 make all     # Run all examples
+```
