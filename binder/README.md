@@ -233,3 +233,4 @@ var ErrInvalidFormData = errors.New("invalid form data")
 var ErrUnsupportedType = errors.New("unsupported target type")
 var ErrUnsupportedTimeFormat = errors.New("unsupported time format")
 var ErrInvalidMapKey = errors.New("invalid map key, only string keys are supported")
+```

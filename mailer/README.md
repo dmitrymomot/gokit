@@ -344,3 +344,4 @@ Renders a template component to an HTML string.
 
 ```go
 var ErrFailedToSendEmail = errors.New("failed to send email")
+```

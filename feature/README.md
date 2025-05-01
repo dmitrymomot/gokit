@@ -250,3 +250,4 @@ var ErrProviderNotInitialized = errors.New("feature: provider not initialized")
 var ErrInvalidContext = errors.New("feature: invalid context")
 var ErrInvalidStrategy = errors.New("feature: invalid rollout strategy")
 var ErrOperationFailed = errors.New("feature: operation failed")
+```

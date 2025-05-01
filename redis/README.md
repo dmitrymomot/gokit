@@ -147,7 +147,7 @@ app.Get("/", func(c *fiber.Ctx) error {
     }
     
     return c.SendString(fmt.Sprintf("You have visited %d times", sess.Get("visits")))
-})
+}
 ```
 
 ## Best Practices
@@ -243,3 +243,4 @@ var ErrFailedToParseRedisConnString = errors.New("failed to parse redis connecti
 var ErrRedisNotReady = errors.New("redis did not become ready within the given time period")
 var ErrEmptyConnectionURL = errors.New("empty redis connection URL")
 var ErrHealthcheckFailed = errors.New("redis healthcheck failed")
+```

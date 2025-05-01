@@ -202,3 +202,4 @@ var ErrInvalidSize = errors.New("invalid page size")
 var ErrInvalidLimit = errors.New("invalid limit value")
 var ErrInvalidOffset = errors.New("invalid offset value")
 var ErrInvalidCursor = errors.New("invalid cursor value")
+```

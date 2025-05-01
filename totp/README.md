@@ -300,6 +300,6 @@ var ErrFailedToGenerateTOTP = errors.New("failed to generate TOTP")
 ### Configuration
 
 The package uses the following environment variable:
-
 ```
 TOTP_ENCRYPTION_KEY = base64-encoded 32-byte key
+```

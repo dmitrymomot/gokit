@@ -306,3 +306,4 @@ var ErrLanguageNotSupported = errors.New("language not supported")
 var ErrTranslationNotFound = errors.New("translation not found")
 var ErrInvalidTranslationFormat = errors.New("invalid translation format")
 var ErrFileSystemError = errors.New("file system error")
+```

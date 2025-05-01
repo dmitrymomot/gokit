@@ -298,3 +298,4 @@ var ErrDecoding = errors.New("cache: failed to decode value")
 var ErrConnectionFailed = errors.New("cache: connection failed")
 var ErrOperationFailed = errors.New("cache: operation failed")
 var ErrNotImplemented = errors.New("cache: feature not implemented")
+```

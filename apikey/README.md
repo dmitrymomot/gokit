@@ -156,3 +156,4 @@ Performs a constant-time comparison of two strings to prevent timing attacks. Re
 var ErrEmptyInput = errors.New("empty api key or secret key")
 var ErrGeneration = errors.New("failed to generate api key")
 var ErrInvalidHash = errors.New("invalid hash format")
+```

@@ -318,3 +318,4 @@ var ErrCreateRequest = errors.New("failed to create HTTP request")
 var ErrSendRequest = errors.New("failed to send HTTP request")
 var ErrReadResponse = errors.New("failed to read HTTP response")
 var ErrResponseTimeout = errors.New("webhook request timed out")
+```

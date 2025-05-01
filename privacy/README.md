@@ -321,3 +321,4 @@ func NewPhoneMasker(options ...Option) (*PhoneMasker, error)
 // Create new registries
 func NewMaskingRegistry(defaultMasker Masker) *MaskingRegistry
 func NewAutoMaskingRegistry(defaultMasker Masker) *AutoMaskingRegistry
+```

@@ -156,3 +156,4 @@ Returns a function that checks the health of the OpenSearch connection. The retu
 ```go
 var ErrConnectionFailed = errors.New("opensearch connection failed")
 var ErrHealthcheckFailed = errors.New("opensearch healthcheck failed")
+```

@@ -298,3 +298,4 @@ var ErrInvalidRequest = errors.New("invalid request or missing file data")
 var ErrMissingConfig = errors.New("missing required configuration")
 var ErrInvalidEndpoint = errors.New("invalid endpoint URL")
 var ErrFailedToLoadConfig = errors.New("failed to load AWS configuration")
+```

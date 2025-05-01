@@ -207,3 +207,4 @@ var ErrInvalidState = errors.New("invalid oauth state")
 var ErrFailedToExchangeCode = errors.New("failed to exchange code")
 var ErrAccountNotVerified = errors.New("account is not verified")
 var ErrFailedToSaveSession = errors.New("failed to save session")
+```

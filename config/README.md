@@ -165,3 +165,4 @@ type Config struct {
 var ErrParsingConfig = errors.New("failed to parse environment variables into config")
 var ErrInvalidConfigType = errors.New("invalid config type")
 var ErrConfigNotLoaded = errors.New("configuration has not been loaded")
+```

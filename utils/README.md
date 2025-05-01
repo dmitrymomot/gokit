@@ -224,3 +224,14 @@ func FormatJSON(v ...any) string
 
 // Deprecated: Use FormatJSON instead
 func PrettyPrint(v ...any) string
+```
+
+### Interface for types that can provide their own name
+```go
+type NamedEntity interface {
+    Name() string
+}
+
+// Get the name from a struct that implements NamedEntity or use fallback
+func GetNameFromStruct(v any, fallback func(v any) string) string
+``` 

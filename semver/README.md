@@ -336,3 +336,4 @@ var ErrInvalidPrerelease = errors.New("invalid prerelease identifier")
 var ErrInvalidBuild = errors.New("invalid build metadata")
 var ErrEmptyVersion = errors.New("empty version string")
 var ErrNegativeValue = errors.New("negative value in version")
+```

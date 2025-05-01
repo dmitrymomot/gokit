@@ -261,3 +261,4 @@ var ErrFailedToParseDBConfig = errors.New("failed to parse db config")
 var ErrFailedToApplyMigrations = errors.New("failed to apply migrations")
 var ErrMigrationsDirNotFound = errors.New("migrations directory not found")
 var ErrMigrationPathNotProvided = errors.New("migration path not provided")
+```
