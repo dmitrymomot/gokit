@@ -169,6 +169,13 @@ var ErrSpecificError = errors.New("specific error description")
    - DO NOT document planned or future functionality that doesn't yet exist
    - ONLY document features that are implemented and working in the current version
 
+8. **Code Example Clarity**
+   - KEEP EXAMPLES FOCUSED on demonstrating usage only
+   - DO NOT include unrelated setup code (like context creation) unless absolutely necessary
+   - DO NOT add extensive error handling in basic examples - use simple "// Handle error" comments
+   - ONLY include error handling code in examples specifically demonstrating error handling patterns
+   - REMOVE boilerplate that distracts from the main usage pattern being demonstrated
+
 ## Anti-Hallucination Checklist
 
 BEFORE finalizing any README, VERIFY the following:
