@@ -147,7 +147,7 @@ app.Get("/", func(c *fiber.Ctx) error {
     }
     
     return c.SendString(fmt.Sprintf("You have visited %d times", sess.Get("visits")))
-}
+})
 ```
 
 ## Best Practices
