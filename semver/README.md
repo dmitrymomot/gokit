@@ -17,7 +17,7 @@ The `semver` package provides a clean, immutable implementation of the [Semantic
 - Full SemVer 2.0.0 specification compliance
 - Immutable `Version` type for thread safety
 - Parse version strings with or without leading 'v'
-- Compare versions for precedence
+- Compare versions for precedence with proper prerelease handling
 - Increment major, minor, and patch components
 - Manipulate version elements independently
 - Check if a version is within a specific range
@@ -43,15 +43,15 @@ if err != nil {
 
 // Also supports leading 'v'
 version, err = semver.Parse("v2.1.0")
-// version represents "2.1.0"
+// Returns version representing "2.1.0"
 
 // Parse with prerelease and build metadata
 version, err = semver.Parse("1.2.3-beta.1+20130313144700")
-// version represents "1.2.3-beta.1+20130313144700"
+// Returns version representing "1.2.3-beta.1+20130313144700"
 
 // Parse without error checking (panics on invalid versions)
 version = semver.MustParse("1.2.3")
-// version represents "1.2.3"
+// Returns version representing "1.2.3"
 ```
 
 ### Validating Versions
@@ -105,7 +105,7 @@ if v3.InRange(v1, v2) {
 
 // Manual comparison
 result := v1.Compare(v2)
-// result is -1 because v1 < v2
+// Returns: -1 because v1 < v2
 ```
 
 ### Manipulating Versions
@@ -114,27 +114,31 @@ result := v1.Compare(v2)
 version := semver.MustParse("1.2.3-alpha+001")
 
 // Create new versions with modified components
-v2 := version.WithMajor(2)        // 2.2.3-alpha+001
-v2 = version.WithMinor(5)         // 1.5.3-alpha+001
-v2 = version.WithPatch(7)         // 1.2.7-alpha+001
-v2 = version.WithPrerelease("beta") // 1.2.3-beta+001
-v2 = version.WithBuild("002")     // 1.2.3-alpha+002
+v2 := version.WithMajor(2)        // Returns: 2.2.3-alpha+001
+v2 = version.WithMinor(5)         // Returns: 1.5.3-alpha+001
+v2 = version.WithPatch(7)         // Returns: 1.2.7-alpha+001
+v2 = version.WithPrerelease("beta") // Returns: 1.2.3-beta+001
+v2 = version.WithBuild("002")     // Returns: 1.2.3-alpha+002
 
 // Increment components (resets prerelease and build metadata)
-v2, err := version.Increment("major") // 2.0.0
+v2, err := version.Increment("major") // Returns: 2.0.0
 if err != nil {
     // Handle error
 }
 
-v2, err = version.Increment("minor")  // 1.3.0
-// Returns v2 = "1.3.0", err = nil
+v2, err = version.Increment("minor")  // Returns: 1.3.0
+if err != nil {
+    // Handle error
+}
 
-v2, err = version.Increment("patch")  // 1.2.4
-// Returns v2 = "1.2.4", err = nil
+v2, err = version.Increment("patch")  // Returns: 1.2.4
+if err != nil {
+    // Handle error
+}
 
 // Get string representations
-str := version.String()         // "1.2.3-alpha+001"
-str = version.MajorMinorPatch() // "1.2.3"
+str := version.String()         // Returns: "1.2.3-alpha+001"
+str = version.MajorMinorPatch() // Returns: "1.2.3"
 ```
 
 ### Error Handling
@@ -164,28 +168,17 @@ if err != nil {
         fmt.Println("The build metadata is invalid")
     default:
         // Handle other errors
-        fmt.Printf("Unexpected error: %v\n", err)
+        fmt.Println("An unexpected error occurred:", err)
     }
 }
 
-// Handling version increment errors
-version := semver.MustParse("1.2.3")
-_, err = version.Increment("invalid")
-if err != nil {
-    // Handle invalid component error
-    fmt.Println("Invalid component specified for increment")
-}
-```
-
-### Working with APIs
-
-```go
-// API versioning with constraints
-apiMinVersion := semver.MustParse("2.0.0")
+// Checking version requirements
 clientVersion := semver.MustParse("2.1.3")
+minRequired := semver.MustParse("2.0.0")
 
-if clientVersion.LessThan(apiMinVersion) {
-    return errors.New("client version too old, please upgrade")
+if clientVersion.LessThan(minRequired) {
+    return fmt.Errorf("client version %s is less than minimum required %s", 
+        clientVersion, minRequired)
 }
 // Client version 2.1.3 is not less than minimum required 2.0.0, so this error won't be returned
 
@@ -224,14 +217,9 @@ if !clientVersion.InRange(minSupported, maxSupported) {
 
 ## API Reference
 
-### Configuration Variables
-
-This package does not expose any configurable variables.
-
 ### Types
 
 ```go
-// Main version type
 type Version struct {
     Major      uint64 // Major version component
     Minor      uint64 // Minor version component
