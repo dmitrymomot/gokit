@@ -10,16 +10,17 @@ go get github.com/dmitrymomot/gokit/redis
 
 ## Overview
 
-The `redis` package provides a simplified, production-ready Redis client interface with robust connection management, environment-based configuration, health monitoring, and a ready-to-use Fiber storage implementation.
+The `redis` package provides a simplified, production-ready Redis client interface with robust connection management, environment-based configuration, health monitoring, and a ready-to-use Fiber storage implementation. The package is thread-safe and built on top of the official go-redis client.
 
 ## Features
 
-- Type-safe configuration with environment variable support
-- Automatic connection retry with configurable attempts and intervals
+- Simple connection API with automatic retry logic and configurable timeouts
+- Environment variable based configuration using struct tags
 - Built-in health check function for service monitoring
-- Context-aware operations with proper timeout handling
-- Full Fiber storage interface implementation for sessions and caching
-- Clear error types for improved error handling
+- Complete Storage implementation compatible with Fiber sessions and caching
+- Comprehensive error types for better error handling
+- Thread-safe implementation for concurrent usage
+- Support for any redis.UniversalClient implementation (Client, ClusterClient, etc.)
 
 ## Usage
 
@@ -31,27 +32,29 @@ import (
     "github.com/dmitrymomot/gokit/redis"
 )
 
-func main() {
-    // Create a context with timeout
-    ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-    defer cancel()
-    
-    // Connect with configuration
-    client, err := redis.Connect(ctx, redis.Config{
-        ConnectionURL: "redis://localhost:6379/0",
-        RetryAttempts: 3,
-        RetryInterval: 5 * time.Second,
-        ConnectTimeout: 30 * time.Second,
-    })
-    if err != nil {
-        panic(err)
+// Connect with configuration
+client, err := redis.Connect(context.Background(), redis.Config{
+    ConnectionURL: "redis://localhost:6379/0",
+    RetryAttempts: 3,
+    RetryInterval: 5 * time.Second,
+    ConnectTimeout: 30 * time.Second,
+})
+if err != nil {
+    // Handle connection error
+    switch {
+    case errors.Is(err, redis.ErrFailedToParseRedisConnString):
+        // Handle invalid connection string
+    case errors.Is(err, redis.ErrRedisNotReady):
+        // Handle connection timeout
+    default:
+        // Handle other errors
     }
-    defer client.Close()
-    
-    // Use the Redis client
-    err = client.Set(ctx, "key", "value", time.Hour).Err()
-    // ...
 }
+defer client.Close()
+
+// Use the Redis client
+err = client.Set(context.Background(), "key", "value", time.Hour).Err()
+// Handle error if needed
 ```
 
 ### Loading Config from Environment
@@ -63,20 +66,18 @@ import (
     "github.com/dmitrymomot/gokit/redis"
 )
 
-func main() {
-    // Load from environment variables
-    cfg, err := config.Load[redis.Config]()
-    if err != nil {
-        panic(err)
-    }
-    
-    // Connect using the loaded config
-    client, err := redis.Connect(context.Background(), cfg)
-    if err != nil {
-        panic(err)
-    }
-    defer client.Close()
+// Load from environment variables (REDIS_URL, REDIS_RETRY_ATTEMPTS, etc.)
+cfg, err := config.Load[redis.Config]()
+if err != nil {
+    // Handle config loading error
 }
+
+// Connect using the loaded config
+client, err := redis.Connect(context.Background(), cfg)
+if err != nil {
+    // Handle connection error
+}
+defer client.Close()
 ```
 
 ### Health Checking
@@ -88,20 +89,20 @@ import (
     "github.com/dmitrymomot/gokit/redis"
 )
 
-func setupHealthCheck(client *redis.Client) {
+func setupHealthCheck(client redis.UniversalClient) http.HandlerFunc {
     // Create a health check function
     healthCheck := redis.Healthcheck(client)
     
     // Use in HTTP health endpoint
-    http.HandleFunc("/health/redis", func(w http.ResponseWriter, r *http.Request) {
+    return func(w http.ResponseWriter, r *http.Request) {
         if err := healthCheck(r.Context()); err != nil {
             w.WriteHeader(http.StatusServiceUnavailable)
-            w.Write([]byte("Redis unhealthy: " + err.Error()))
+            w.Write([]byte("Redis unhealthy"))
             return
         }
         w.WriteHeader(http.StatusOK)
         w.Write([]byte("Redis healthy"))
-    })
+    }
 }
 ```
 
@@ -115,115 +116,130 @@ import (
     "github.com/gofiber/fiber/v2/middleware/session"
 )
 
-func setupFiberApp(ctx context.Context) *fiber.App {
-    // Connect to Redis
-    client, err := redis.Connect(ctx, redis.Config{
-        ConnectionURL: "redis://localhost:6379/0",
-    })
-    if err != nil {
-        panic(err)
-    }
-    
+func setupFiberSession(client redis.UniversalClient) *session.Store {
     // Create Redis storage for Fiber
     storage := redis.NewStorage(client)
     
     // Create session store with Redis storage
-    store := session.New(session.Config{
+    return session.New(session.Config{
         Storage: storage,
     })
+}
+
+// Usage in a Fiber route
+app.Get("/", func(c *fiber.Ctx) error {
+    store := c.Locals("store").(*session.Store)
+    sess, err := store.Get(c)
+    if err != nil {
+        return err
+    }
     
-    // Create Fiber app
-    app := fiber.New()
+    // Get or set session values
+    visits := sess.Get("visits")
+    if visits == nil {
+        sess.Set("visits", 1)
+    } else {
+        sess.Set("visits", visits.(int)+1)
+    }
     
-    // Example route with session
-    app.Get("/", func(c *fiber.Ctx) error {
-        sess, err := store.Get(c)
-        if err != nil {
-            return err
-        }
-        
-        // Get or set session values
-        visits := sess.Get("visits")
-        if visits == nil {
-            sess.Set("visits", 1)
-        } else {
-            sess.Set("visits", visits.(int)+1)
-        }
-        
-        if err := sess.Save(); err != nil {
-            return err
-        }
-        
-        return c.SendString(fmt.Sprintf("You have visited %d times", sess.Get("visits")))
-    })
+    if err := sess.Save(); err != nil {
+        return err
+    }
     
-    return app
-}
-```
-
-## Configuration
-
-The `Config` struct supports the following fields, all configurable via environment variables:
-
-| Field | Env Variable | Default | Description |
-|-------|--------------|---------|-------------|
-| `ConnectionURL` | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection URL |
-| `RetryAttempts` | `REDIS_RETRY_ATTEMPTS` | `3` | Number of connection retry attempts |
-| `RetryInterval` | `REDIS_RETRY_INTERVAL` | `5s` | Interval between retry attempts |
-| `ConnectTimeout` | `REDIS_CONNECT_TIMEOUT` | `30s` | Connection timeout |
-
-## API Reference
-
-### Connection Management
-
-```go
-// Connect establishes a connection to Redis with retry logic
-func Connect(ctx context.Context, cfg Config) (*redis.Client, error)
-
-// Healthcheck creates a health check function for the Redis connection
-func Healthcheck(client redis.UniversalClient) func(context.Context) error
-```
-
-### Storage Interface
-
-```go
-// Create a new storage instance
-storage := redis.NewStorage(client)
-
-// Available methods
-storage.Get(key string) ([]byte, error)
-storage.Set(key string, val []byte, exp time.Duration) error
-storage.Delete(key string) error
-storage.Reset() error
-storage.Close() error
-storage.Conn() redis.UniversalClient
-storage.Keys() ([][]byte, error)
-```
-
-## Error Handling
-
-The package defines several error types for specific error conditions:
-
-```go
-if errors.Is(err, redis.ErrRedisNotReady) {
-    // Handle Redis not ready error
-}
-
-if errors.Is(err, redis.ErrFailedToParseRedisConnString) {
-    // Handle invalid connection string error
-}
-
-if errors.Is(err, redis.ErrHealthcheckFailed) {
-    // Handle healthcheck failure
-}
+    return c.SendString(fmt.Sprintf("You have visited %d times", sess.Get("visits")))
+})
 ```
 
 ## Best Practices
 
-1. **Always use context with timeouts** for Redis operations to prevent blocked goroutines
-2. **Close Redis clients** when they're no longer needed to prevent resource leaks
-3. **Implement health checks** in your service readiness/liveness probes
-4. **Use environment-based configuration** for different deployment environments
-5. **Consider connection pooling** for high-throughput applications
-6. **Add error handling** for Redis operations, particularly for distributed systems
-7. **Set appropriate timeouts** based on your application's needs and network conditions
+1. **Connection Management**:
+   - Use the `defer client.Close()` pattern to ensure Redis connections are properly released
+   - Set reasonable timeout values for your specific application needs
+   - Configure retry attempts based on your application's resilience requirements
+
+2. **Configuration**:
+   - Use environment variables for configuration in production environments
+   - Override connection timeout in high-traffic applications to prevent cascading failures
+
+3. **Error Handling**:
+   - Always check for specific error types using `errors.Is()` rather than string matching
+   - Implement proper fallback mechanisms when Redis is temporarily unavailable
+
+4. **Storage Usage**:
+   - Set appropriate expiration times for cache or session data
+   - Be cautious with the `Reset()` method as it clears the entire Redis database
+
+## API Reference
+
+### Configuration
+
+```go
+type Config struct {
+    ConnectionURL  string        // Redis connection URL (env: REDIS_URL, default: "redis://localhost:6379/0")
+    RetryAttempts  int           // Number of connection retry attempts (env: REDIS_RETRY_ATTEMPTS, default: 3)
+    RetryInterval  time.Duration // Interval between retry attempts (env: REDIS_RETRY_INTERVAL, default: 5s)
+    ConnectTimeout time.Duration // Connection timeout (env: REDIS_CONNECT_TIMEOUT, default: 30s)
+}
+```
+
+### Functions
+
+```go
+func Connect(ctx context.Context, cfg Config) (*redis.Client, error)
+```
+Establishes a connection to Redis with retry logic and timeout handling.
+
+```go
+func Healthcheck(client redis.UniversalClient) func(context.Context) error
+```
+Creates a health check function that verifies Redis connection status.
+
+```go
+func NewStorage(redisClient redis.UniversalClient) *Storage
+```
+Creates a new Storage instance that implements Fiber's storage interface.
+
+### Storage Methods
+
+```go
+func (s *Storage) Get(key string) ([]byte, error)
+```
+Retrieves a value from Redis by its key.
+
+```go
+func (s *Storage) Set(key string, val []byte, exp time.Duration) error
+```
+Stores a key-value pair in Redis with an optional expiration time.
+
+```go
+func (s *Storage) Delete(key string) error
+```
+Removes a key and its value from Redis.
+
+```go
+func (s *Storage) Reset() error
+```
+Removes all keys from the Redis database (FLUSHDB).
+
+```go
+func (s *Storage) Close() error
+```
+Terminates the connection to the Redis server.
+
+```go
+func (s *Storage) Conn() redis.UniversalClient
+```
+Returns the underlying Redis client for direct access.
+
+```go
+func (s *Storage) Keys() ([][]byte, error)
+```
+Returns all keys in the Redis database using SCAN.
+
+### Error Types
+
+```go
+var ErrFailedToParseRedisConnString = errors.New("failed to parse redis connection string")
+var ErrRedisNotReady = errors.New("redis did not become ready within the given time period")
+var ErrEmptyConnectionURL = errors.New("empty redis connection URL")
+var ErrHealthcheckFailed = errors.New("redis healthcheck failed")
