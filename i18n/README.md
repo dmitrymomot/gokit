@@ -56,40 +56,25 @@ if err != nil {
 }
 
 // Get translation in default language
-greeting, err := translator.T("en", "greeting")
-if err != nil {
-	// Handle translation error
-	return fmt.Errorf("translation error: %w", err)
-}
+greeting := translator.T("en", "greeting")
 // greeting = "Hello, world!"
 
 // Get translation in specific language
-frGreeting, err := translator.T("fr", "greeting")
-if err != nil {
-	// Handle translation error based on error type
-	switch {
-	case errors.Is(err, i18n.ErrLanguageNotSupported):
-		// Use default language as fallback
-		frGreeting, _ = translator.T("en", "greeting")
-	case errors.Is(err, i18n.ErrTranslationNotFound):
-		// Use a fallback message
-		frGreeting = "Greeting not available"
-	default:
-		return fmt.Errorf("unexpected error: %w", err)
-	}
-}
+frGreeting := translator.T("fr", "greeting")
 // frGreeting = "Bonjour, le monde!"
+
+// If you need to check if a language is supported first
+if !slices.Contains(translator.SupportedLanguages(), "xyz") {
+	// Handle unsupported language
+	fmt.Println("Language 'xyz' is not supported")
+}
 ```
 
 ### Variable Substitution
 
 ```go
 // Translation with variables
-welcome, err := translator.T("en", "welcome", "name", "John")
-if err != nil {
-	// Handle error
-	return err
-}
+welcome := translator.T("en", "welcome", "name", "John")
 // welcome = "Welcome to our application, John!"
 ```
 
@@ -97,18 +82,10 @@ if err != nil {
 
 ```go
 // Pluralized translation (key has different forms based on count)
-items, err := translator.N("en", "items", 1, "count", "1")
-if err != nil {
-	// Handle error
-	return err
-}
+items := translator.N("en", "items", 1, "count", "1")
 // items = "1 item"
 
-multiItems, err := translator.N("en", "items", 5, "count", "5")
-if err != nil {
-	// Handle error
-	return err
-}
+multiItems := translator.N("en", "items", 5, "count", "5")
 // multiItems = "5 items"
 ```
 
@@ -123,11 +100,7 @@ import (
 // Create a handler that uses translations
 handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	// Get the translator from the request context
-	greeting, err := translator.Tc(r.Context(), "greeting")
-	if err != nil {
-		http.Error(w, "Translation error", http.StatusInternalServerError)
-		return
-	}
+	greeting := translator.Tc(r.Context(), "greeting")
 	
 	// Response will be in the language determined from the request
 	fmt.Fprintf(w, "Greeting: %s\n", greeting)
@@ -149,35 +122,31 @@ extractor := func(r *http.Request) string {
 http.Handle("/custom", i18n.Middleware(translator, extractor)(handler))
 ```
 
-### Error Handling
+### Error Handling for Initialization and Export
 
 ```go
-// Example of comprehensive error handling
-translation, err := translator.T("xyz", "greeting")
+// Error handling for initialization
+adapter, err := i18n.NewFileSystemAdapter("./translations")
+if err != nil {
+	switch {
+	case errors.Is(err, i18n.ErrFileSystemError):
+		// Handle file system error
+		fmt.Printf("Error accessing translation files: %v\n", err)
+	default:
+		// Handle other unexpected errors
+		fmt.Printf("Unexpected error: %v\n", err)
+	}
+}
+
+// Error handling for JSON export
+jsonData, err := translator.ExportJSON("xyz")
 if err != nil {
 	switch {
 	case errors.Is(err, i18n.ErrLanguageNotSupported):
-		// Language not supported
+		// Handle unsupported language
 		fmt.Printf("Language 'xyz' is not supported: %v\n", err)
-		// Use default language as fallback
-		translation, _ = translator.T("en", "greeting")
-	case errors.Is(err, i18n.ErrTranslationNotFound):
-		// Translation not found
-		fmt.Printf("Translation key 'greeting' not found: %v\n", err)
-		// Use a default message
-		translation = "Hello"
-	case errors.Is(err, i18n.ErrInvalidTranslationFormat):
-		// Invalid format in translation file
-		fmt.Printf("Invalid translation format: %v\n", err)
-		// Use a sanitized default
-		translation = "Hello"
-	case errors.Is(err, i18n.ErrFileSystemError):
-		// File system error
-		fmt.Printf("Error accessing translation files: %v\n", err)
-		// Use in-memory fallback translations for critical messages
-		translation = "Hello"
 	default:
-		// Other unexpected errors
+		// Handle other unexpected errors
 		fmt.Printf("Unexpected error: %v\n", err)
 	}
 }
@@ -192,8 +161,8 @@ if err != nil {
    - Keep translation keys consistent across languages
 
 2. **Error Handling**:
-   - Always check for errors when initializing
-   - Implement appropriate fallbacks for missing translations
+   - Always check for errors when initializing the translator
+   - Implement appropriate fallbacks when translations are missing
    - Enable missing translation logging during development
    - Handle specific error types with appropriate responses
 
@@ -286,32 +255,32 @@ Enables or disables logging of missing translations.
 ### Translation Methods
 
 ```go
-func (t *Translator) T(lang, key string, args ...string) (string, error)
+func (t *Translator) T(lang, key string, args ...string) string
 ```
 Basic translation method with variable substitution.
 
 ```go
-func (t *Translator) N(lang, key string, n int, args ...string) (string, error)
+func (t *Translator) N(lang, key string, n int, args ...string) string
 ```
 Pluralized translation based on count.
 
 ```go
-func (t *Translator) Td(lang, key, defaultValue string, args ...string) (string, error)
+func (t *Translator) Td(lang, key, defaultValue string, args ...string) string
 ```
 Translation with a default fallback value.
 
 ```go
-func (t *Translator) Duration(lang string, d time.Duration) (string, error)
+func (t *Translator) Duration(lang string, d time.Duration) string
 ```
 Converts duration to a localized string.
 
 ```go
-func (t *Translator) Tc(ctx context.Context, key string, args ...string) (string, error)
+func (t *Translator) Tc(ctx context.Context, key string, args ...string) string
 ```
 Context-based translation using language from context.
 
 ```go
-func (t *Translator) Nc(ctx context.Context, key string, n int, args ...string) (string, error)
+func (t *Translator) Nc(ctx context.Context, key string, n int, args ...string) string
 ```
 Context-based pluralized translation.
 
