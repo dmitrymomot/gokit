@@ -10,7 +10,7 @@ go get github.com/dmitrymomot/gokit/opensearch
 
 ## Overview
 
-The `opensearch` package provides a simple, type-safe interface to OpenSearch with environment-based configuration, automatic health checking, and standardized error handling.
+The `opensearch` package provides a simple, type-safe interface to OpenSearch with environment-based configuration, automatic health checking, and standardized error handling. It is thread-safe and designed to be used in concurrent applications.
 
 ## Features
 
@@ -18,6 +18,8 @@ The `opensearch` package provides a simple, type-safe interface to OpenSearch wi
 - Built-in health check on connection
 - Comprehensive error handling with specific error types
 - Simplified client initialization
+- Thread-safe implementation for concurrent use
+- Context-aware operations for cancellation support
 
 ## Usage
 
@@ -37,16 +39,19 @@ client, err := opensearch.New(context.Background(), opensearch.Config{
 })
 if err != nil {
     // Handle error
+    // Returns opensearch.ErrConnectionFailed or opensearch.ErrHealthcheckFailed
 }
 
 // Use the client
 info, err := client.Info()
+// Returns info about the OpenSearch cluster
 ```
 
 ### Environment-Based Configuration
 
 ```go
 import (
+    "context"
     "github.com/dmitrymomot/gokit/config"
     "github.com/dmitrymomot/gokit/opensearch"
 )
@@ -59,13 +64,19 @@ if err != nil {
 
 // Create client with loaded config
 client, err := opensearch.New(context.Background(), cfg)
+if err != nil {
+    // Handle error
+}
 ```
 
 ### Health Check Integration
 
 ```go
 import (
+    "context"
     "net/http"
+    "errors"
+    "github.com/dmitrymomot/gokit/opensearch"
 )
 
 // Create a healthcheck function for an existing client
@@ -80,11 +91,43 @@ http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
     }
     w.Write([]byte("OpenSearch healthy"))
 })
+
+// Error Handling Example
+if err := healthCheck(context.Background()); err != nil {
+    switch {
+    case errors.Is(err, opensearch.ErrHealthcheckFailed):
+        // Handle health check failure
+    default:
+        // Handle unknown errors
+    }
+}
 ```
 
-## Configuration
+## Best Practices
 
-The `Config` struct provides options for OpenSearch connections with environment variable integration:
+1. **Secure Credential Storage**:
+   - Store OpenSearch credentials in environment variables
+   - Never hardcode sensitive information in your code
+
+2. **Health Monitoring**:
+   - Implement health checks in your service status endpoints
+   - Set appropriate timeouts for health check context
+
+3. **Performance Considerations**:
+   - Configure retries appropriately based on your network reliability
+   - Use context with timeouts for operations that may take long
+
+4. **Error Handling**:
+   - Use errors.Is() to check for specific error types
+   - Properly wrap errors to maintain context
+
+5. **Context Usage**:
+   - Always pass appropriate context to control operation lifetimes
+   - Use context cancellation for graceful shutdown
+
+## API Reference
+
+### Configuration
 
 ```go
 type Config struct {
@@ -96,33 +139,20 @@ type Config struct {
 }
 ```
 
-## API Reference
-
-### Client Creation
-
-- `New(ctx context.Context, cfg Config) (*opensearch.Client, error)`: Create an OpenSearch client with built-in health check
-
-### Health Monitoring
-
-- `Healthcheck(client *opensearch.Client) func(context.Context) error`: Create a health check function for OpenSearch
-
-### Error Handling
+### Functions
 
 ```go
-// Check for specific errors
-if errors.Is(err, opensearch.ErrConnectionFailed) {
-    // Handle connection failure
-}
-
-if errors.Is(err, opensearch.ErrHealthcheckFailed) {
-    // Handle health check failure
-}
+func New(ctx context.Context, cfg Config) (*opensearch.Client, error)
 ```
+Creates a new OpenSearch client with automatic health check. Returns an OpenSearch client or an error if the connection or health check fails.
 
-## Best Practices
+```go
+func Healthcheck(client *opensearch.Client) func(context.Context) error
+```
+Returns a function that checks the health of the OpenSearch connection. The returned function accepts a context and returns an error if the health check fails.
 
-1. **Secure credential storage**: Store OpenSearch credentials in environment variables
-2. **Implement health checks**: Use the provided health check functionality in your application
-3. **Configure retries appropriately**: Adjust MaxRetries based on your network reliability
-4. **Handle errors specifically**: Use the provided error types for better error handling
-5. **Use context for cancellation**: Pass appropriate context to control operation lifetimes
+### Error Types
+
+```go
+var ErrConnectionFailed = errors.New("opensearch connection failed")
+var ErrHealthcheckFailed = errors.New("opensearch healthcheck failed")
