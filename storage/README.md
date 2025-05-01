@@ -10,19 +10,18 @@ go get github.com/dmitrymomot/gokit/storage
 
 ## Overview
 
-The `storage` package provides a simple abstraction over Amazon S3 and other S3-compatible storage services. It offers a clean interface for common operations like file uploads, downloads, listing, and deletion with proper error handling and configuration options.
+The storage package provides a simple abstraction over Amazon S3 and other S3-compatible storage services. It offers a clean interface for common operations like file uploads, downloads, listing, and deletion with proper error handling and configuration options. The package is thread-safe and can be safely used in concurrent applications.
 
 ## Features
 
 - Clean interface abstracting underlying S3 operations
-- Flexible configuration using functional options pattern
 - Automatic content type detection with extensive MIME mappings
-- Comprehensive error handling with clear error types
+- Comprehensive error handling with specific error types
 - Support for both public and private file permissions
-- Size limits and validation for uploads
 - Multi-part upload support for large files
 - Directory-style operations (list, delete recursively)
-- HTTP request integration for direct uploads
+- HTTP request integration for direct file uploads
+- Thread-safe implementation for concurrent usage
 
 ## Usage
 
@@ -70,8 +69,7 @@ file, err := client.UploadFile(ctx, fileBytes, storage.UploadOptions{
 if err != nil {
 	// Handle error
 }
-
-fmt.Printf("Uploaded to: %s\n", file.URL)
+// Returns: File with Path, URL, Size, and ContentType
 
 // From HTTP request
 func handleUpload(w http.ResponseWriter, r *http.Request) {
@@ -85,11 +83,7 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	// Return the file information
-	json.NewEncoder(w).Encode(map[string]string{
-		"url": file.URL,
-		"path": file.Path,
-	})
+	// Returns: File with Path, URL, Size, and ContentType
 }
 ```
 
@@ -101,13 +95,11 @@ files, err := client.ListFiles(ctx, "examples/")
 if err != nil {
 	// Handle error
 }
-
-for _, file := range files {
-	fmt.Printf("Path: %s, Size: %d bytes, URL: %s\n", file.Path, file.Size, file.URL)
-}
+// Returns: Slice of File structs with details of each file
 
 // Get a file's URL
 url := client.GetFileURL("examples/hello.txt")
+// Returns: Complete URL to access the file
 
 // Delete a single file
 err = client.DeleteFile(ctx, "examples/hello.txt")
@@ -119,6 +111,25 @@ if err != nil {
 err = client.DeleteDirectory(ctx, "examples/")
 if err != nil {
 	// Handle error
+}
+```
+
+### Error Handling
+
+```go
+file, err := client.UploadFile(ctx, largeFileBytes, opts)
+if err != nil {
+	switch {
+	case errors.Is(err, storage.ErrFileTooLarge):
+		// Handle file size exceeds maximum
+		fmt.Println("File is too large, maximum size is", cfg.MaxFileSize)
+	case errors.Is(err, storage.ErrFailedToUploadFile):
+		// Handle upload failure
+		fmt.Println("Upload failed, please try again")
+	default:
+		// Handle general error
+		fmt.Println("An error occurred:", err)
+	}
 }
 ```
 
@@ -149,6 +160,31 @@ client, err := storage.New(
 	storage.WithS3Client(customS3Client),
 )
 ```
+
+## Best Practices
+
+1. **Security Considerations**:
+   - Never embed AWS keys directly in your code
+   - Use IAM roles or environment variables for credentials
+   - Set appropriate file permissions (public vs. private)
+   - Implement file type validation for uploads
+
+2. **Performance Optimization**:
+   - Reuse the client to avoid repeated initialization
+   - Set appropriate timeouts based on your application needs
+   - Configure retries for transient errors
+   - Use a CDN for frequently accessed public files
+
+3. **Error Handling**:
+   - Always check for and handle errors from all operations
+   - Use `errors.Is()` to check for specific error types
+   - Implement proper logging for storage operations
+   - Consider implementing retry logic for important operations
+
+4. **Path Management**:
+   - Use consistent path prefixes for better organization
+   - Include user or tenant identifiers in paths for multi-tenant applications
+   - Use directory-style paths with trailing slashes for directories
 
 ## API Reference
 
@@ -198,7 +234,7 @@ type Config struct {
 }
 ```
 
-### File Model
+### Models and Types
 
 ```go
 // File represents information about a stored file
@@ -208,11 +244,7 @@ type File struct {
 	Size        int64  // File size in bytes
 	ContentType string // MIME content type
 }
-```
 
-### Upload Options
-
-```go
 // UploadOptions configures file upload behavior
 type UploadOptions struct {
 	Path        string            // Storage path (including filename)
@@ -227,7 +259,7 @@ type UploadFromRequestOptions struct {
 	Path        string            // Storage directory path (filename is preserved)
 	IsPublic    bool              // If true, file is publicly accessible
 	Metadata    map[string]string // Optional metadata key-value pairs
-	MaxFileSize int64             // Override default max file size
+	ContentType string            // Override content type (auto-detected if empty)
 }
 ```
 
@@ -235,66 +267,34 @@ type UploadFromRequestOptions struct {
 
 ```go
 // WithHTTPClient sets a custom HTTP client
-WithHTTPClient(client *http.Client) ClientOption
+func WithHTTPClient(client *http.Client) ClientOption
 
 // WithS3Client uses a pre-configured S3 client
-WithS3Client(client *s3.Client) ClientOption
+func WithS3Client(client *s3.Client) ClientOption
 
 // WithRetryMaxAttempts sets the maximum retry attempts
-WithRetryMaxAttempts(attempts int) ClientOption
+func WithRetryMaxAttempts(attempts int) ClientOption
 
 // WithRetryMode configures the retry behavior
-WithRetryMode(mode aws.RetryMode) ClientOption
+func WithRetryMode(mode aws.RetryMode) ClientOption
 
 // WithS3ConfigOption adds a custom S3 config option
-WithS3ConfigOption(option func(*s3config.LoadOptions) error) ClientOption
+func WithS3ConfigOption(option func(*s3config.LoadOptions) error) ClientOption
 
 // WithS3ClientOption adds a custom S3 client option
-WithS3ClientOption(option func(*s3.Options)) ClientOption
+func WithS3ClientOption(option func(*s3.Options)) ClientOption
 ```
 
-## Error Handling
-
-The package defines several specific error types for better error handling:
+### Error Types
 
 ```go
-// Check for specific error types
-if errors.Is(err, storage.ErrFileTooLarge) {
-    // Handle file size exceeds maximum
-}
-
-if errors.Is(err, storage.ErrFailedToUploadFile) {
-    // Handle upload failure
-}
-```
-
-Available error types:
-- `ErrFailedToUploadFile`: File upload failed
-- `ErrFileTooLarge`: File exceeds the maximum size limit
-- `ErrFailedToDeleteFile`: File deletion failed
-- `ErrFailedToDeleteDirectory`: Directory deletion failed
-- `ErrFailedToListFiles`: File listing failed
-- `ErrInvalidRequest`: Request is invalid or missing file data
-- `ErrMissingConfig`: Required configuration is missing
-- `ErrInvalidEndpoint`: Provided endpoint URL is invalid
-- `ErrFailedToLoadConfig`: AWS configuration loading failed
-
-## Best Practices
-
-1. **Security Considerations**:
-   - Never embed AWS keys directly in your code
-   - Use IAM roles or environment variables for credentials
-   - Set appropriate file permissions (public vs. private)
-   - Implement file type validation for uploads
-
-2. **Performance Optimization**:
-   - Reuse the client to avoid repeated initialization
-   - Set appropriate timeouts based on your application needs
-   - Configure retries for transient errors
-   - Use a CDN for frequently accessed public files
-
-3. **Error Handling**:
-   - Always check for and handle errors from all operations
-   - Use `errors.Is()` to check for specific error types
-   - Implement proper logging for storage operations
-   - Consider implementing retry logic for important operations
+// Package-level error variables
+var ErrFailedToUploadFile = errors.New("failed to upload file")
+var ErrFileTooLarge = errors.New("file size exceeds the maximum allowed limit")
+var ErrFailedToDeleteFile = errors.New("failed to delete file")
+var ErrFailedToDeleteDirectory = errors.New("failed to delete directory")
+var ErrFailedToListFiles = errors.New("failed to list files")
+var ErrInvalidRequest = errors.New("invalid request or missing file data")
+var ErrMissingConfig = errors.New("missing required configuration")
+var ErrInvalidEndpoint = errors.New("invalid endpoint URL")
+var ErrFailedToLoadConfig = errors.New("failed to load AWS configuration")
