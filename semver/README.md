@@ -10,7 +10,7 @@ go get github.com/dmitrymomot/gokit/semver
 
 ## Overview
 
-The `semver` package provides a clean, immutable implementation of the [Semantic Versioning 2.0.0 specification](https://semver.org/). It offers reliable tools for parsing, validating, comparing, and manipulating version strings in Go applications.
+The `semver` package provides a clean, immutable implementation of the [Semantic Versioning 2.0.0 specification](https://semver.org/). It offers reliable tools for parsing, validating, comparing, and manipulating version strings in Go applications. This package is thread-safe due to its immutable design and suitable for concurrent use in production systems.
 
 ## Features
 
@@ -28,22 +28,30 @@ The `semver` package provides a clean, immutable implementation of the [Semantic
 ### Parsing Versions
 
 ```go
-import "github.com/dmitrymomot/gokit/semver"
+import (
+    "fmt"
+    "github.com/dmitrymomot/gokit/semver"
+)
 
 // Standard parsing with error checking
 version, err := semver.Parse("1.2.3")
 if err != nil {
     // Handle error
+    return fmt.Errorf("failed to parse version: %w", err)
 }
+// version represents "1.2.3"
 
 // Also supports leading 'v'
 version, err = semver.Parse("v2.1.0")
+// version represents "2.1.0"
 
 // Parse with prerelease and build metadata
 version, err = semver.Parse("1.2.3-beta.1+20130313144700")
+// version represents "1.2.3-beta.1+20130313144700"
 
 // Parse without error checking (panics on invalid versions)
 version = semver.MustParse("1.2.3")
+// version represents "1.2.3"
 ```
 
 ### Validating Versions
@@ -51,11 +59,15 @@ version = semver.MustParse("1.2.3")
 ```go
 // Check if a string is a valid SemVer
 isValid := semver.Validate("1.2.3")
+// Returns: true
+
 isValid = semver.Validate("v1.2.3-beta+exp.sha.5114f85")
+// Returns: true
 
 // Validate a Version struct
 version := semver.Version{Major: 1, Minor: 2, Patch: 3}
 isValid = version.IsValid()
+// Returns: true
 ```
 
 ### Comparing Versions
@@ -66,36 +78,34 @@ v2 := semver.MustParse("2.0.0")
 
 // Core comparison methods
 if v1.LessThan(v2) {
-    // v1 < v2
+    // This code will execute since 1.2.3 < 2.0.0
 }
 
 if v1.GreaterThan(v2) {
-    // v1 > v2
+    // This code will not execute
 }
 
 if v1.Equal(v2) {
-    // v1 == v2
+    // This code will not execute
 }
 
 if v1.LessThanOrEqual(v2) {
-    // v1 <= v2
+    // This code will execute
 }
 
 if v1.GreaterThanOrEqual(v2) {
-    // v1 >= v2
+    // This code will not execute
 }
 
 // Check if a version is within a range (inclusive)
 v3 := semver.MustParse("1.5.0")
 if v3.InRange(v1, v2) {
-    // v1 <= v3 <= v2
+    // This code will execute since 1.2.3 <= 1.5.0 <= 2.0.0
 }
 
 // Manual comparison
 result := v1.Compare(v2)
-// result is -1 if v1 < v2
-// result is  0 if v1 == v2
-// result is  1 if v1 > v2
+// result is -1 because v1 < v2
 ```
 
 ### Manipulating Versions
@@ -112,12 +122,59 @@ v2 = version.WithBuild("002")     // 1.2.3-alpha+002
 
 // Increment components (resets prerelease and build metadata)
 v2, err := version.Increment("major") // 2.0.0
+if err != nil {
+    // Handle error
+}
+
 v2, err = version.Increment("minor")  // 1.3.0
+// Returns v2 = "1.3.0", err = nil
+
 v2, err = version.Increment("patch")  // 1.2.4
+// Returns v2 = "1.2.4", err = nil
 
 // Get string representations
 str := version.String()         // "1.2.3-alpha+001"
 str = version.MajorMinorPatch() // "1.2.3"
+```
+
+### Error Handling
+
+```go
+import (
+    "errors"
+    "fmt"
+    "github.com/dmitrymomot/gokit/semver"
+)
+
+// Handling parsing errors
+_, err := semver.Parse("invalid.version")
+if err != nil {
+    switch {
+    case errors.Is(err, semver.ErrInvalidVersion):
+        // Handle invalid version format
+        fmt.Println("The version string format is invalid")
+    case errors.Is(err, semver.ErrEmptyVersion):
+        // Handle empty version string
+        fmt.Println("The version string is empty")
+    case errors.Is(err, semver.ErrInvalidPrerelease):
+        // Handle invalid prerelease identifier
+        fmt.Println("The prerelease identifier is invalid")
+    case errors.Is(err, semver.ErrInvalidBuild):
+        // Handle invalid build metadata
+        fmt.Println("The build metadata is invalid")
+    default:
+        // Handle other errors
+        fmt.Printf("Unexpected error: %v\n", err)
+    }
+}
+
+// Handling version increment errors
+version := semver.MustParse("1.2.3")
+_, err = version.Increment("invalid")
+if err != nil {
+    // Handle invalid component error
+    fmt.Println("Invalid component specified for increment")
+}
 ```
 
 ### Working with APIs
@@ -130,6 +187,7 @@ clientVersion := semver.MustParse("2.1.3")
 if clientVersion.LessThan(apiMinVersion) {
     return errors.New("client version too old, please upgrade")
 }
+// Client version 2.1.3 is not less than minimum required 2.0.0, so this error won't be returned
 
 // Check compatibility with a version range
 minSupported := semver.MustParse("1.5.0")
@@ -138,11 +196,39 @@ maxSupported := semver.MustParse("3.0.0")
 if !clientVersion.InRange(minSupported, maxSupported) {
     return errors.New("unsupported client version")
 }
+// Client version 2.1.3 is in range 1.5.0 to 3.0.0, so this error won't be returned
 ```
+
+## Best Practices
+
+1. **Version Semantics**:
+   - Use major version zero (0.y.z) for initial development only
+   - Increment major version (x.0.0) when making incompatible API changes
+   - Increment minor version (x.y.0) when adding functionality in a backward compatible manner
+   - Increment patch version (x.y.z) when making backward compatible bug fixes
+
+2. **Prerelease and Build Identifiers**:
+   - Use prerelease versions (e.g., `1.0.0-alpha.1`) for pre-release testing
+   - Use build metadata (e.g., `1.0.0+20130313144700`) for build identification
+   - Remember that build metadata does not affect version precedence
+
+3. **Error Handling**:
+   - Always check for errors when parsing user-supplied version strings
+   - Use MustParse only for hard-coded versions or when panics are acceptable
+   - Check specific error types for better error messages
+
+4. **Comparisons**:
+   - Use the proper comparison methods for semantic version comparison
+   - Avoid string-based version comparisons which can lead to incorrect results
+   - For version ranges, always use InRange rather than separate comparisons
 
 ## API Reference
 
-### Core Types
+### Configuration Variables
+
+This package does not expose any configurable variables.
+
+### Types
 
 ```go
 // Main version type
@@ -155,72 +241,110 @@ type Version struct {
 }
 ```
 
-### Parsing and Validation
+### Functions
 
 ```go
-// Parse a version string into a Version struct
 func Parse(version string) (Version, error)
+```
+Parses a version string into a Version struct.
 
-// Parse without error checking (panics on invalid input)
+```go
 func MustParse(version string) Version
+```
+Parse without error checking (panics on invalid input).
 
-// Validate a version string
+```go
 func Validate(version string) bool
+```
+Validates a version string.
 
-// Check if a Version struct is valid
+### Methods
+
+```go
 func (v Version) IsValid() bool
 ```
-
-### Comparison Methods
+Checks if a Version struct is valid.
 
 ```go
-// Compare versions and return -1, 0, or 1
 func (v Version) Compare(other Version) int
+```
+Compares versions and returns -1, 0, or 1.
 
-// Convenience comparison methods
+```go
 func (v Version) LessThan(other Version) bool
+```
+Checks if version is less than other.
+
+```go
 func (v Version) GreaterThan(other Version) bool
+```
+Checks if version is greater than other.
+
+```go
 func (v Version) Equal(other Version) bool
+```
+Checks if versions are equal.
+
+```go
 func (v Version) LessThanOrEqual(other Version) bool
+```
+Checks if version is less than or equal to other.
+
+```go
 func (v Version) GreaterThanOrEqual(other Version) bool
+```
+Checks if version is greater than or equal to other.
+
+```go
 func (v Version) InRange(lower, upper Version) bool
 ```
-
-### Manipulation Methods
+Checks if version is within a range (inclusive).
 
 ```go
-// Create new versions with modified components
 func (v Version) WithMajor(major uint64) Version
+```
+Creates a new version with a different major component.
+
+```go
 func (v Version) WithMinor(minor uint64) Version
+```
+Creates a new version with a different minor component.
+
+```go
 func (v Version) WithPatch(patch uint64) Version
+```
+Creates a new version with a different patch component.
+
+```go
 func (v Version) WithPrerelease(prerelease string) Version
+```
+Creates a new version with a different prerelease component.
+
+```go
 func (v Version) WithBuild(build string) Version
+```
+Creates a new version with a different build metadata.
 
-// Increment a version component
+```go
 func (v Version) Increment(component string) (Version, error)
+```
+Increments a version component (major, minor, or patch).
 
-// String representations
+```go
 func (v Version) String() string
+```
+Returns the full version as a string.
+
+```go
 func (v Version) MajorMinorPatch() string
 ```
+Returns the major.minor.patch portion as a string.
 
 ### Error Types
 
 ```go
-var (
-    ErrInvalidVersion    = errors.New("invalid semantic version")
-    ErrInvalidPrerelease = errors.New("invalid prerelease identifier")
-    ErrInvalidBuild      = errors.New("invalid build metadata")
-    ErrEmptyVersion      = errors.New("empty version string")
-    ErrNegativeValue     = errors.New("negative value in version")
-)
-```
-
-## SemVer Best Practices
-
-1. **Major version zero (0.y.z)** is for initial development and may have breaking changes at any time
-2. **Increment major version (x.0.0)** when making incompatible API changes
-3. **Increment minor version (x.y.0)** when adding functionality in a backward compatible manner
-4. **Increment patch version (x.y.z)** when making backward compatible bug fixes
-5. **Use prerelease versions** (e.g., `1.0.0-alpha.1`) for pre-release testing
-6. **Use build metadata** (e.g., `1.0.0+20130313144700`) for build identification
+var ErrInvalidVersion = errors.New("invalid semantic version")
+var ErrInvalidPrerelease = errors.New("invalid prerelease identifier")
+var ErrInvalidBuild = errors.New("invalid build metadata")
+var ErrEmptyVersion = errors.New("empty version string")
+var ErrNegativeValue = errors.New("negative value in version")
