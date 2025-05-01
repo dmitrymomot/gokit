@@ -10,17 +10,17 @@ go get github.com/dmitrymomot/gokit/validator
 
 ## Overview
 
-The `validator` package provides a robust validation system for Go structs using struct tags. It includes a wide range of built-in validators and supports custom validation rules, with flexibility for error message customization.
+The `validator` package provides a robust validation system for Go structs using struct tags. It includes 30+ built-in validators and supports custom validation rules through a simple registration mechanism. The package is thread-safe for concurrent use and offers flexible error message customization through translator functions.
 
 ## Features
 
-- Simple struct tag-based validation
-- 25+ built-in validators covering common use cases
-- Custom validation rule support with simple registration
-- Customizable error messages with translation support
-- Support for nested structs and complex validation rules
-- Thread-safe operation for concurrent validation
-- Comprehensive field type support
+- Simple struct tag-based validation with clear syntax
+- 30+ built-in validators for common validation scenarios
+- Custom validation rule support with simple registration mechanism
+- Customizable error messages with translator function support
+- Recursive validation for nested structs and slices
+- Thread-safe implementation for concurrent validation
+- Comprehensive field type support including strings, numbers, slices and maps
 
 ## Usage
 
@@ -55,8 +55,7 @@ func main() {
     err := v.ValidateStruct(user)
     if err != nil {
         // Handle validation errors
-        // err will contain all validation failures
-        fmt.Println(err)
+        // err will be of type *validator.ValidationErrors
     }
 }
 ```
@@ -65,7 +64,7 @@ func main() {
 
 ```go
 // Create a custom error translator function
-translator := func(key string, label string, params ...any) string {
+translator := func(key string, label string, params ...string) string {
     switch key {
     case "validation.required":
         return fmt.Sprintf("%s field cannot be empty", label)
@@ -97,13 +96,13 @@ validator.RegisterValidation("zipcode", func(fieldValue any, fieldType reflect.S
     // Convert field value to string
     val, ok := fieldValue.(string)
     if !ok {
-        return validator.NewValidationError("validation.type_mismatch", label)
+        return errors.New(translator("validation.type_mismatch", label, params...))
     }
     
     // Validate US zip code format
     zipcodeRegex := regexp.MustCompile(`^\d{5}(-\d{4})?$`)
     if !zipcodeRegex.MatchString(val) {
-        return validator.NewValidationError("validation.zipcode", label)
+        return errors.New(translator("validation.zipcode", label, params...))
     }
     
     return nil
@@ -148,25 +147,133 @@ err := v.ValidateStruct(customer)
 // err will contain nested validation errors
 ```
 
-## Validation Options
+### Error Handling
 
-### Common Validators
+```go
+err := v.ValidateStruct(user)
+if err != nil {
+    // Type assertion to access validation errors
+    if validationErrs, ok := validator.ExtractValidationErrors(err); ok {
+        // Access specific field errors
+        for field, fieldErr := range validationErrs.Values() {
+            fmt.Printf("Field '%s': %s\n", field, fieldErr[0])
+        }
+    }
+}
+
+// Alternative checking method
+if validator.IsValidationError(err) {
+    // Handle validation errors
+    validationErrs := validator.ExtractValidationErrors(err)
+    // Process errors...
+}
+```
+
+## Best Practices
+
+1. **Field Labeling**: 
+   - Use the `label` tag to provide user-friendly field names for error messages
+   - Example: `label:"Email Address"` instead of just `label:"email"`
+   - When no label is provided, the field name will be used
+
+2. **Validation Rules Organization**:
+   - Group related validators together in a logical order
+   - Start with `required` if the field is mandatory
+   - Example: `validate:"required,email,max:100"`
+   - Separate rules with commas, no spaces
+
+3. **Custom Validations**:
+   - Register custom validators for business-specific rules
+   - Keep custom validation functions small and focused
+   - Return specific error types for better error handling
+   - Use the error translator for consistent error messages
+
+4. **Error Handling**:
+   - Implement a custom error translator for user-friendly messages
+   - Return all validation errors at once rather than stopping at the first error
+   - Use the helper functions like `ExtractValidationErrors` and `IsValidationError`
+   - Check specific field errors using the `Values()` method
+
+5. **Performance Considerations**:
+   - Create validator instances once and reuse them
+   - Consider caching validation results for frequently validated data
+   - For high-performance needs, validate only modified fields rather than entire structs
+
+## API Reference
+
+### Types
+
+```go
+type Validator struct {
+    // Contains unexported fields
+}
+
+type ValidationFunc func(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error
+
+type ErrorTranslatorFunc func(key string, label string, params ...string) string
+
+type ValidationErrors url.Values
+```
+
+### Functions
+
+```go
+func NewValidator(errorTranslator ErrorTranslatorFunc) *Validator
+```
+Creates a new Validator instance with the provided error translator function. If nil is provided, a default translator is used.
+
+```go
+func RegisterValidation(tag string, fn ValidationFunc)
+```
+Registers a custom validation function globally for use with the specified tag.
+
+```go
+func NewValidationError(args ...string) ValidationErrors
+```
+Creates a new validation error with the specified field and message pairs.
+
+```go
+func ExtractValidationErrors(err error) ValidationErrors
+```
+Extracts validation errors from an error if it's a validation error type.
+
+```go
+func IsValidationError(err error) bool
+```
+Checks if an error is a validation error.
+
+### Methods
+
+```go
+func (v *Validator) ValidateStruct(s any) error
+```
+Validates the struct fields based on 'validate' tags and returns validation errors.
+
+```go
+func (e ValidationErrors) Error() string
+```
+Returns the error message string, implementing the error interface.
+
+```go
+func (e ValidationErrors) Values() url.Values
+```
+Returns the underlying url.Values containing field errors.
+
+### Built-in Validators
 
 | Validator   | Description                           | Example Usage                |
 |-------------|---------------------------------------|------------------------------|
 | required    | Field must not be empty               | `validate:"required"`        |
 | email       | Must be a valid email                 | `validate:"email"`           |
+| realemail   | Valid email with stricter checks      | `validate:"realemail"`       |
 | range       | Value must be within range            | `validate:"range:1,100"`     |
 | min         | Minimum value or length               | `validate:"min:5"`           |
 | max         | Maximum value or length               | `validate:"max:100"`         |
 | regex       | Must match regular expression         | `validate:"regex:^[a-z]+$"`  |
 | in          | Must be one of specified values       | `validate:"in:a,b,c"`        |
+| notin       | Must not be in specified values       | `validate:"notin:a,b,c"`     |
 | length      | Must be exact length                  | `validate:"length:10"`       |
-
-### Special Formats
-
-| Validator   | Description                           | Example Usage                |
-|-------------|---------------------------------------|------------------------------|
+| between     | Value between min and max (inclusive) | `validate:"between:5,10"`    |
 | url         | Valid URL                             | `validate:"url"`             |
 | phone       | Valid phone number                    | `validate:"phone"`           |
 | uuid        | Valid UUID                            | `validate:"uuid"`            |
@@ -174,11 +281,6 @@ err := v.ValidateStruct(customer)
 | creditcard  | Valid credit card number              | `validate:"creditcard"`      |
 | hexcolor    | Valid hex color code                  | `validate:"hexcolor"`        |
 | ip          | Valid IP address                      | `validate:"ip"`              |
-
-### Content Rules
-
-| Validator   | Description                           | Example Usage                |
-|-------------|---------------------------------------|------------------------------|
 | alpha       | Letters only                          | `validate:"alpha"`           |
 | alphanum    | Letters and numbers only              | `validate:"alphanum"`        |
 | numeric     | Numbers only                          | `validate:"numeric"`         |
@@ -186,52 +288,10 @@ err := v.ValidateStruct(customer)
 | password    | Meets password complexity rules       | `validate:"password"`        |
 | fullname    | Valid full name format                | `validate:"fullname"`        |
 | slug        | Valid URL slug                        | `validate:"slug"`            |
-
-### Comparison Rules
-
-| Validator   | Description                           | Example Usage                |
-|-------------|---------------------------------------|------------------------------|
+| boolean     | Boolean value                         | `validate:"boolean"`         |
 | eq          | Equal to value                        | `validate:"eq:100"`          |
 | ne          | Not equal to value                    | `validate:"ne:0"`            |
 | gt          | Greater than value                    | `validate:"gt:0"`            |
 | gte         | Greater than or equal to value        | `validate:"gte:1"`           |
 | lt          | Less than value                       | `validate:"lt:100"`          |
 | lte         | Less than or equal to value           | `validate:"lte:99"`          |
-
-## Error Handling
-
-The validator returns detailed error information that can be used to display user-friendly messages:
-
-```go
-err := v.ValidateStruct(user)
-if err != nil {
-    // Type assertion to access validation errors
-    if validationErr, ok := err.(*validator.ValidationErrors); ok {
-        // Access specific field errors
-        for field, fieldErr := range validationErr.Errors {
-            fmt.Printf("Field '%s': %s\n", field, fieldErr)
-        }
-    }
-}
-```
-
-## Best Practices
-
-1. **Descriptive Labels**: 
-   - Use the `label` tag to provide user-friendly field names for error messages
-   - Example: `label:"Email Address"` instead of just `label:"email"`
-
-2. **Validation Groups**:
-   - Group related validators together in a logical order
-   - Start with `required` if the field is mandatory
-   - Example: `validate:"required,email,max:100"`
-
-3. **Custom Validations**:
-   - Register custom validators for business-specific rules
-   - Keep custom validation functions small and focused
-   - Return specific error types for better error handling
-
-4. **Error Handling**:
-   - Implement a custom error translator for user-friendly messages
-   - Consider internationalization (i18n) for multi-language support
-   - Return all validation errors at once rather than stopping at the first error
