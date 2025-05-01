@@ -1,6 +1,6 @@
 # Scopes Package
 
-A flexible authorization scopes management package for granular permission control in Go applications.
+A flexible scope management system for API authorization and OAuth-style permission handling.
 
 ## Installation
 
@@ -10,243 +10,203 @@ go get github.com/dmitrymomot/gokit/scopes
 
 ## Overview
 
-The `scopes` package provides a comprehensive solution for working with authorization scopes in authentication systems. It offers parsing, validation, and comparison capabilities with support for hierarchical scopes and wildcard patterns for flexible permission management.
+The `scopes` package provides a comprehensive toolkit for working with OAuth-style scopes in authorization systems. It offers efficient parsing, validation, and comparison of scope strings with support for hierarchical scopes and wildcards. This package is thread-safe and optimized for both small and large collections of scopes.
 
 ## Features
 
-- Parses and joins scope strings with customizable separators
-- Supports wildcard patterns for flexible permissions (`*` and namespace wildcards like `admin.*`)
-- Validates scopes against allowed scope collections
-- Handles hierarchical scopes with customizable delimiters (e.g., `admin.read`)
-- Provides optimized implementations for both small and large scope collections
-- Normalizes scopes by removing duplicates and ensuring consistent ordering
+- Hierarchical scope support with customizable delimiters (`admin.users.read`)
+- Wildcard matching for flexible permission patterns (`admin.*`)
+- Efficient scope parsing and string conversion
+- Validation against defined permission sets
+- Scope normalization (deduplication and sorting)
+- Thread-safe implementation with optimized algorithms
+- Customizable separators, delimiters, and wildcards
 
 ## Usage
 
-### Basic Scope Parsing and Validation
+### Basic Example
 
 ```go
-package main
+import "github.com/dmitrymomot/gokit/scopes"
 
-import (
-	"fmt"
+// Parse a scope string into individual scopes
+scopes := scopes.ParseScopes("read write admin.users")
+// Returns: []string{"read", "write", "admin.users"}
 
-	"github.com/dmitrymomot/gokit/scopes"
-)
+// Convert scopes back to a string
+scopesStr := scopes.JoinScopes(scopes)
+// Returns: "read write admin.users"
 
-func main() {
-	// Parse scopes from a string
-	userScopes := scopes.ParseScopes("read write admin.users")
-	fmt.Println("User scopes:", userScopes)
-	// Output: User scopes: [read write admin.users]
+// Check if user has a specific scope (with wildcard support)
+hasAccess := scopes.HasScope(scopes, "admin.users.read")
+// Returns: false (because "admin.users" doesn't match "admin.users.read")
 
-	// Join scopes back to a string
-	scopesStr := scopes.JoinScopes(userScopes)
-	fmt.Println("Scopes string:", scopesStr)
-	// Output: Scopes string: read write admin.users
+// However, with wildcards:
+scopes = []string{"admin.*", "read"}
+hasAccess = scopes.HasScope(scopes, "admin.users.read")
+// Returns: true (because "admin.*" matches "admin.users.read")
+```
 
-	// Validate against allowed scopes
-	allowedScopes := []string{"read", "write", "admin.*"}
-	isValid := scopes.ValidateScopes(userScopes, allowedScopes)
-	fmt.Println("Scopes valid:", isValid) 
-	// Output: Scopes valid: true
+### Scope Validation
+
+```go
+// Define valid scopes for your API
+validScopes := []string{"read", "write", "admin.*", "user.*"}
+
+// Validate user scopes against valid scopes
+userScopes := []string{"read", "admin.users", "admin.settings"}
+valid := scopes.ValidateScopes(userScopes, validScopes)
+// Returns: true (all user scopes match valid scopes patterns)
+
+// Example with invalid scope
+userScopes = []string{"read", "delete"} // "delete" is not in validScopes
+valid = scopes.ValidateScopes(userScopes, validScopes)
+// Returns: false
+```
+
+### Checking Required Scopes
+
+```go
+// Check if user has all required scopes
+userScopes := []string{"admin.*", "read"}
+requiredScopes := []string{"admin.users", "read"}
+
+hasAll := scopes.HasAllScopes(userScopes, requiredScopes)
+// Returns: true (user has all required scopes)
+
+// Check if user has any of the required scopes
+requiredForPartialAccess := []string{"admin.settings", "write"}
+hasAny := scopes.HasAnyScopes(userScopes, requiredForPartialAccess)
+// Returns: true (user has at least "admin.settings" via "admin.*")
+```
+
+### Error Handling
+
+```go
+// When validating scopes in your application logic
+if !scopes.ValidateScopes(userScopes, validScopes) {
+    switch {
+    case errors.Is(err, scopes.ErrInvalidScope):
+        // Handle invalid scope error
+        return fmt.Errorf("invalid scope provided: %w", err)
+    case errors.Is(err, scopes.ErrScopeNotAllowed):
+        // Handle scope not allowed error
+        return fmt.Errorf("scope not allowed: %w", err)
+    default:
+        // Handle unexpected errors
+        return fmt.Errorf("scope validation failed: %w", err)
+    }
 }
 ```
 
-### Checking for Specific Permissions
+### Customizing Separators and Delimiters
 
 ```go
-package main
+// Customize the separator (default is space " ")
+scopes.ScopeSeparator = ","
 
-import (
-	"fmt"
+// Parse comma-separated scopes
+scopes := scopes.ParseScopes("read,write,admin.users")
+// Returns: []string{"read", "write", "admin.users"}
 
-	"github.com/dmitrymomot/gokit/scopes"
-)
+// Customize the delimiter (default is ".")
+scopes.ScopeDelimiter = ":"
 
-func main() {
-	// User has these scopes
-	userScopes := []string{"read", "admin.users"}
+// Customize the wildcard character (default is "*")
+scopes.ScopeWildcard = "?"
 
-	// Check if user has a specific scope
-	hasRead := scopes.HasScope(userScopes, "read")
-	fmt.Println("Has read permission:", hasRead) 
-	// Output: Has read permission: true
-
-	// Check using wildcard matching
-	hasAdminUsers := scopes.HasScope(userScopes, "admin.users")
-	fmt.Println("Has admin.users permission:", hasAdminUsers)
-	// Output: Has admin.users permission: true
-
-	// Check multiple required scopes
-	hasAllRequired := scopes.HasAllScopes(userScopes, []string{"read", "admin.users"})
-	fmt.Println("Has all required scopes:", hasAllRequired)
-	// Output: Has all required scopes: true
-
-	// Check if user has any of the required scopes
-	hasAnyRequired := scopes.HasAnyScopes(userScopes, []string{"write", "admin.users"})
-	fmt.Println("Has any required scopes:", hasAnyRequired)
-	// Output: Has any required scopes: true
-}
-```
-
-### Working with Wildcards
-
-```go
-package main
-
-import (
-	"fmt"
-
-	"github.com/dmitrymomot/gokit/scopes"
-)
-
-func main() {
-	// Admin with wildcard permissions
-	adminScopes := []string{"admin.*"}
-
-	// Check various admin permissions
-	hasAdminRead := scopes.HasScope(adminScopes, "admin.read")
-	hasAdminWrite := scopes.HasScope(adminScopes, "admin.write")
-	hasAdminUsers := scopes.HasScope(adminScopes, "admin.users")
-
-	fmt.Println("Has admin.read:", hasAdminRead)
-	// Output: Has admin.read: true
-	fmt.Println("Has admin.write:", hasAdminWrite)
-	// Output: Has admin.write: true
-	fmt.Println("Has admin.users:", hasAdminUsers)
-	// Output: Has admin.users: true
-
-	// But non-admin scopes won't match
-	hasUserRead := scopes.HasScope(adminScopes, "user.read")
-	fmt.Println("Has user.read:", hasUserRead)
-	// Output: Has user.read: false
-
-	// Global wildcard matches everything
-	superAdmin := []string{"*"}
-	fmt.Println("Super admin has admin.anything:", 
-		scopes.HasScope(superAdmin, "admin.anything"))
-	// Output: Super admin has admin.anything: true
-}
-```
-
-### Normalizing Scopes
-
-```go
-package main
-
-import (
-	"fmt"
-
-	"github.com/dmitrymomot/gokit/scopes"
-)
-
-func main() {
-	// Normalize scopes (removes duplicates and sorts alphabetically)
-	messyScopes := []string{"write", "read", "read", "admin.*", "write"}
-	normalized := scopes.NormalizeScopes(messyScopes)
-
-	fmt.Println("Normalized scopes:", normalized)
-	// Output: Normalized scopes: [admin.* read write]
-
-	// Compare two scope collections (order-independent)
-	scopes1 := []string{"read", "write", "admin.users"}
-	scopes2 := []string{"write", "admin.users", "read"}
-
-	equal := scopes.EqualScopes(scopes1, scopes2)
-	fmt.Println("Scopes are equal:", equal)
-	// Output: Scopes are equal: true
-}
-```
-
-### Customizing Scope Delimiters
-
-```go
-package main
-
-import (
-	"fmt"
-
-	"github.com/dmitrymomot/gokit/scopes"
-)
-
-func main() {
-	// Set custom separators for a different format
-	scopes.ScopeSeparator = ","
-	scopes.ScopeWildcard = "?"
-	scopes.ScopeDelimiter = ":"
-
-	// Now parse using comma separator
-	userScopes := scopes.ParseScopes("read,write,admin:users")
-	fmt.Println("Parsed with custom separator:", userScopes)
-	// Output: Parsed with custom separator: [read write admin:users]
-
-	// Check wildcard with custom format
-	adminScopes := []string{"admin:?"}
-	hasAdminUsers := scopes.HasScope(adminScopes, "admin:users")
-	fmt.Println("Has admin:users with custom wildcard:", hasAdminUsers)
-	// Output: Has admin:users with custom wildcard: true
-}
+// Now wildcards work with the new format
+hasScope := scopes.HasScope([]string{"admin:?"}, "admin:users")
+// Returns: true
 ```
 
 ## Best Practices
 
-1. **Normalize scopes** before storing to ensure consistent format
-2. **Use hierarchical scopes** (e.g., `resource.action`) for more granular permissions
-3. **Leverage wildcards** for granting broader permissions to trusted users
-4. **Validate all user scopes** against allowed scopes before processing requests
+1. **Scope Design**:
+   - Design hierarchical scopes for intuitive permission grouping
+   - Limit scope depth to 2-3 levels for readability
+   - Use consistent naming conventions (e.g., resource.action)
+
+2. **Wildcard Usage**:
+   - Use wildcards sparingly and with caution
+   - Prefer specific scopes over wildcards for security-critical operations
+   - Consider implementing additional checks for sensitive operations
+
+3. **Performance**:
+   - Normalize scopes after parsing to improve later comparisons
+   - Cache scope validation results when possible
+   - For high-traffic applications, pre-compute common scope validations
+
+4. **Security**:
+   - Validate all user-provided scopes against your valid scopes
+   - Never trust client-provided scope strings without validation
+   - Implement scope-based authorization at all levels of your application
 
 ## API Reference
 
-### Variables
+### Configuration Variables
 
-#### `ScopeSeparator string`
-Defines the character used to separate multiple scopes in a string (default: space " ").
-
-#### `ScopeWildcard string`
-Defines the wildcard character used for pattern matching (default: "*").
-
-#### `ScopeDelimiter string`
-Defines the character used to separate hierarchical scope parts (default: ".").
-
-### Constants
-
-#### `ScopeRead`, `ScopeWrite`, `ScopeDelete`, `ScopeAdmin`
-Common scope constants for typical operations.
+```go
+var ScopeSeparator = " " // Separator used between scopes in a string
+var ScopeWildcard = "*"   // Wildcard character for scope matching
+var ScopeDelimiter = "." // Delimiter for hierarchical scope parts
+```
 
 ### Functions
 
-#### `ParseScopes(scopesStr string) []string`
+```go
+func ParseScopes(scopesStr string) []string
+```
 Converts a space-separated string of scopes into a string slice.
 
-#### `JoinScopes(scopes []string) string`
+```go
+func JoinScopes(scopes []string) string
+```
 Converts a slice of scopes back to a space-separated string.
 
-#### `ScopeMatches(scope, pattern string) bool`
-Checks if a single scope matches a pattern, supporting wildcards.
+```go
+func ScopeMatches(scope, pattern string) bool
+```
+Checks if a single scope matches a pattern (with wildcard support).
 
-#### `HasScope(scopes []string, scope string) bool`
+```go
+func HasScope(scopes []string, scope string) bool
+```
 Checks if a collection of scopes contains a specific scope.
 
-#### `HasAllScopes(scopes, required []string) bool`
+```go
+func HasAllScopes(scopes, required []string) bool
+```
 Checks if scopes contain all of the required scopes.
 
-#### `HasAnyScopes(scopes, required []string) bool`
+```go
+func HasAnyScopes(scopes, required []string) bool
+```
 Checks if scopes contain any of the required scopes.
 
-#### `EqualScopes(scopes1, scopes2 []string) bool`
+```go
+func EqualScopes(scopes1, scopes2 []string) bool
+```
 Checks if two scope collections are identical (regardless of order).
 
-#### `ValidateScopes(scopes, validScopes []string) bool`
+```go
+func ValidateScopes(scopes, validScopes []string) bool
+```
 Checks if all scopes are valid according to the provided valid scopes.
 
-#### `NormalizeScopes(scopes []string) []string`
+```go
+func NormalizeScopes(scopes []string) []string
+```
 Removes duplicate scopes and sorts them alphabetically.
 
-### Errors
+### Error Types
 
-#### `ErrInvalidScope`
+```go
+var ErrInvalidScope = errors.New("invalid scope")
+```
 Returned when a scope is not valid.
 
-#### `ErrScopeNotAllowed`
+```go
+var ErrScopeNotAllowed = errors.New("scope not allowed")
+```
 Returned when a scope is not in the list of allowed scopes.
