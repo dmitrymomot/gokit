@@ -1,6 +1,6 @@
 # Logger Package
 
-Extends Go's standard `log/slog` with utilities for structured, context-aware logging.
+A structured, context-aware logging package built on top of Go's standard `log/slog`.
 
 ## Installation
 
@@ -10,7 +10,7 @@ go get github.com/dmitrymomot/gokit/logger
 
 ## Overview
 
-The `logger` package provides tools for enhancing Go's built-in `log/slog` with type-safe context value extraction, consistent configuration across environments, and simplified logger setup. The implementation is thread-safe and suitable for concurrent use in production environments.
+The `logger` package enhances Go's built-in `log/slog` with type-safe context value extraction, consistent configuration across environments, and simplified logger setup. It is designed to be thread-safe for concurrent usage in production environments while maintaining zero external dependencies.
 
 ## Features
 
@@ -45,7 +45,7 @@ logger.SetAsDefault(log)
 
 // Use like standard slog
 log.Info("Application started", "port", 8080)
-// Output (JSON): {"time":"2023-05-22T15:04:05Z","level":"INFO","msg":"Application started","port":8080}
+// Returns: {"time":"2023-05-22T15:04:05Z","level":"INFO","msg":"Application started","port":8080}
 ```
 
 ### Environment-Based Loggers
@@ -54,12 +54,12 @@ log.Info("Application started", "port", 8080)
 // Development logger (text format, debug level)
 devLog := logger.NewDevelopmentLogger("my-service")
 devLog.Debug("Server starting", "port", 8080)
-// Output (text): DEBUG my-service Server starting port=8080
+// Returns: DEBUG my-service Server starting port=8080
 
 // Production logger (JSON format, info level)
 prodLog := logger.NewProductionLogger("my-service")
 prodLog.Info("Server started", "port", 8080)
-// Output (JSON): {"time":"2023-05-22T15:04:05Z","level":"INFO","service":"my-service","msg":"Server started","port":8080}
+// Returns: {"time":"2023-05-22T15:04:05Z","level":"INFO","service":"my-service","msg":"Server started","port":8080}
 
 // Or choose based on environment
 isProduction := os.Getenv("ENV") == "production"
@@ -68,8 +68,6 @@ if isProduction {
 	env = logger.EnvProduction
 }
 log := logger.NewEnvironmentLogger("my-service", env)
-log.Info("Server ready")
-// Output: depends on environment setting
 ```
 
 ### Context Value Extraction
@@ -97,23 +95,14 @@ log := logger.NewLogger(logger.Config{
 	},
 })
 
-// Create middleware to add values to context
-func requestIDMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqID := r.Header.Get("X-Request-ID")
-		ctx := context.WithValue(r.Context(), requestIDKey, reqID)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-// In your handler
+// In your HTTP handler
 func handler(w http.ResponseWriter, r *http.Request) {
-	// Add userID to context
+	// Add values to context
 	ctx := context.WithValue(r.Context(), userIDKey, "user-123")
 	
 	// This log will automatically include request_id and user_id from context
 	log.InfoContext(ctx, "Processing request")
-	// Output (JSON): {"time":"2023-05-22T15:04:05Z","level":"INFO","msg":"Processing request","request_id":"abc-123","user_id":"user-123"}
+	// Returns: {"time":"2023-05-22T15:04:05Z","level":"INFO","msg":"Processing request","user_id":"user-123"}
 }
 ```
 
@@ -129,7 +118,7 @@ type Session struct {
 
 var sessionKey = contextKey("session")
 
-// Extract complex objects from context
+// Create a custom extractor for complex objects
 sessionExtractor := logger.WithContextExtractor(func(ctx context.Context) (slog.Attr, bool) {
 	if sess, ok := ctx.Value(sessionKey).(*Session); ok && sess != nil {
 		return slog.Group("session", 
@@ -148,142 +137,29 @@ log := logger.NewLogger(logger.Config{
 		sessionExtractor,
 	},
 })
-
-// Create context with session
-ctx := context.Background()
-session := &Session{
-	ID:        "sess-456",
-	CreatedAt: time.Now(),
-	UserID:    "user-123",
-}
-ctx = context.WithValue(ctx, sessionKey, session)
-
-// Log with session information
-log.InfoContext(ctx, "User authenticated")
-// Output (JSON): {"time":"2023-05-22T15:04:05Z","level":"INFO","msg":"User authenticated","session":{"id":"sess-456","created_at":"2023-05-22T15:04:05Z","user_id":"user-123"}}
-```
-
-### Using Context Extractor Factory Functions
-
-```go
-import (
-	"context"
-	"github.com/dmitrymomot/gokit/logger"
-)
-
-// Define your extractors
-requestIDExtractor := logger.WithContextValue("request_id", requestIDKey)
-userIDExtractor := logger.WithContextValue("user_id", userIDKey)
-
-// Create logger with the new context-aware factory functions
-log := logger.NewDevelopmentLoggerWithExtractors(
-	"my-service",
-	requestIDExtractor,
-	userIDExtractor,
-)
-
-// Or for production
-prodLog := logger.NewProductionLoggerWithExtractors(
-	"my-service",
-	requestIDExtractor,
-	userIDExtractor,
-)
-
-// Or environment-based with extractors
-envLog := logger.NewEnvironmentLoggerWithExtractors(
-	"my-service",
-	logger.EnvProduction,
-	requestIDExtractor,
-	userIDExtractor,
-)
-
-// Use the loggers with context
-ctx := context.WithValue(context.Background(), requestIDKey, "req-123")
-log.InfoContext(ctx, "Operation completed")
-// Output includes the request_id from context automatically
-```
-
-### Decorating Existing Handlers
-
-```go
-// Create a base handler
-baseHandler := slog.NewJSONHandler(os.Stdout, nil)
-
-// Decorate it with context extraction
-decoratedHandler := logger.NewLogHandlerDecorator(
-	baseHandler,
-	logger.WithContextValue("request_id", requestIDKey),
-	logger.WithContextValue("user_id", userIDKey),
-)
-
-// Create a logger with the decorated handler
-log := slog.New(decoratedHandler)
-
-// Use with context
-ctx := context.Background()
-ctx = context.WithValue(ctx, requestIDKey, "req-abc-123")
-ctx = context.WithValue(ctx, userIDKey, "user-456")
-
-log.InfoContext(ctx, "Request processed")
-// Output (JSON): {"time":"2023-05-22T15:04:05Z","level":"INFO","msg":"Request processed","request_id":"req-abc-123","user_id":"user-456"}
 ```
 
 ### Error Handling
 
 ```go
-import (
-	"errors"
-	"os"
-	"log/slog"
-	"github.com/dmitrymomot/gokit/logger"
-)
-
-// Example 1: Handling configuration errors
-invalidConfig := logger.Config{
-	// Invalid output destination
-	Output: nil,
-}
-
-log, err := logger.NewLoggerWithError(invalidConfig)
+// Handle errors properly in logs
 if err != nil {
-	// Handle configuration error
-	fmt.Printf("Logger configuration error: %v\n", err)
-	// Use a default fallback logger
-	log = logger.NewDevelopmentLogger("fallback")
+	log.Error("Operation failed", 
+		"error", err,
+		"component", "database",
+		"operation", "query")
 }
 
-// Example 2: Logging errors properly
-func processItem(id string) error {
-	// Some operation that might fail
-	if id == "" {
-		return errors.New("invalid item ID")
-	}
-	return nil
+// Log multiple errors together
+errors := []error{dbErr, cacheErr}
+if len(errors) > 0 {
+	log.Error("Multiple failures occurred",
+		slog.Group("errors",
+			slog.Any("db", errors[0]),
+			slog.Any("cache", errors[1]),
+		),
+		"operation", "system_startup")
 }
-
-// Log error with structured information
-err = processItem("")
-if err != nil {
-	log.Error("Failed to process item", 
-		"error", err, 
-		"component", "processor",
-		"severity", "high")
-	// Output (text): ERROR Failed to process item error="invalid item ID" component=processor severity=high
-}
-
-// Example 3: Error grouping
-errors := []error{
-	errors.New("database connection failed"),
-	errors.New("cache update failed"),
-}
-
-log.Error("Multiple errors occurred", 
-	slog.Group("errors", 
-		slog.Any("db", errors[0]),
-		slog.Any("cache", errors[1]),
-	),
-	"operation", "system_startup")
-// Output: detailed error log with grouped errors
 ```
 
 ## Best Practices
@@ -322,6 +198,7 @@ type Config struct {
     Format            Format
     Output            io.Writer
     DefaultAttrs      []slog.Attr
+    HandlerOptions    *slog.HandlerOptions
     ContextExtractors []ContextExtractor
 }
 ```
@@ -362,9 +239,9 @@ func NewLogger(cfg Config) *slog.Logger
 Create a new logger with the given configuration.
 
 ```go
-func NewLoggerWithError(cfg Config) (*slog.Logger, error)
+func SetAsDefault(logger *slog.Logger)
 ```
-Create a new logger with the given configuration, returning any validation errors.
+Set the given logger as the default slog logger.
 
 ```go
 func NewDevelopmentLogger(serviceName string, attrs ...slog.Attr) *slog.Logger
@@ -382,24 +259,19 @@ func NewEnvironmentLogger(serviceName string, env Environment, attrs ...slog.Att
 Create a logger based on the specified environment.
 
 ```go
-func NewDevelopmentLoggerWithExtractors(serviceName string, extractors ...ContextExtractor) *slog.Logger
+func NewDevelopmentLoggerWithExtractors(serviceName string, extractors []ContextExtractor, attrs ...slog.Attr) *slog.Logger
 ```
 Create a development logger with context extractors.
 
 ```go
-func NewProductionLoggerWithExtractors(serviceName string, extractors ...ContextExtractor) *slog.Logger
+func NewProductionLoggerWithExtractors(serviceName string, extractors []ContextExtractor, attrs ...slog.Attr) *slog.Logger
 ```
 Create a production logger with context extractors.
 
 ```go
-func NewEnvironmentLoggerWithExtractors(serviceName string, env Environment, extractors ...ContextExtractor) *slog.Logger
+func NewEnvironmentLoggerWithExtractors(serviceName string, env Environment, extractors []ContextExtractor, attrs ...slog.Attr) *slog.Logger
 ```
 Create an environment-specific logger with context extractors.
-
-```go
-func SetAsDefault(log *slog.Logger)
-```
-Set the given logger as the default slog logger.
 
 ```go
 func WithContextValue(name string, key any) ContextExtractor
