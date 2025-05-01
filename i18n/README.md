@@ -42,7 +42,7 @@ import (
 adapter, err := i18n.NewFileSystemAdapter("./translations")
 if err != nil {
 	// Handle adapter creation error
-	panic(fmt.Sprintf("Failed to create adapter: %v", err))
+	return fmt.Errorf("failed to create adapter: %w", err)
 }
 
 // Initialize translator
@@ -52,28 +52,33 @@ translator, err := i18n.NewTranslator(context.Background(), adapter,
 )
 if err != nil {
 	// Handle initialization error
-	panic(fmt.Sprintf("Failed to initialize translator: %v", err))
+	return fmt.Errorf("failed to initialize translator: %w", err)
 }
 
 // Get translation in default language
 greeting, err := translator.T("en", "greeting")
 if err != nil {
 	// Handle translation error
-	fmt.Println("Error:", err)
-} else {
-	fmt.Println(greeting) 
-	// Output: "Hello, world!"
+	return fmt.Errorf("translation error: %w", err)
 }
+// greeting = "Hello, world!"
 
 // Get translation in specific language
 frGreeting, err := translator.T("fr", "greeting")
 if err != nil {
-	// Handle translation error
-	fmt.Println("Error:", err)
-} else {
-	fmt.Println(frGreeting) 
-	// Output: "Bonjour, le monde!"
+	// Handle translation error based on error type
+	switch {
+	case errors.Is(err, i18n.ErrLanguageNotSupported):
+		// Use default language as fallback
+		frGreeting, _ = translator.T("en", "greeting")
+	case errors.Is(err, i18n.ErrTranslationNotFound):
+		// Use a fallback message
+		frGreeting = "Greeting not available"
+	default:
+		return fmt.Errorf("unexpected error: %w", err)
+	}
 }
+// frGreeting = "Bonjour, le monde!"
 ```
 
 ### Variable Substitution
@@ -82,20 +87,10 @@ if err != nil {
 // Translation with variables
 welcome, err := translator.T("en", "welcome", "name", "John")
 if err != nil {
-	fmt.Println("Error:", err)
-} else {
-	fmt.Println(welcome) 
-	// Output: "Welcome to our application, John!"
+	// Handle error
+	return err
 }
-
-// With specific language and variables
-frWelcome, err := translator.T("fr", "welcome", "name", "John")
-if err != nil {
-	fmt.Println("Error:", err)
-} else {
-	fmt.Println(frWelcome) 
-	// Output: "Bienvenue dans notre application, John!"
-}
+// welcome = "Welcome to our application, John!"
 ```
 
 ### Pluralization
@@ -104,115 +99,20 @@ if err != nil {
 // Pluralized translation (key has different forms based on count)
 items, err := translator.N("en", "items", 1, "count", "1")
 if err != nil {
-	fmt.Println("Error:", err)
-} else {
-	fmt.Println(items) 
-	// Output: "1 item"
+	// Handle error
+	return err
 }
+// items = "1 item"
 
 multiItems, err := translator.N("en", "items", 5, "count", "5")
 if err != nil {
-	fmt.Println("Error:", err)
-} else {
-	fmt.Println(multiItems) 
-	// Output: "5 items"
+	// Handle error
+	return err
 }
+// multiItems = "5 items"
 ```
 
-### Translation with Default Fallback
-
-```go
-// If translation is missing, use the provided default value
-message, err := translator.Td("en", "admin.welcome", "Welcome, Admin!", "name", "John")
-if err != nil {
-	fmt.Println("Error:", err)
-} else {
-	fmt.Println(message) 
-	// Output: "Welcome, Admin!" if key doesn't exist, with variables substituted
-}
-```
-
-### Duration Formatting
-
-```go
-// Convert durations to human-readable localized strings
-duration, err := translator.Duration("en", 90 * time.Minute)
-if err != nil {
-	fmt.Println("Error:", err)
-} else {
-	fmt.Println(duration) 
-	// Output: "1 hour 30 minutes" (depending on translation files)
-}
-
-// Different languages format durations differently
-frDuration, err := translator.Duration("fr", 2 * 24 * time.Hour)
-if err != nil {
-	fmt.Println("Error:", err)
-} else {
-	fmt.Println(frDuration) 
-	// Output: "2 jours" (depending on translation files)
-}
-```
-
-### Context-Based Translations
-
-```go
-// Set language in context
-ctx := i18n.SetLocale(context.Background(), "fr")
-
-// Use context-based translation (uses language from context)
-message, err := translator.Tc(ctx, "greeting")
-if err != nil {
-	fmt.Println("Error:", err)
-} else {
-	fmt.Println(message) 
-	// Output: Uses French translation - "Bonjour, le monde!"
-}
-
-// Pluralized context-based translation
-items, err := translator.Nc(ctx, "items", 3, "count", "3")
-if err != nil {
-	fmt.Println("Error:", err)
-} else {
-	fmt.Println(items) 
-	// Output: Uses French pluralization rules with count 3
-}
-```
-
-### Translation Files
-
-Translation files should be organized by language code:
-
-```
-/translations
-  /en
-    common.json
-    errors.json
-  /fr
-    common.json
-    errors.json
-```
-
-Example `en/common.json`:
-
-```json
-{
-    "greeting": "Hello, world!",
-    "welcome": "Welcome to our application, {{name}}!",
-    "items": {
-        "one": "{{count}} item",
-        "other": "{{count}} items"
-    },
-    "datetime": {
-        "hours": {
-            "one": "{{count}} hour",
-            "other": "{{count}} hours"
-        }
-    }
-}
-```
-
-### HTTP Integration
+### HTTP Middleware
 
 ```go
 import (
@@ -220,24 +120,17 @@ import (
 	"github.com/dmitrymomot/gokit/i18n"
 )
 
-// Initialize translator with adapter
-translator, _ := i18n.NewTranslator(context.Background(), adapter)
-
 // Create a handler that uses translations
 handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	// Get the locale from the request context
-	locale := i18n.GetLocale(r.Context())
-	
-	// Use the detected language for translations
-	greeting, err := translator.T(locale, "greeting")
+	// Get the translator from the request context
+	greeting, err := translator.Tc(r.Context(), "greeting")
 	if err != nil {
 		http.Error(w, "Translation error", http.StatusInternalServerError)
 		return
 	}
 	
+	// Response will be in the language determined from the request
 	fmt.Fprintf(w, "Greeting: %s\n", greeting)
-	// If request has Accept-Language: fr
-	// Output: Greeting: Bonjour, le monde!
 })
 
 // Apply the i18n middleware to automatically detect language
@@ -248,132 +141,55 @@ http.Handle("/", i18n.Middleware(translator, nil)(handler))
 
 ```go
 // Create a custom language extractor (e.g., from URL query parameter)
-customExtractor := func(r *http.Request) string {
+extractor := func(r *http.Request) string {
 	return r.URL.Query().Get("lang")
 }
 
-// Apply middleware with custom extractor
-http.Handle("/", i18n.Middleware(translator, customExtractor)(handler))
-// Now visiting /?lang=fr will use French translations
-```
-
-### Client-Side Translations
-
-```go
-// Export translations for a language as JSON string
-// Useful for sending translations to browser-based applications
-jsonData, err := translator.ExportJSON("en")
-if err != nil {
-	// Handle error
-	http.Error(w, "Export error", http.StatusInternalServerError)
-	return
-}
-
-// Send to client
-w.Header().Set("Content-Type", "application/json")
-w.Write([]byte(jsonData))
-// Output: JSON containing all English translations
+// Use the custom extractor with the middleware
+http.Handle("/custom", i18n.Middleware(translator, extractor)(handler))
 ```
 
 ### Error Handling
 
 ```go
-import (
-	"context"
-	"errors"
-	"fmt"
-	
-	"github.com/dmitrymomot/gokit/i18n"
-)
-
-// Example 1: Handling unsupported language
+// Example of comprehensive error handling
 translation, err := translator.T("xyz", "greeting")
 if err != nil {
 	switch {
 	case errors.Is(err, i18n.ErrLanguageNotSupported):
+		// Language not supported
 		fmt.Printf("Language 'xyz' is not supported: %v\n", err)
 		// Use default language as fallback
 		translation, _ = translator.T("en", "greeting")
-	default:
-		fmt.Printf("Unexpected error: %v\n", err)
-	}
-}
-
-// Example 2: Handling missing translation
-translation, err = translator.T("en", "nonexistent.key")
-if err != nil {
-	switch {
 	case errors.Is(err, i18n.ErrTranslationNotFound):
-		fmt.Printf("Translation key 'nonexistent.key' not found: %v\n", err)
+		// Translation not found
+		fmt.Printf("Translation key 'greeting' not found: %v\n", err)
 		// Use a default message
-		translation = "Default message"
-	default:
-		fmt.Printf("Unexpected error: %v\n", err)
-	}
-}
-
-// Example 3: Handling invalid translation format
-// Imagine a corrupted translation file
-translation, err = translator.T("en", "corrupt.key")
-if err != nil {
-	switch {
+		translation = "Hello"
 	case errors.Is(err, i18n.ErrInvalidTranslationFormat):
+		// Invalid format in translation file
 		fmt.Printf("Invalid translation format: %v\n", err)
-		// Report the issue and use a safe fallback
-		translation = "Error in translation system"
-	default:
-		fmt.Printf("Unexpected error: %v\n", err)
-	}
-}
-
-// Example 4: Handling file system errors
-// This might happen if translation files become inaccessible
-if err != nil {
-	switch {
+		// Use a sanitized default
+		translation = "Hello"
 	case errors.Is(err, i18n.ErrFileSystemError):
-		fmt.Printf("File system error accessing translations: %v\n", err)
+		// File system error
+		fmt.Printf("Error accessing translation files: %v\n", err)
 		// Use in-memory fallback translations for critical messages
-		translation = inMemoryFallbackTranslations["greeting"]
+		translation = "Hello"
 	default:
+		// Other unexpected errors
 		fmt.Printf("Unexpected error: %v\n", err)
 	}
-}
-
-// Example 5: Comprehensive error handling with fallbacks
-func getTranslation(t *i18n.Translator, lang, key string) string {
-	translation, err := t.T(lang, key)
-	if err != nil {
-		switch {
-		case errors.Is(err, i18n.ErrLanguageNotSupported):
-			// Try default language
-			translation, err = t.T("en", key)
-			if err != nil {
-				return key // Use key as last resort
-			}
-			return translation
-		case errors.Is(err, i18n.ErrTranslationNotFound):
-			return key // Use key as fallback
-		case errors.Is(err, i18n.ErrInvalidTranslationFormat):
-			fmt.Printf("Invalid translation format for %s.%s\n", lang, key)
-			return key
-		case errors.Is(err, i18n.ErrFileSystemError):
-			fmt.Printf("File system error: %v\n", err)
-			return key
-		default:
-			fmt.Printf("Unknown error: %v\n", err)
-			return key
-		}
-	}
-	return translation
 }
 ```
 
 ## Best Practices
 
-1. **Organization**:
-   - Organize translations by language and category
+1. **Translation Management**:
+   - Organize translations in a logical directory structure
+   - Use JSON or YAML for translation files
+   - Use dot notation for organizing nested translations
    - Keep translation keys consistent across languages
-   - Use hierarchical keys for related translations (e.g., `user.greeting`, `user.farewell`)
 
 2. **Error Handling**:
    - Always check for errors when initializing
@@ -467,11 +283,6 @@ func WithMissingTranslationsLogging(log bool) Option
 ```
 Enables or disables logging of missing translations.
 
-```go
-func WithNoLogging() Option
-```
-Disables all logging for the translator.
-
 ### Translation Methods
 
 ```go
@@ -510,11 +321,6 @@ func (t *Translator) ExportJSON(lang string) (string, error)
 Exports all translations for a language as JSON.
 
 ```go
-func (t *Translator) HasTranslation(lang, key string) bool
-```
-Checks if a translation exists.
-
-```go
 func (t *Translator) SupportedLanguages() []string
 ```
 Returns all supported languages.
@@ -531,4 +337,3 @@ var ErrLanguageNotSupported = errors.New("language not supported")
 var ErrTranslationNotFound = errors.New("translation not found")
 var ErrInvalidTranslationFormat = errors.New("invalid translation format")
 var ErrFileSystemError = errors.New("file system error")
-```
