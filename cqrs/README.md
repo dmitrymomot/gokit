@@ -1,6 +1,6 @@
 # CQRS Package
 
-A Command Query Responsibility Segregation (CQRS) implementation with event sourcing support.
+A Command Query Responsibility Segregation pattern implementation with event sourcing support.
 
 ## Installation
 
@@ -10,21 +10,21 @@ go get github.com/dmitrymomot/gokit/cqrs
 
 ## Overview
 
-The `cqrs` package provides a robust implementation of the Command Query Responsibility Segregation pattern. It leverages Watermill for message handling and supports multiple message transport mechanisms including Redis, Kafka, and in-memory channels.
+The CQRS package provides a robust implementation of the Command Query Responsibility Segregation pattern for building message-driven applications. It offers type-safe command and event handling using Go generics, built on top of Watermill for message processing. The package is thread-safe, supports multiple message transports, and is designed for both synchronous and asynchronous communication patterns.
 
 ## Features
 
-- Type-safe command and event handling with generics
-- Multiple message transports (Redis, Kafka, Go channels)
-- Middleware support (retry, timeout, circuit breaker)
-- Comprehensive error handling
-- Delayed message processing
-- PostgreSQL-based message transport option
-- Thread-safe implementations
+- Type-safe command and event handling with Go generics
+- Multiple message transports (Redis, Kafka, Go channels, PostgreSQL)
+- Middleware support for retry, timeout, and circuit breaker patterns
+- Comprehensive error handling with customizable error filters
+- Delayed message processing capabilities
+- Poison queue support for unprocessable messages
+- Thread-safe implementations suitable for concurrent processing
 
 ## Usage
 
-### Command Handling
+### Basic Command Handling
 
 ```go
 import (
@@ -66,7 +66,7 @@ errorHandler := func(ctx context.Context, err error) error {
     return nil
 }
 
-// Start in a goroutine or error group
+// Start in a goroutine
 go cqrs.CommandProcessorFunc(
     ctx,
     cqrs.CommandProcessorConfig{
@@ -84,7 +84,7 @@ err = commandBus.Send(ctx, &CreateUserCommand{
 })
 ```
 
-### Event Handling
+### Basic Event Handling
 
 ```go
 // 1. Define your event
@@ -123,7 +123,7 @@ err = eventBus.Publish(ctx, &UserCreatedEvent{
 })
 ```
 
-### Available Message Publishers
+### Using Different Message Publishers
 
 ```go
 // Redis publisher (recommended for production)
@@ -139,42 +139,131 @@ goChannelPublisher := cqrs.NewGoChannelPublisher(logger)
 pgPublisher, err := cqrs.NewPostgresPublisher(db, logger)
 ```
 
-## Advanced Features
-
-### Middleware Support
+### Error Handling
 
 ```go
-// Add retry middleware
-retryMiddleware := middleware.Retry{
-    MaxRetries:      3,
-    InitialInterval: time.Second,
-    Logger:          logger,
+// Define custom error handler
+config := cqrs.CommandProcessorConfig{
+    // Other config...
+    ErrorHandler: func(ctx context.Context, err error) error {
+        // Log the error
+        logger.ErrorContext(ctx, "Failed to process command", "error", err)
+        
+        // Determine whether to retry based on error type
+        if errors.Is(err, SomeTransientError) {
+            return err // Return the error to trigger retry
+        }
+        
+        // Don't retry for permanent errors
+        return nil
+    },
+    // Ignore specific errors
+    ErrorsIgnore: []error{cqrs.ErrDuplicateMessage},
+}
+```
+
+## Best Practices
+
+1. **Message Design**:
+   - Keep commands and events simple and focused
+   - Use immutable data structures
+   - Include correlation IDs for tracing
+
+2. **Error Handling**:
+   - Configure appropriate error handlers for commands and events
+   - Use error filters to distinguish between transient and permanent failures
+   - Set up poison queues for unprocessable messages
+
+3. **Performance**:
+   - Choose the appropriate message transport for your needs
+   - Configure appropriate timeout values
+   - Use middleware carefully as it adds overhead
+
+4. **Testing**:
+   - Use in-memory transport for unit tests
+   - Test command and event handlers in isolation
+   - Use the decorator pattern for cross-cutting concerns
+
+## API Reference
+
+### Configuration Types
+
+```go
+type CommandProcessorConfig struct {
+    SubscriberConstructor            SubscriberConstructor
+    Logger                          *slog.Logger
+    Publisher                        message.Publisher
+    ErrorHandler                     func(context.Context, error) error
+    ErrorsIgnore                     []error
+    UnprocessableMessageErrorFilter  func(error) bool
+    UnprocessableMessageTopic        string
+    PoisonQueueEnabled               bool
+    RetryConfig                     *RetryConfig
+    CircuitBreakerConfig            *CircuitBreakerConfig
 }
 
-// Apply to command handler
-handler = handler.Use(retryMiddleware.Middleware)
+type EventProcessorConfig struct {
+    SubscriberConstructor            SubscriberConstructor
+    Logger                          *slog.Logger
+    Publisher                        message.Publisher
+    ErrorHandler                     func(context.Context, error) error
+    ErrorsIgnore                     []error
+    UnprocessableMessageErrorFilter  func(error) bool
+    UnprocessableMessageTopic        string
+    PoisonQueueEnabled               bool
+    RetryConfig                     *RetryConfig
+    CircuitBreakerConfig            *CircuitBreakerConfig
+}
 ```
 
-### Custom Message Metadata
+### Publisher Functions
 
 ```go
-// Send command with metadata
-err = commandBus.SendWithModifiedMessage(ctx, &CreateUserCommand{/*...*/}, 
-    func(msg *message.Message) error {
-        msg.Metadata.Set("priority", "high")
-        msg.Metadata.Set("source", "api")
-        return nil
-    })
+func NewRedisPublisher(client redis.UniversalClient, logger *slog.Logger) (message.Publisher, error)
+func NewKafkaPublisher(brokers []string, logger *slog.Logger) (message.Publisher, error)
+func NewGoChannelPublisher(logger *slog.Logger) message.Publisher
+func NewPostgresPublisher(db *sql.DB, logger *slog.Logger) (message.Publisher, error)
 ```
 
-### Delayed Processing (with PostgreSQL)
+### Subscriber Functions
 
 ```go
-// Process message after 1 hour
-pgPublisher.PublishWithDelay(ctx, &SomeCommand{/*...*/}, time.Hour)
+func NewRedisSubscriber(client redis.UniversalClient, logger *slog.Logger) SubscriberConstructor
+func NewKafkaSubscriber(brokers []string, logger *slog.Logger) SubscriberConstructor
+func NewGoChannelSubscriber(logger *slog.Logger, pubSub *message.GoChannel) SubscriberConstructor
+func NewPostgresSubscriber(db *sql.DB, logger *slog.Logger) SubscriberConstructor
 ```
 
-## Example Applications
+### Command and Event Functions
+
+```go
+func NewCommandBus(publisher message.Publisher, logger *slog.Logger) (*CommandBus, error)
+func NewEventBus(publisher message.Publisher, logger *slog.Logger) (*EventBus, error)
+func NewCommandHandler[C any](handler func(context.Context, *C) error) *CommandHandler
+func NewEventHandler[E any](handler func(context.Context, *E) error) *EventHandler
+func CommandProcessorFunc(ctx context.Context, config CommandProcessorConfig, handlers ...*CommandHandler) func() error
+func EventProcessorFunc(ctx context.Context, config EventProcessorConfig, handlers ...*EventHandler) func() error
+```
+
+### Decorator Functions
+
+```go
+func CommandHandlerMiddleware[C any](h CommandHandlerFunc[C], middlewares ...CommandHandlerMiddlewareFunc[C]) CommandHandlerFunc[C]
+func EventHandlerMiddleware[E any](h EventHandlerFunc[E], middlewares ...EventHandlerMiddlewareFunc[E]) EventHandlerFunc[E]
+```
+
+### Error Types
+
+```go
+var ErrDuplicateMessage = errors.New("duplicate message")
+var ErrMessagingInfrastructure = errors.New("messaging infrastructure error")
+var ErrHandlerNotFound = errors.New("handler not found")
+var ErrPublisherNotFound = errors.New("publisher not found")
+var ErrSubscriberNotFound = errors.New("subscriber not found")
+var ErrInvalidMessagePayload = errors.New("invalid message payload")
+```
+
+## Examples
 
 The package includes example applications in the `examples` directory:
 
@@ -187,3 +276,4 @@ To run the examples:
 cd cqrs/examples/distributed
 make docker  # Start Redis
 make all     # Run all examples
+```
