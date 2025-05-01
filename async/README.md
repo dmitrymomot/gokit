@@ -26,8 +26,6 @@ The `async` package provides a clean, type-safe way to execute functions asynchr
 ### Basic Example
 
 ```go
-package main
-
 import (
 	"context"
 	"fmt"
@@ -55,7 +53,7 @@ func main() {
 		return
 	}
 	
-	fmt.Println(result) // Output: Result: 10
+	// Result: 10
 }
 ```
 
@@ -69,13 +67,11 @@ future := async.Async(ctx, 5, func(ctx context.Context, n int) (string, error) {
     return fmt.Sprintf("Result: %d", n*2), nil
 })
 
-// Wait for the result with a shorter timeout
+// Wait for the result with a timeout
 result, err := future.AwaitWithTimeout(500 * time.Millisecond)
 if err != nil {
     // This will happen because our function takes 2 seconds
-    fmt.Println("Operation timed out or failed:", err)
-    // err will contain context.DeadlineExceeded
-    return
+    // err will contain "future: timeout waiting for completion"
 }
 ```
 
@@ -89,18 +85,17 @@ future := async.Async(ctx, 5, func(ctx context.Context, n int) (string, error) {
 
 // Check if complete without blocking
 if future.IsComplete() {
-    fmt.Println("The operation has completed!")
-    result, err := future.Await() // This won't block since it's complete
-    // Process result...
+    // This will be false initially
+    result, err := future.Await() 
 } else {
-    fmt.Println("Still working...")
+    // This will execute initially
 }
 
 // Wait a bit and check again
 time.Sleep(1500 * time.Millisecond)
 if future.IsComplete() {
     // This will now be true
-    fmt.Println("The operation has completed!")
+    result, err := future.Await() // Won't block since it's complete
 }
 ```
 
@@ -121,43 +116,26 @@ future3 := async.Async(ctx, 3, processNumber)
 // Wait for all futures to complete
 results, err := async.WaitAll(future1, future2, future3)
 if err != nil {
-    fmt.Println("One of the operations failed:", err)
+    // Handle error
     return
 }
 
-// Process all results
-for i, result := range results {
-    fmt.Printf("Result %d: %s\n", i+1, result)
-}
-// Output:
-// Result 1: Processed 1
-// Result 2: Processed 2
-// Result 3: Processed 3
+// Results would contain: ["Processed 1", "Processed 2", "Processed 3"]
 
 // Or wait for any future to complete
 index, result, err := async.WaitAny(future1, future2, future3)
 if err != nil {
-    fmt.Println("The completed operation failed:", err)
+    // Handle error
     return
 }
 
-fmt.Printf("Future %d completed first with result: %s\n", index+1, result)
-// Output will be: "Future 1 completed first with result: Processed 1"
-// Because it has the shortest sleep time
+// index would be 0 (future1 completes first)
+// result would be "Processed 1"
 ```
 
 ### Error Handling
 
 ```go
-import (
-    "context"
-    "errors"
-    "fmt"
-    "time"
-    
-    "github.com/dmitrymomot/gokit/async"
-)
-
 // Function that may fail
 riskyOperation := func(ctx context.Context, shouldFail bool) (string, error) {
     if shouldFail {
@@ -171,21 +149,17 @@ successFuture := async.Async(ctx, false, riskyOperation)
 result, err := successFuture.Await()
 if err != nil {
     // This won't execute
-    fmt.Println("Error:", err)
 } else {
-    fmt.Println("Success:", result)
-    // Output: Success: success
+    // result will be "success"
 }
 
 // Failure case
 failureFuture := async.Async(ctx, true, riskyOperation)
 result, err := failureFuture.Await()
 if err != nil {
-    fmt.Println("Error:", err)
-    // Output: Error: operation failed
+    // err will be "operation failed"
 } else {
     // This won't execute
-    fmt.Println("Success:", result)
 }
 
 // Handling cancellation
@@ -205,8 +179,7 @@ cancel()
 // Wait for the result
 result, err := future.Await()
 if err != nil {
-    fmt.Println("Operation was cancelled:", err)
-    // Output: Operation was cancelled: context canceled
+    // err will be context.Canceled
 }
 ```
 
@@ -279,7 +252,9 @@ Checks if the asynchronous function is complete without blocking.
 
 ### Error Types
 
-The async package primarily uses standard Go error types:
+The async package uses standard Go error types and custom errors:
 - `context.Canceled`: Returned when the context is canceled
-- `context.DeadlineExceeded`: Returned when an operation times out
+- `context.DeadlineExceeded`: Returned when a context deadline is exceeded
+- `"future: timeout waiting for completion"`: Returned when AwaitWithTimeout times out
+- `"future: no futures provided to WaitAny"`: Returned when WaitAny is called with no futures
 - Custom errors from the provided async function will be returned directly
