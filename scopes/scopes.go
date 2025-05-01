@@ -19,14 +19,6 @@ var (
 	ScopeDelimiter = "."
 )
 
-const (
-	// Common scope constants
-	ScopeRead   = "read"
-	ScopeWrite  = "write"
-	ScopeDelete = "delete"
-	ScopeAdmin  = "admin"
-)
-
 // ParseScopes converts a space-separated string of scopes into a string slice.
 //
 // It handles trimming of extra spaces and removes empty entries. Returns nil if the input is empty.
