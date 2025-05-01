@@ -10,19 +10,21 @@ go get github.com/dmitrymomot/gokit/sanitizer
 
 ## Overview
 
-The `sanitizer` package provides a clean, zero-configuration approach to sanitize struct fields using struct tags. It supports 15+ built-in sanitizers and allows custom sanitization functions to be registered.
+The `sanitizer` package provides a clean, tag-based approach to sanitize struct fields using struct tags. It offers a thread-safe implementation with 15+ built-in sanitizers and supports custom sanitization functions. This package is designed to simplify input sanitation in web applications and APIs.
 
 ## Features
 
 - Declarative tag-based field sanitization
 - Thread-safe implementation with mutex protection
 - Multiple sanitization rules per field
-- Built-in sanitizers for common operations
+- 15+ built-in sanitizers for common operations
 - Extensible with custom sanitization functions
+- Zero dependencies beyond standard library and strcase
+- Support for parameterized sanitizers
 
 ## Usage
 
-### Basic Usage
+### Basic Example
 
 ```go
 import (
@@ -57,8 +59,6 @@ func main() {
 
 ### Custom Sanitizers
 
-Register your own custom sanitizers to extend functionality:
-
 ```go
 import (
     "reflect"
@@ -92,8 +92,6 @@ type Comment struct {
 
 ### HTTP Input Sanitization
 
-Automatically sanitize user input from web forms:
-
 ```go
 func handleUserRegistration(w http.ResponseWriter, r *http.Request) {
     var user User
@@ -113,7 +111,55 @@ func handleUserRegistration(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-## Built-in Sanitizers
+## Best Practices
+
+1. **Order Matters**:
+   - Sanitizers are applied in the order they appear in the tag
+   - Place `trim` before other sanitizers to handle whitespace first
+
+2. **Security**:
+   - Always sanitize user-generated content with `striphtml` or `escape` to prevent XSS attacks
+   - Combine sanitization with validation for robust input processing
+
+3. **Custom Sanitizers**:
+   - Register custom sanitizers in an `init()` function to ensure they're available globally
+   - Keep custom sanitizer functions simple and focused on a single task
+
+4. **Performance**:
+   - Keep sanitizer functions efficient, especially for high-traffic applications
+   - Consider applying sanitization only on the fields that need it
+
+5. **Usage Patterns**:
+   - Use multiple sanitizers with comma-separated values (e.g., `sanitize:"trim,lower"`)
+   - Pair with `validator` package for complete input processing
+
+## API Reference
+
+### Functions
+
+```go
+func SanitizeStruct(s any)
+```
+Sanitizes the struct fields based on 'sanitize' tags. Takes a pointer to a struct as input.
+
+```go
+func RegisterSanitizer(tag string, fn SanitizeFunc)
+```
+Registers a custom sanitization function with the given tag name.
+
+```go
+func ResetSanitizers()
+```
+Resets all sanitizers to the default set. Useful for testing purposes.
+
+### Types
+
+```go
+type SanitizeFunc func(fieldValue any, fieldType reflect.StructField, params []string) any
+```
+Function signature for sanitizers. Takes the field value, field type, and optional parameters.
+
+### Built-in Sanitizers
 
 | Sanitizer   | Description                             | Example Tag                    |
 |-------------|-----------------------------------------|--------------------------------|
@@ -132,34 +178,3 @@ func handleUserRegistration(w http.ResponseWriter, r *http.Request) {
 | snakecase   | Converts to snake_case                  | `sanitize:"snakecase"`         |
 | kebabcase   | Converts to kebab-case                  | `sanitize:"kebabcase"`         |
 | ucfirst     | Uppercase first character               | `sanitize:"ucfirst"`           |
-
-## API Reference
-
-### Core Functions
-
-```go
-// Sanitize a struct using struct tags
-func SanitizeStruct(s any)
-
-// Register a custom sanitizer
-func RegisterSanitizer(tag string, fn SanitizeFunc)
-
-// Reset all sanitizers to defaults (useful for testing)
-func ResetSanitizers()
-```
-
-### Sanitizer Function Type
-
-```go
-// Function signature for sanitizers
-type SanitizeFunc func(fieldValue any, fieldType reflect.StructField, params []string) any
-```
-
-## Best Practices
-
-1. **Use multiple sanitizers**: Apply multiple sanitizers to the same field using comma-separated values (e.g., `sanitize:"trim,lower"`)
-2. **Order matters**: Sanitizers are applied in the order they appear in the tag
-3. **Validate after sanitizing**: Use packages like `validator` after sanitization for complete input processing
-4. **Custom sanitizers**: Register custom sanitizers in an `init()` function to ensure they're available globally
-5. **Security**: Always sanitize user-generated content with `striphtml` or `escape` to prevent XSS attacks
-6. **Performance**: Keep sanitizer functions efficient, especially for high-traffic applications
