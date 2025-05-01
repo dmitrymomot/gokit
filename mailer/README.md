@@ -21,6 +21,7 @@ The `mailer` package provides a clean interface for sending emails via the Postm
 - Comprehensive error handling with semantic error types
 - Thread-safe implementation for concurrent usage
 - Simplified client interface with intuitive API
+- HTML templating with reusable components
 
 ## Usage
 
@@ -51,6 +52,47 @@ err = client.SendEmail(context.Background(), mailer.SendEmailParams{
 	Tag:      "welcome",
 })
 // Email is sent with tracking enabled for opens and links
+```
+
+### With HTML Templates
+
+```go
+import (
+	"context"
+	"github.com/dmitrymomot/gokit/mailer"
+	"github.com/dmitrymomot/gokit/mailer/templates"
+	"github.com/dmitrymomot/gokit/mailer/templates/components"
+)
+
+// Create a mailer client
+client := mailer.MustNewClient(mailer.Config{
+	PostmarkServerToken:  "your-token",
+	PostmarkAccountToken: "your-token",
+	SenderEmail:          "noreply@example.com",
+	SupportEmail:         "support@example.com",
+})
+
+// Build an email using components
+emailTemplate := components.Layout(
+	components.Header("Welcome to Our Platform"),
+	components.Text("We're excited to have you join us."),
+	components.PrimaryButton("Get Started", "https://example.com/start"),
+	components.Footer(" 2025 Example Inc."),
+)
+
+// Render template to HTML
+htmlBody, err := templates.Render(context.Background(), emailTemplate)
+if err != nil {
+	// Handle error
+}
+
+// Send email with the rendered template
+err = client.SendEmail(context.Background(), mailer.SendEmailParams{
+	SendTo:   "user@example.com",
+	Subject:  "Welcome!",
+	BodyHTML: htmlBody,
+	Tag:      "onboarding",
+})
 ```
 
 ### Loading Config from Environment Variables
@@ -93,6 +135,68 @@ if err != nil {
 }
 ```
 
+## Template Components
+
+The package includes reusable email template components built with the `templ` library:
+
+```go
+import "github.com/dmitrymomot/gokit/mailer/templates/components"
+```
+
+### Available Components
+
+- `Layout`: Base container with responsive styling for email content
+  ```go
+  components.Layout(/* child components */)
+  ```
+
+- `Header`: Section headers with standardized styling
+  ```go
+  components.Header("Welcome to Our Service")
+  ```
+
+- `Text`: Formatted text paragraphs with customizable styling
+  ```go
+  components.Text("This is a paragraph of text.")
+  ```
+
+- `Button`: Call-to-action buttons with various styles
+  ```go
+  components.PrimaryButton("Get Started", "https://example.com/start")
+  components.SuccessButton("Confirm", "https://example.com/confirm")
+  components.DangerButton("Delete", "https://example.com/delete")
+  ```
+
+- `Link`: Styled hyperlinks for navigation
+  ```go
+  components.Link("Visit our website", "https://example.com")
+  ```
+
+- `Logo`: Display company logo in emails
+  ```go
+  components.Logo("https://example.com/logo.png", "Company Name")
+  ```
+
+- `OTP`: One-time password/code formatting
+  ```go
+  components.OTP("123456")
+  ```
+
+- `Footer`: Standard footer with customizable content
+  ```go
+  components.Footer(" 2025 Company Name")
+  ```
+
+### Template Rendering
+
+The `templates` package provides a rendering function to convert template components to HTML:
+
+```go
+func Render(ctx context.Context, tpl templ.Component) (string, error)
+```
+
+This function takes a template component and renders it to an HTML string that can be used with the `SendEmail` method.
+
 ## Best Practices
 
 1. **Context Usage**:
@@ -110,6 +214,11 @@ if err != nil {
 4. **Configuration**:
    - Store API tokens in secure environment variables
    - Use the `config` package for type-safe loading of environment variables
+
+5. **Templates**:
+   - Compose complex templates from smaller, reusable components
+   - Test email rendering in multiple email clients
+   - Use responsive design components for mobile compatibility
 
 ## API Reference
 
@@ -154,6 +263,11 @@ Creates a new instance of the mailer client with the provided configuration.
 func MustNewClient(cfg Config) EmailSender
 ```
 Creates a new instance of the mailer client, panics if initialization fails.
+
+```go
+func templates.Render(ctx context.Context, tpl templ.Component) (string, error)
+```
+Renders a template component to an HTML string.
 
 ### Error Types
 
