@@ -453,3 +453,4 @@ var ErrInvalidClaims = errors.New("invalid claims")
 var ErrMissingClaims = errors.New("missing claims")
 var ErrInvalidSignature = errors.New("invalid signature")
 var ErrUnexpectedSigningMethod = errors.New("unexpected signing method")
+```
