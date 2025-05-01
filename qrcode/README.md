@@ -40,102 +40,55 @@ Built on top of the high-performance [go-qrcode](https://github.com/skip2/go-qrc
 ### Generate QR Code as PNG
 
 ```go
-package main
+import "github.com/dmitrymomot/gokit/qrcode"
 
-import (
-    "fmt"
-    "os"
-    
-    "github.com/dmitrymomot/gokit/qrcode"
-)
-
-func main() {
-    // Generate a QR code for a URL (default size is 256px if size <= 0)
-    png, err := qrcode.Generate("https://example.com", 256)
-    if err != nil {
-        fmt.Printf("Error generating QR code: %v\n", err)
-        return
-    }
-    
-    // Output: PNG byte slice with QR code image data
-    fmt.Printf("Generated QR code with size: %d bytes\n", len(png))
-    
-    // Save to file
-    err = os.WriteFile("example.png", png, 0644)
-    if err != nil {
-        fmt.Printf("Error saving QR code: %v\n", err)
-        return
-    }
-    
-    fmt.Println("QR code saved to example.png")
+// Generate a QR code for a URL (default size is 256px if size <= 0)
+png, err := qrcode.Generate("https://example.com", 256)
+if err != nil {
+    // Handle error
 }
+
+// Save to file
+err = os.WriteFile("example.png", png, 0644)
 ```
 
 ### Generate QR Code for HTML
 
 ```go
-package main
+import "github.com/dmitrymomot/gokit/qrcode"
 
-import (
-    "fmt"
-    
-    "github.com/dmitrymomot/gokit/qrcode"
-)
-
-func main() {
-    // Generate QR code as base64 data URI
-    dataURI, err := qrcode.GenerateBase64Image("https://example.com", 256)
-    if err != nil {
-        fmt.Printf("Error generating QR code: %v\n", err)
-        return
-    }
-    
-    // Output: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA... (truncated for brevity)
-    fmt.Printf("Data URI (first 30 chars): %s...\n", dataURI[:30])
-    
-    // Use in HTML
-    html := fmt.Sprintf(`<img src="%s" alt="QR Code">`, dataURI)
-    fmt.Println("HTML img tag created with QR code data URI")
+// Generate QR code as base64 data URI
+dataURI, err := qrcode.GenerateBase64Image("https://example.com", 256)
+if err != nil {
+    // Handle error
 }
+
+// Use in HTML
+html := fmt.Sprintf(`<img src="%s" alt="QR Code">`, dataURI)
 ```
 
 ### Using with HTTP Handlers
 
 ```go
-package main
-
-import (
-    "fmt"
-    "net/http"
+http.HandleFunc("/qrcode", func(w http.ResponseWriter, r *http.Request) {
+    content := r.URL.Query().Get("content")
+    if content == "" {
+        http.Error(w, "Missing content parameter", http.StatusBadRequest)
+        return
+    }
     
-    "github.com/dmitrymomot/gokit/qrcode"
-)
-
-func main() {
-    http.HandleFunc("/qrcode", func(w http.ResponseWriter, r *http.Request) {
-        content := r.URL.Query().Get("content")
-        if content == "" {
-            http.Error(w, "Missing content parameter", http.StatusBadRequest)
-            return
-        }
-        
-        // Generate QR code
-        png, err := qrcode.Generate(content, 256)
-        if err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-            return
-        }
-        
-        // Serve the image
-        w.Header().Set("Content-Type", "image/png")
-        w.Header().Set("Cache-Control", "public, max-age=86400")
-        w.Write(png)
-    })
+    // Generate QR code
+    png, err := qrcode.Generate(content, 256)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
     
-    fmt.Println("Starting server on :8080")
-    fmt.Println("Access QR code at: http://localhost:8080/qrcode?content=https://example.com")
-    http.ListenAndServe(":8080", nil)
-}
+    // Serve the image
+    w.Header().Set("Content-Type", "image/png")
+    w.Header().Set("Cache-Control", "public, max-age=86400")
+    w.Write(png)
+})
 ```
 
 ## API Reference
@@ -182,24 +135,14 @@ var ErrorFailedToGenerateQRCode = errors.New("failed to generate QR code")
 The package uses error wrapping to provide context when errors occur:
 
 ```go
-package main
-
 import (
     "errors"
-    "fmt"
-    
     "github.com/dmitrymomot/gokit/qrcode"
 )
 
-func main() {
-    // Try to generate a QR code with invalid parameters
-    _, err := qrcode.Generate("", -10)
-    
-    // Check for specific error type
-    if errors.Is(err, qrcode.ErrorFailedToGenerateQRCode) {
-        fmt.Println("QR code generation failed")
-        fmt.Printf("Underlying error: %v\n", err)
-    }
+// Check for specific error
+if errors.Is(err, qrcode.ErrorFailedToGenerateQRCode) {
+    // Handle QR code generation failure
 }
 ```
 
