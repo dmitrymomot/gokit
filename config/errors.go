@@ -12,4 +12,7 @@ var (
 
 	// ErrConfigNotLoaded is returned when attempting to access a config that hasn't been loaded
 	ErrConfigNotLoaded = errors.New("configuration has not been loaded")
+
+	// ErrNilPointer is returned when a nil pointer is provided to Load
+	ErrNilPointer = errors.New("nil pointer provided to config loader")
 )

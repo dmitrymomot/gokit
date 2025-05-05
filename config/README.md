@@ -44,8 +44,9 @@ type DatabaseConfig struct {
 }
 
 func main() {
-	// Load the configuration
-	dbConfig, err := config.Load[DatabaseConfig]()
+	// Create and load the configuration
+	var dbConfig DatabaseConfig
+	err := config.Load(&dbConfig)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -72,15 +73,19 @@ type AuthConfig struct {
 }
 
 // Load different configurations independently
-serverCfg, err := config.Load[ServerConfig]()
-authCfg, err := config.Load[AuthConfig]()
+var serverCfg ServerConfig
+err := config.Load(&serverCfg)
+
+var authCfg AuthConfig
+err = config.Load(&authCfg)
 ```
 
 ### Using MustLoad
 
 ```go
 // Will panic if environment variables are missing or invalid
-appConfig := config.MustLoad[AppConfig]()
+var appConfig AppConfig
+config.MustLoad(&appConfig)
 
 // Useful for configurations that are required at startup
 ```
@@ -88,13 +93,16 @@ appConfig := config.MustLoad[AppConfig]()
 ### Error Handling
 
 ```go
-config, err := config.Load[MyConfig]()
+var myConfig MyConfig
+err := config.Load(&myConfig)
 if err != nil {
 	switch {
 	case errors.Is(err, config.ErrParsingConfig):
 		// Handle parsing error (missing required field, invalid format)
 	case errors.Is(err, config.ErrConfigNotLoaded):
 		// Handle not loaded error
+	case errors.Is(err, config.ErrNilPointer):
+		// Handle nil pointer error
 	default:
 		// Handle other errors
 	}
@@ -127,12 +135,12 @@ if err != nil {
 ### Functions
 
 ```go
-func Load[T any]() (T, error)
+func Load[T any](v *T) error
 ```
-Loads environment variables into the configuration struct of type T. Ensures each configuration type is only loaded once and subsequent calls return the cached instance. Returns an error if parsing fails.
+Loads environment variables into the provided configuration struct pointer of type T. Ensures each configuration type is only loaded once and subsequent calls return the cached instance. Returns an error if parsing fails or a nil pointer is provided.
 
 ```go
-func MustLoad[T any]() T
+func MustLoad[T any](v *T)
 ```
 Like Load but panics if configuration loading fails. Useful for configurations that are required for the application to start.
 
@@ -165,4 +173,5 @@ type Config struct {
 var ErrParsingConfig = errors.New("failed to parse environment variables into config")
 var ErrInvalidConfigType = errors.New("invalid config type")
 var ErrConfigNotLoaded = errors.New("configuration has not been loaded")
+var ErrNilPointer = errors.New("nil pointer provided to config loader")
 ```

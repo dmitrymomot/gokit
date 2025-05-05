@@ -36,7 +36,8 @@ func main() {
 	defer stop()
 
 	// Init PostgreSQL connection
-	pgCfg, err := config.Load[pg.Config]()
+	var pgCfg pg.Config
+	err := config.Load(&pgCfg)
 	if err != nil {
 		log.ErrorContext(ctx, "Failed to load config", "error", err)
 		os.Exit(1)

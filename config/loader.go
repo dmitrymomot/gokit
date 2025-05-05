@@ -12,7 +12,7 @@ import (
 // configCache provides a type-safe way to store and retrieve configuration
 // instances using generics
 type configCache struct {
-	mu     sync.Mutex
+	mu     sync.RWMutex
 	values map[string]any
 	onces  map[string]*sync.Once
 }
@@ -30,7 +30,7 @@ var (
 // throughout the application lifecycle.
 //
 // The function parses environment variables into a struct based on field tags.
-// If loading fails, an appropriate error will be returned (ErrParsingConfig).
+// If loading fails, an appropriate error will be returned.
 // Once a configuration type is successfully loaded, subsequent calls for the same
 // type will return the cached version.
 //
@@ -43,24 +43,29 @@ var (
 //		Password string `env:"DB_PASS,required"`
 //	}
 //
-//	config, err := config.Load[DatabaseConfig]()
+//	var dbConfig DatabaseConfig
+//	err := config.Load(&dbConfig)
 //	if err != nil {
 //		// Handle error
 //	}
-func Load[T any]() (T, error) {
-	var config T
-	typeName := getTypeName[T]()
-
-	// Single lock section to check cache and set up once
-	globalCache.mu.Lock()
-
-	// Try to retrieve from cache immediately if already loaded
-	if cached, ok := globalCache.values[typeName]; ok {
-		globalCache.mu.Unlock()
-		return cached.(T), nil
+func Load[T any](v *T) error {
+	if v == nil {
+		return ErrNilPointer
 	}
 
+	typeName := getTypeName[T]()
+
+	// Try to retrieve from cache first with a read lock
+	globalCache.mu.RLock()
+	if cached, ok := globalCache.values[typeName]; ok {
+		*v = cached.(T)
+		globalCache.mu.RUnlock()
+		return nil
+	}
+	globalCache.mu.RUnlock()
+
 	// Get or create the once instance for this type
+	globalCache.mu.Lock()
 	once, exists := globalCache.onces[typeName]
 	if !exists {
 		once = new(sync.Once)
@@ -73,46 +78,55 @@ func Load[T any]() (T, error) {
 
 	// Use sync.Once to ensure the config is parsed only once
 	once.Do(func() {
-		// Parse environment variables into a new instance of T
-		if parseErr := env.Parse(&config); parseErr != nil {
+		// Parse environment variables into the provided instance
+		if parseErr := env.Parse(v); parseErr != nil {
 			err = fmt.Errorf("%w: %v", ErrParsingConfig, parseErr)
 			return
 		}
 
 		// Store the successfully parsed config in the cache
 		globalCache.mu.Lock()
-		globalCache.values[typeName] = config
+		globalCache.values[typeName] = *v // Store a copy
 		globalCache.mu.Unlock()
 	})
 
 	if err != nil {
-		return config, err
+		return err
 	}
 
-	// If there's no error, the config should be in the cache
-	globalCache.mu.Lock()
-	cached, ok := globalCache.values[typeName]
-	globalCache.mu.Unlock()
-
-	if ok {
-		return cached.(T), nil
+	// If we didn't hit the once.Do or there was no error,
+	// ensure the value is loaded from cache
+	globalCache.mu.RLock()
+	if cached, ok := globalCache.values[typeName]; ok {
+		*v = cached.(T)
+		globalCache.mu.RUnlock()
+		return nil
 	}
+	globalCache.mu.RUnlock()
 
-	return config, ErrConfigNotLoaded
+	return ErrConfigNotLoaded
 }
 
 // MustLoad works like Load but panics if configuration loading fails.
 // This is useful for configurations that are required for the application to start.
-func MustLoad[T any]() T {
-	config, err := Load[T]()
-	if err != nil {
+//
+// Example:
+//
+//	var dbConfig DatabaseConfig
+//	config.MustLoad(&dbConfig)
+func MustLoad[T any](v *T) {
+	if err := Load(v); err != nil {
 		panic(fmt.Sprintf("Failed to load required configuration: %v", err))
 	}
-	return config
 }
 
 // getTypeName returns a string identifier for the generic type T
 func getTypeName[T any]() string {
 	var zero T
-	return reflect.TypeOf(zero).String()
+	t := reflect.TypeOf(zero)
+	if t == nil {
+		// Handle interface types
+		return fmt.Sprintf("%T", *new(T))
+	}
+	return t.String()
 }

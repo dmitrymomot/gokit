@@ -46,7 +46,8 @@ func TestLoad_Success(t *testing.T) {
 	t.Setenv("TEST_BOOL_SUCCESS", "false")
 
 	// Load configuration
-	cfg, err := config.Load[TestConfigSuccess]()
+	var cfg TestConfigSuccess
+	err := config.Load(&cfg)
 
 	// Assert no error
 	require.NoError(t, err, "Load should not return an error with valid environment variables")
@@ -64,7 +65,8 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("TEST_BOOL_DEFAULT")
 
 	// Load configuration
-	cfg, err := config.Load[TestConfigDefault]()
+	var cfg TestConfigDefault
+	err := config.Load(&cfg)
 
 	// Assert no error
 	require.NoError(t, err, "Load should not return an error when using default values")
@@ -80,7 +82,8 @@ func TestLoad_MissingRequired(t *testing.T) {
 	os.Unsetenv("REQUIRED_VALUE")
 
 	// Load configuration
-	_, err := config.Load[RequiredConfig]()
+	var cfg RequiredConfig
+	err := config.Load(&cfg)
 
 	// Assert error is returned
 	require.Error(t, err, "Load should return an error when a required value is missing")
@@ -92,14 +95,16 @@ func TestLoad_Singleton(t *testing.T) {
 	t.Setenv("TEST_STRING_SINGLETON", "first_value")
 
 	// First load
-	firstConfig, err := config.Load[TestConfigSingleton]()
+	var firstConfig TestConfigSingleton
+	err := config.Load(&firstConfig)
 	require.NoError(t, err, "First load should not return an error")
 
 	// Change environment variable
 	t.Setenv("TEST_STRING_SINGLETON", "second_value")
 
 	// Second load - should return cached version, not new value
-	secondConfig, err := config.Load[TestConfigSingleton]()
+	var secondConfig TestConfigSingleton
+	err = config.Load(&secondConfig)
 	require.NoError(t, err, "Second load should not return an error")
 
 	// Assert both configs have the same value (the first one)
@@ -115,14 +120,25 @@ func TestLoad_DifferentTypes(t *testing.T) {
 	t.Setenv("VALUE_TYPE2", "test_type2")
 
 	// Load first config type
-	config1, err := config.Load[TestConfigDifferent1]()
+	var config1 TestConfigDifferent1
+	err := config.Load(&config1)
 	require.NoError(t, err, "Loading first config type should not error")
 
 	// Load second config type
-	config2, err := config.Load[TestConfigDifferent2]()
+	var config2 TestConfigDifferent2
+	err = config.Load(&config2)
 	require.NoError(t, err, "Loading second config type should not error")
 
 	// Assert each has the correct value
 	assert.Equal(t, "test_type1", config1.Value, "First config should have its own value")
 	assert.Equal(t, "test_type2", config2.Value, "Second config should have its own value")
+}
+
+// Add a test for nil pointer
+func TestLoad_NilPointer(t *testing.T) {
+	var cfg *TestConfigSuccess = nil
+	err := config.Load(cfg)
+	
+	require.Error(t, err, "Load should return an error when given a nil pointer")
+	assert.ErrorIs(t, err, config.ErrNilPointer, "Error should be ErrNilPointer")
 }
