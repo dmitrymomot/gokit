@@ -46,6 +46,7 @@ Key features:
 - Form data binding
 - Query parameters binding
 - Tag-based field mapping
+- Support for primitive types and slices
 
 [View the Binder package documentation](./binder/README.md)
 
@@ -68,7 +69,9 @@ The `cqrs` package implements Command Query Responsibility Segregation pattern f
 Key features:
 - Command handling and dispatching
 - Event handling and publishing
-- Redis-based messaging infrastructure
+- Multiple message transport options (Redis, Kafka, in-memory channels, PostgreSQL)
+- Comprehensive error handling
+- Thread-safe operation for concurrent use
 
 [View the CQRS package documentation](./cqrs/README.md)
 
@@ -87,23 +90,32 @@ Key features:
 - Accept-Language header parsing
 - Custom language extractors
 - Default language fallback mechanism
+- Proper error handling with custom error types
+- Configurable logging for diagnostics
 
 [View the I18n package documentation](./i18n/README.md)
 
 ### JWT
 
-The `jwt` package provides JSON Web Token handling utilities.
+The `jwt` package provides a minimalist JWT implementation with HMAC-SHA256 signing.
+
+Key features:
+- Token generation and validation
+- Context utilities
+- HTTP middleware with flexible token extraction strategies
+- Security and implementation best practices
 
 [View the JWT package documentation](./jwt/README.md)
 
 ### Logger
 
-The `logger` package provides structured logging with context extractors.
+The `logger` package provides context-aware structured logging built on Go's standard log/slog package.
 
 Key features:
 - Development and production logger configurations
 - Context value extraction
-- Integration with Go's `log/slog` package
+- Environment-specific configuration
+- Thread-safe operation
 - Custom attribute support
 
 [View the Logger package documentation](./logger/README.md)
@@ -126,11 +138,11 @@ Key features:
 
 [View the MongoDB package documentation](./mongo/README.md)
 
-### OAuth
+### OAuth/Google
 
-The `oauth` package provides OAuth authentication utilities.
+The `oauth/google` package provides Google OAuth authentication utilities.
 
-[View the OAuth package documentation](./oauth/google/README.md)
+[View the OAuth/Google package documentation](./oauth/google/README.md)
 
 ### OpenSearch
 
@@ -158,7 +170,7 @@ The `privacy` package provides utilities for masking sensitive data like emails,
 
 ### QR Code
 
-The `qrcode` package provides QR code generation utilities.
+The `qrcode` package provides a simplified API for generating QR codes as PNG images or base64 data URIs for HTML embedding.
 
 [View the QR Code package documentation](./qrcode/README.md)
 
@@ -168,30 +180,18 @@ The `randomname` package provides random name generation.
 
 [View the Random Name package documentation](./randomname/README.md)
 
-### RBAC
-
-The `rbac` package provides Role-Based Access Control functionality.
-
-[View the RBAC package documentation](./rbac/README.md)
-
 ### Redis
 
-The `redis` package provides a Redis client wrapper with connection helpers, healthcheck functionality, and a Fiber storage interface implementation.
+The `redis` package provides a Redis client wrapper for key-value storage.
 
 Key features:
-- Simple connection helpers with automatic retries
-- Built-in healthcheck function for service readiness probes
-- Environment-based configuration
-- Fiber storage interface implementation for web applications
-- Thread-safe key-value operations
+- Simple key-value storage interface compatible with caching and session systems
+- Support for any redis.UniversalClient implementation
+- Key expiration support
+- Proper error handling
+- Thread-safe operations
 
 [View the Redis package documentation](./redis/README.md)
-
-### Router
-
-The `router` package provides an HTTP router with middleware support.
-
-[View the Router package documentation](./router/README.md)
 
 ### Sanitizer
 
@@ -221,6 +221,7 @@ Key features:
 - Version comparison following SemVer 2.0.0 rules
 - Version manipulation (incrementing, modifying components)
 - Range checking between versions
+- Support for major.minor.patch format with prerelease identifiers
 
 [View the Semantic Versioning package documentation](./semver/README.md)
 
@@ -237,9 +238,10 @@ The `statemachine` package provides a flexible state machine implementation with
 Key features:
 - Core interfaces for State, Event, Action, and Guard
 - Fluent builder pattern for configuration
-- Support for conditional transitions
+- Support for conditional transitions through Guards
 - Support for side effects through Actions
 - Thread-safety for concurrent use
+- Custom error types for better error handling
 
 [View the State Machine package documentation](./statemachine/README.md)
 
@@ -251,7 +253,13 @@ The `storage` package provides storage interfaces and implementations.
 
 ### Token
 
-The `token` package provides token generation and validation utilities.
+The `token` package provides a lightweight token generation and validation library with HMAC-SHA256 signatures.
+
+Key features:
+- Type-safe payload handling with Go generics
+- URL-safe Base64 encoding
+- Minimal API with zero external dependencies
+- Thread safety and constant-time signature comparison
 
 [View the Token package documentation](./token/README.md)
 
@@ -269,13 +277,19 @@ The `useragent` package provides user agent parsing utilities.
 
 ### Utils
 
-The `utils` package provides various utility functions.
+The `utils` package provides lightweight utility functions including pointer creation, slug generation, display name normalization, reflection utilities, and JSON formatting.
 
 [View the Utils package documentation](./utils/README.md)
 
 ### Validator
 
-The `validator` package provides struct validation with custom rules support.
+The `validator` package provides a flexible, tag-based validation system for Go structs.
+
+Key features:
+- 30+ built-in validators
+- Customizable error messages
+- Support for nested structs
+- Thread-safe operation for concurrent validation
 
 [View the Validator package documentation](./validator/README.md)
 
@@ -288,6 +302,7 @@ Key features:
 - Retry mechanism for failed requests
 - Structured logging with `log/slog`
 - Decorator pattern for extending functionality
+- Benchmarked for high-volume, concurrent scenarios
 
 [View the Webhook package documentation](./webhook/README.md)
 
