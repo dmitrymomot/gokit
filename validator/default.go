@@ -16,39 +16,42 @@ import (
 var (
 	// validators holds the registered validation functions.
 	validators = map[string]ValidationFunc{
-		"required":   requiredValidator,
-		"max":        maxValidator,
-		"min":        minValidator,
-		"range":      rangeValidator,
-		"email":      emailValidator,
-		"regex":      regexValidator,
-		"numeric":    numericValidator,
-		"alpha":      alphaValidator,
-		"alphanum":   alphanumValidator,
-		"url":        urlValidator,
-		"ip":         ipValidator,
-		"date":       dateValidator,
-		"in":         inValidator,
-		"notin":      notInValidator,
-		"length":     lengthValidator,
-		"between":    betweenValidator,
-		"boolean":    booleanValidator,
-		"uuid":       uuidValidator,
-		"creditcard": creditCardValidator,
-		"eq":         equalValidator,
-		"ne":         notEqualValidator,
-		"lt":         lessThanValidator,
-		"lte":        lessThanOrEqualValidator,
-		"gt":         greaterThanValidator,
-		"gte":        greaterThanOrEqualValidator,
-		"len":        lengthValidator,
-		"realemail":  realEmailValidator,
-		"password":   passwordValidator,
-		"phone":      phoneValidator,
-		"username":   usernameValidator,
-		"slug":       slugValidator,
-		"hexcolor":   hexcolorValidator,
-		"fullname":   fullnameValidator,
+		"required":      requiredValidator,
+		"max":           maxValidator,
+		"min":           minValidator,
+		"range":         rangeValidator,
+		"email":         emailValidator,
+		"regex":         regexValidator,
+		"numeric":       numericValidator,
+		"alpha":         alphaValidator,
+		"alphanum":      alphanumValidator,
+		"alphaspace":    alphaSpaceValidator,
+		"alphaspacenum": alphaSpaceNumValidator,
+		"url":           urlValidator,
+		"ip":            ipValidator,
+		"date":          dateValidator,
+		"in":            inValidator,
+		"notin":         notInValidator,
+		"length":        lengthValidator,
+		"between":       betweenValidator,
+		"boolean":       booleanValidator,
+		"uuid":          uuidValidator,
+		"creditcard":    creditCardValidator,
+		"eq":            equalValidator,
+		"ne":            notEqualValidator,
+		"lt":            lessThanValidator,
+		"lte":           lessThanOrEqualValidator,
+		"gt":            greaterThanValidator,
+		"gte":           greaterThanOrEqualValidator,
+		"len":           lengthValidator,
+		"realemail":     realEmailValidator,
+		"password":      passwordValidator,
+		"phone":         phoneValidator,
+		"username":      usernameValidator,
+		"slug":          slugValidator,
+		"hexcolor":      hexcolorValidator,
+		"fullname":      fullnameValidator,
+		"name":          nameValidator,
 	}
 	// validatorsMutex is used to synchronize access to the validators map.
 	validatorsMutex sync.RWMutex
@@ -336,6 +339,30 @@ func alphanumValidator(fieldValue any, fieldType reflect.StructField, params []s
 	}
 	if matched := regexp.MustCompile(`^[A-Za-z0-9]+$`).MatchString(value); !matched {
 		return errors.New(translator("validation.alphanum", label, params...))
+	}
+	return nil
+}
+
+// alphaSpaceValidator checks if a field contains only alphabetic characters and spaces.
+func alphaSpaceValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value, ok := fieldValue.(string)
+	if !ok {
+		return nil
+	}
+	if matched := regexp.MustCompile(`^[A-Za-z ]+$`).MatchString(value); !matched {
+		return errors.New(translator("validation.alphaspace", label, params...))
+	}
+	return nil
+}
+
+// alphaSpaceNumValidator checks if a field contains only alphanumeric characters and spaces.
+func alphaSpaceNumValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value, ok := fieldValue.(string)
+	if !ok {
+		return nil
+	}
+	if matched := regexp.MustCompile(`^[A-Za-z0-9 ]+$`).MatchString(value); !matched {
+		return errors.New(translator("validation.alphaspacenum", label, params...))
 	}
 	return nil
 }
@@ -800,5 +827,30 @@ func fullnameValidator(fieldValue any, fieldType reflect.StructField, params []s
 	if strings.ContainsAny(fullname, "1234567890") {
 		return errors.New(translator("validation.fullname", label, params...))
 	}
+	return nil
+}
+
+// nameRegex is the regular expression for a valid name.
+// Name must be at least 2 characters long and contain only letters and spaces.
+var nameRegex = regexp.MustCompile(`^[a-zA-Z][a-zA-Z ]*[a-zA-Z]$`)
+
+// nameValidator checks if a field is a valid name.
+// It returns an error if the field value is not a valid name.
+// It returns nil if the field value is a valid name.
+// Name must be at least 2 characters long and contain only letters and spaces.
+func nameValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value := reflect.ValueOf(fieldValue)
+	name := value.String()
+
+	// Check minimum length of 2 characters
+	if len(name) < 2 {
+		return errors.New(translator("validation.name", label, params...))
+	}
+
+	// Use regex to validate the name format
+	if !nameRegex.MatchString(name) {
+		return errors.New(translator("validation.name", label, params...))
+	}
+
 	return nil
 }
