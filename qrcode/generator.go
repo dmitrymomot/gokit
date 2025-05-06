@@ -4,20 +4,32 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 
-	"github.com/skip2/go-qrcode"
+	skipqrcode "github.com/skip2/go-qrcode"
 )
 
-// ErrorFailedToGenerateQRCode is returned when the QR code generation fails.
-var ErrorFailedToGenerateQRCode = errors.New("failed to generate QR code")
+// Error variables for QR code generation
+var (
+	// ErrEmptyContent is returned when content string is empty or only whitespace
+	ErrEmptyContent = errors.New("content cannot be empty")
+	// ErrorFailedToGenerateQRCode is returned when the QR code generation fails.
+	ErrorFailedToGenerateQRCode = errors.New("failed to generate QR code")
+)
+
+// defaultSize is the size in pixels used when no size is specified
+const defaultSize = 256
 
 // Generate creates a QR code image in PNG format with the given content.
 // Returns the image as a byte slice or an error if generation fails.
 func Generate(content string, size int) ([]byte, error) {
-	if size <= 0 {
-		size = 256
+	if strings.TrimSpace(content) == "" {
+		return nil, ErrEmptyContent
 	}
-	png, err := qrcode.Encode(content, qrcode.Medium, size)
+	if size <= 0 {
+		size = defaultSize
+	}
+	png, err := skipqrcode.Encode(content, skipqrcode.Medium, size)
 	if err != nil {
 		return nil, errors.Join(ErrorFailedToGenerateQRCode, err)
 	}
