@@ -1,10 +1,13 @@
 package validator
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/url"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -26,31 +29,76 @@ var (
 		"alpha":         alphaValidator,
 		"alphanum":      alphanumValidator,
 		"alphaspace":    alphaSpaceValidator,
+		"aspace":        alphaSpaceValidator,        // Short alias for alphaspace
 		"alphaspacenum": alphaSpaceNumValidator,
+		"aspacenum":     alphaSpaceNumValidator,     // Short alias for alphaspacenum
+		"startswith":    startsWithValidator,
+		"starts":        startsWithValidator,        // Short alias for startswith
+		"endswith":      endsWithValidator,
+		"ends":          endsWithValidator,          // Short alias for endswith
+		"contains":      containsValidator,
+		"notcontains":   notContainsValidator,
+		"notcont":       notContainsValidator,       // Short alias for notcontains
+		"ascii":         asciiValidator,
+		"positive":      positiveValidator,
+		"pos":           positiveValidator,          // Short alias for positive
+		"negative":      negativeValidator,
+		"neg":           negativeValidator,          // Short alias for negative
+		"even":          evenValidator,
+		"odd":           oddValidator,
+		"multiple":      multipleValidator,
+		"mult":          multipleValidator,          // Short alias for multiple
+		"base64":        base64Validator,
+		"b64":           base64Validator,            // Short alias for base64
+		"json":          jsonValidator,
+		"semver":        semverValidator,
+		"extension":     extensionValidator,
+		"ext":           extensionValidator,         // Short alias for extension
 		"url":           urlValidator,
 		"ip":            ipValidator,
+		"ipv4":          ipv4Validator,
+		"ipv6":          ipv6Validator,
+		"domain":        domainValidator,
+		"mac":           macValidator,
+		"port":          portValidator,
 		"date":          dateValidator,
+		"pastdate":      pastDateValidator,
+		"past":          pastDateValidator,          // Short alias for pastdate
+		"futuredate":    futureDateValidator,
+		"future":        futureDateValidator,        // Short alias for futuredate
+		"workday":       workdayValidator,
+		"wday":          workdayValidator,           // Short alias for workday
+		"weekend":       weekendValidator,
+		"wend":          weekendValidator,           // Short alias for weekend
 		"in":            inValidator,
 		"notin":         notInValidator,
 		"length":        lengthValidator,
+		"len":           lengthValidator,            // Short alias for length
 		"between":       betweenValidator,
+		"btw":           betweenValidator,           // Short alias for between
 		"boolean":       booleanValidator,
+		"bool":          booleanValidator,           // Short alias for boolean
 		"uuid":          uuidValidator,
 		"creditcard":    creditCardValidator,
+		"cc":            creditCardValidator,        // Short alias for creditcard
 		"eq":            equalValidator,
 		"ne":            notEqualValidator,
 		"lt":            lessThanValidator,
 		"lte":           lessThanOrEqualValidator,
 		"gt":            greaterThanValidator,
 		"gte":           greaterThanOrEqualValidator,
-		"len":           lengthValidator,
 		"realemail":     realEmailValidator,
+		"remail":        realEmailValidator,         // Short alias for realemail
 		"password":      passwordValidator,
+		"pwd":           passwordValidator,          // Short alias for password
 		"phone":         phoneValidator,
 		"username":      usernameValidator,
+		"uname":         usernameValidator,          // Short alias for username
 		"slug":          slugValidator,
 		"hexcolor":      hexcolorValidator,
+		"hcolor":        hexcolorValidator,          // Short alias for hexcolor
 		"fullname":      fullnameValidator,
+		"fname":         fullnameValidator,          // Short alias for fullname
 		"name":          nameValidator,
 	}
 	// validatorsMutex is used to synchronize access to the validators map.
@@ -655,30 +703,6 @@ func greaterThanOrEqualValidator(fieldValue any, fieldType reflect.StructField, 
 	return nil
 }
 
-// lenValidator checks if a field has a length equal to the parameter value.
-// It returns an error if the field length is not equal to the parameter value.
-// It returns nil if the field length is equal to the parameter value.
-// It supports string, slice, array, and map types.
-func lenValidator(fieldValue any, _ reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
-	if len(params) == 0 {
-		return nil
-	}
-	value := reflect.ValueOf(fieldValue)
-	switch value.Kind() {
-	case reflect.String:
-		if value.Len() != len(params[0]) {
-			return errors.New(translator("validation.len", label, params...))
-		}
-	case reflect.Slice, reflect.Array, reflect.Map:
-		if value.Len() != len(params[0]) {
-			return errors.New(translator("validation.len", label, params...))
-		}
-	default:
-		return nil
-	}
-	return nil
-}
-
 // passwordValidator checks if a field is a valid password.
 // It returns an error if the field value is not a valid password.
 // It returns nil if the field value is a valid password.
@@ -853,4 +877,648 @@ func nameValidator(fieldValue any, fieldType reflect.StructField, params []strin
 	}
 
 	return nil
+}
+
+// pastDateValidator checks if a date is in the past.
+// It returns an error if the field value is not a date in the past.
+// It returns nil if the field value is a date in the past.
+func pastDateValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	var (
+		t   time.Time
+		err error
+		ok  bool
+	)
+
+	// Check if the field value is a time.Time directly
+	if t, ok = fieldValue.(time.Time); !ok {
+		// If not, try to parse it as a string
+		if s, ok := fieldValue.(string); ok && s != "" {
+			// If format is provided in params
+			if len(params) > 0 {
+				t, err = time.Parse(params[0], s)
+			} else {
+				// Try standard formats
+				t, err = time.Parse(time.RFC3339, s)
+				if err != nil {
+					t, err = time.Parse("2006-01-02", s)
+				}
+			}
+			if err != nil {
+				return errors.New(translator("validation.date", label, params...))
+			}
+		} else {
+			return nil // Not a time.Time or string, ignore
+		}
+	}
+
+	// Check if the date is in the past
+	if !t.Before(time.Now()) {
+		return errors.New(translator("validation.pastdate", label, params...))
+	}
+
+	return nil
+}
+
+// futureDateValidator checks if a date is in the future.
+// It returns an error if the field value is not a date in the future.
+// It returns nil if the field value is a date in the future.
+func futureDateValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	var (
+		t   time.Time
+		err error
+		ok  bool
+	)
+
+	// Check if the field value is a time.Time directly
+	if t, ok = fieldValue.(time.Time); !ok {
+		// If not, try to parse it as a string
+		if s, ok := fieldValue.(string); ok && s != "" {
+			// If format is provided in params
+			if len(params) > 0 {
+				t, err = time.Parse(params[0], s)
+			} else {
+				// Try standard formats
+				t, err = time.Parse(time.RFC3339, s)
+				if err != nil {
+					t, err = time.Parse("2006-01-02", s)
+				}
+			}
+			if err != nil {
+				return errors.New(translator("validation.date", label, params...))
+			}
+		} else {
+			return nil // Not a time.Time or string, ignore
+		}
+	}
+
+	// Check if the date is in the future
+	if !t.After(time.Now()) {
+		return errors.New(translator("validation.futuredate", label, params...))
+	}
+
+	return nil
+}
+
+// workdayValidator checks if a date falls on a workday (Monday-Friday).
+// It returns an error if the field value is not a workday.
+// It returns nil if the field value is a workday.
+func workdayValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	var (
+		t   time.Time
+		err error
+		ok  bool
+	)
+
+	// Check if the field value is a time.Time directly
+	if t, ok = fieldValue.(time.Time); !ok {
+		// If not, try to parse it as a string
+		if s, ok := fieldValue.(string); ok && s != "" {
+			// If format is provided in params
+			if len(params) > 0 {
+				t, err = time.Parse(params[0], s)
+			} else {
+				// Try standard formats
+				t, err = time.Parse(time.RFC3339, s)
+				if err != nil {
+					t, err = time.Parse("2006-01-02", s)
+				}
+			}
+			if err != nil {
+				return errors.New(translator("validation.date", label, params...))
+			}
+		} else {
+			return nil // Not a time.Time or string, ignore
+		}
+	}
+
+	// Check if the date is a workday (Monday-Friday)
+	if weekday := t.Weekday(); weekday < 1 || weekday > 5 {
+		return errors.New(translator("validation.workday", label, params...))
+	}
+
+	return nil
+}
+
+// weekendValidator checks if a date falls on a weekend (Saturday-Sunday).
+// It returns an error if the field value is not a weekend day.
+// It returns nil if the field value is a weekend day.
+func weekendValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	var (
+		t   time.Time
+		err error
+		ok  bool
+	)
+
+	// Check if the field value is a time.Time directly
+	if t, ok = fieldValue.(time.Time); !ok {
+		// If not, try to parse it as a string
+		if s, ok := fieldValue.(string); ok && s != "" {
+			// If format is provided in params
+			if len(params) > 0 {
+				t, err = time.Parse(params[0], s)
+			} else {
+				// Try standard formats
+				t, err = time.Parse(time.RFC3339, s)
+				if err != nil {
+					t, err = time.Parse("2006-01-02", s)
+				}
+			}
+			if err != nil {
+				return errors.New(translator("validation.date", label, params...))
+			}
+		} else {
+			return nil // Not a time.Time or string, ignore
+		}
+	}
+
+	// Check if the date is a weekend day (Saturday-Sunday)
+	if weekday := t.Weekday(); weekday != 0 && weekday != 6 {
+		return errors.New(translator("validation.weekend", label, params...))
+	}
+
+	return nil
+}
+
+// ipv4Validator checks if a field is a valid IPv4 address.
+// It returns an error if the field value is not a valid IPv4 address.
+// It returns nil if the field value is a valid IPv4 address.
+func ipv4Validator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value, ok := fieldValue.(string)
+	if !ok || value == "" {
+		return nil
+	}
+	
+	ip := net.ParseIP(value)
+	if ip == nil || ip.To4() == nil {
+		return errors.New(translator("validation.ipv4", label, params...))
+	}
+	
+	return nil
+}
+
+// ipv6Validator checks if a field is a valid IPv6 address.
+// It returns an error if the field value is not a valid IPv6 address.
+// It returns nil if the field value is a valid IPv6 address.
+func ipv6Validator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value, ok := fieldValue.(string)
+	if !ok || value == "" {
+		return nil
+	}
+	
+	ip := net.ParseIP(value)
+	if ip == nil || ip.To4() != nil {
+		return errors.New(translator("validation.ipv6", label, params...))
+	}
+	
+	return nil
+}
+
+// domainRegex is a regular expression for validating domain names.
+var domainRegex = regexp.MustCompile(`^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]$`)
+
+// domainValidator checks if a field is a valid domain name.
+// It returns an error if the field value is not a valid domain name.
+// It returns nil if the field value is a valid domain name.
+func domainValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value, ok := fieldValue.(string)
+	if !ok || value == "" {
+		return nil
+	}
+	
+	if !domainRegex.MatchString(value) {
+		return errors.New(translator("validation.domain", label, params...))
+	}
+	
+	return nil
+}
+
+// macRegex is a regular expression for validating MAC addresses.
+var macRegex = regexp.MustCompile(`^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$`)
+
+// macValidator checks if a field is a valid MAC address.
+// It returns an error if the field value is not a valid MAC address.
+// It returns nil if the field value is a valid MAC address.
+func macValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value, ok := fieldValue.(string)
+	if !ok || value == "" {
+		return nil
+	}
+	
+	if !macRegex.MatchString(value) {
+		return errors.New(translator("validation.mac", label, params...))
+	}
+	
+	return nil
+}
+
+// portValidator checks if a field is a valid port number (0-65535).
+// It returns an error if the field value is not a valid port number.
+// It returns nil if the field value is a valid port number.
+func portValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	var port int64
+	
+	value := reflect.ValueOf(fieldValue)
+	switch value.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		port = value.Int()
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		port = int64(value.Uint())
+	case reflect.Float32, reflect.Float64:
+		port = int64(value.Float())
+	case reflect.String:
+		var err error
+		port, err = strconv.ParseInt(value.String(), 10, 64)
+		if err != nil {
+			return errors.New(translator("validation.port", label, params...))
+		}
+	default:
+		return nil // Not a numeric type, ignore
+	}
+	
+	if port < 0 || port > 65535 {
+		return errors.New(translator("validation.port", label, params...))
+	}
+	
+	return nil
+}
+
+// startsWithValidator checks if a field starts with a specific prefix.
+// It returns an error if the field value does not start with the specified prefix.
+// It returns nil if the field value starts with the specified prefix.
+// The prefix is provided as the first parameter.
+func startsWithValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	if len(params) == 0 {
+		return nil // No prefix specified
+	}
+	
+	value, ok := fieldValue.(string)
+	if !ok {
+		return nil
+	}
+	
+	prefix := params[0]
+	if !strings.HasPrefix(value, prefix) {
+		return errors.New(translator("validation.startswith", label, params...))
+	}
+	
+	return nil
+}
+
+// endsWithValidator checks if a field ends with a specific suffix.
+// It returns an error if the field value does not end with the specified suffix.
+// It returns nil if the field value ends with the specified suffix.
+// The suffix is provided as the first parameter.
+func endsWithValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	if len(params) == 0 {
+		return nil // No suffix specified
+	}
+	
+	value, ok := fieldValue.(string)
+	if !ok {
+		return nil
+	}
+	
+	suffix := params[0]
+	if !strings.HasSuffix(value, suffix) {
+		return errors.New(translator("validation.endswith", label, params...))
+	}
+	
+	return nil
+}
+
+// containsValidator checks if a field contains a specific substring.
+// It returns an error if the field value does not contain the specified substring.
+// It returns nil if the field value contains the specified substring.
+// The substring is provided as the first parameter.
+func containsValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	if len(params) == 0 {
+		return nil // No substring specified
+	}
+	
+	value, ok := fieldValue.(string)
+	if !ok {
+		return nil
+	}
+	
+	substring := params[0]
+	if !strings.Contains(value, substring) {
+		return errors.New(translator("validation.contains", label, params...))
+	}
+	
+	return nil
+}
+
+// notContainsValidator checks if a field does not contain a specific substring.
+// It returns an error if the field value contains the specified substring.
+// It returns nil if the field value does not contain the specified substring.
+// The substring is provided as the first parameter.
+func notContainsValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	if len(params) == 0 {
+		return nil // No substring specified
+	}
+	
+	value, ok := fieldValue.(string)
+	if !ok {
+		return nil
+	}
+	
+	substring := params[0]
+	if strings.Contains(value, substring) {
+		return errors.New(translator("validation.notcontains", label, params...))
+	}
+	
+	return nil
+}
+
+// asciiRegex is a regular expression for validating ASCII characters.
+var asciiRegex = regexp.MustCompile(`^[\x00-\x7F]*$`)
+
+// asciiValidator checks if a field contains only ASCII characters.
+// It returns an error if the field value contains non-ASCII characters.
+// It returns nil if the field value contains only ASCII characters.
+func asciiValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value, ok := fieldValue.(string)
+	if !ok {
+		return nil
+	}
+	
+	if !asciiRegex.MatchString(value) {
+		return errors.New(translator("validation.ascii", label, params...))
+	}
+	
+	return nil
+}
+
+// positiveValidator checks if a field is a positive number.
+// It returns an error if the field value is not a positive number.
+// It returns nil if the field value is a positive number.
+func positiveValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value := reflect.ValueOf(fieldValue)
+	
+	switch value.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if value.Int() <= 0 {
+			return errors.New(translator("validation.positive", label, params...))
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if value.Uint() == 0 {
+			return errors.New(translator("validation.positive", label, params...))
+		}
+	case reflect.Float32, reflect.Float64:
+		if value.Float() <= 0 {
+			return errors.New(translator("validation.positive", label, params...))
+		}
+	case reflect.String:
+		num, err := strconv.ParseFloat(value.String(), 64)
+		if err != nil || num <= 0 {
+			return errors.New(translator("validation.positive", label, params...))
+		}
+	default:
+		return nil // Not a numeric type, ignore
+	}
+	
+	return nil
+}
+
+// negativeValidator checks if a field is a negative number.
+// It returns an error if the field value is not a negative number.
+// It returns nil if the field value is a negative number.
+func negativeValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value := reflect.ValueOf(fieldValue)
+	
+	switch value.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if value.Int() >= 0 {
+			return errors.New(translator("validation.negative", label, params...))
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		// Unsigned integers can't be negative
+		return errors.New(translator("validation.negative", label, params...))
+	case reflect.Float32, reflect.Float64:
+		if value.Float() >= 0 {
+			return errors.New(translator("validation.negative", label, params...))
+		}
+	case reflect.String:
+		num, err := strconv.ParseFloat(value.String(), 64)
+		if err != nil || num >= 0 {
+			return errors.New(translator("validation.negative", label, params...))
+		}
+	default:
+		return nil // Not a numeric type, ignore
+	}
+	
+	return nil
+}
+
+// evenValidator checks if a field is an even number.
+// It returns an error if the field value is not an even number.
+// It returns nil if the field value is an even number.
+func evenValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value := reflect.ValueOf(fieldValue)
+	
+	switch value.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if value.Int()%2 != 0 {
+			return errors.New(translator("validation.even", label, params...))
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if value.Uint()%2 != 0 {
+			return errors.New(translator("validation.even", label, params...))
+		}
+	case reflect.Float32, reflect.Float64:
+		// For floating-point, check if it's an integer and even
+		f := value.Float()
+		if f != float64(int64(f)) || int64(f)%2 != 0 {
+			return errors.New(translator("validation.even", label, params...))
+		}
+	case reflect.String:
+		num, err := strconv.ParseInt(value.String(), 10, 64)
+		if err != nil || num%2 != 0 {
+			return errors.New(translator("validation.even", label, params...))
+		}
+	default:
+		return nil // Not a numeric type, ignore
+	}
+	
+	return nil
+}
+
+// oddValidator checks if a field is an odd number.
+// It returns an error if the field value is not an odd number.
+// It returns nil if the field value is an odd number.
+func oddValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value := reflect.ValueOf(fieldValue)
+	
+	switch value.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if value.Int()%2 == 0 {
+			return errors.New(translator("validation.odd", label, params...))
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if value.Uint()%2 == 0 {
+			return errors.New(translator("validation.odd", label, params...))
+		}
+	case reflect.Float32, reflect.Float64:
+		// For floating-point, check if it's an integer and odd
+		f := value.Float()
+		if f != float64(int64(f)) || int64(f)%2 == 0 {
+			return errors.New(translator("validation.odd", label, params...))
+		}
+	case reflect.String:
+		num, err := strconv.ParseInt(value.String(), 10, 64)
+		if err != nil || num%2 == 0 {
+			return errors.New(translator("validation.odd", label, params...))
+		}
+	default:
+		return nil // Not a numeric type, ignore
+	}
+	
+	return nil
+}
+
+// multipleValidator checks if a field is a multiple of a specified number.
+// It returns an error if the field value is not a multiple of the specified number.
+// It returns nil if the field value is a multiple of the specified number.
+// The divisor is provided as the first parameter.
+func multipleValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	if len(params) == 0 {
+		return nil // No divisor specified
+	}
+	
+	divisor, err := strconv.ParseInt(params[0], 10, 64)
+	if err != nil || divisor == 0 {
+		return nil // Invalid divisor
+	}
+	
+	value := reflect.ValueOf(fieldValue)
+	
+	switch value.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if value.Int()%divisor != 0 {
+			return errors.New(translator("validation.multiple", label, params...))
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if value.Uint()%uint64(divisor) != 0 {
+			return errors.New(translator("validation.multiple", label, params...))
+		}
+	case reflect.Float32, reflect.Float64:
+		// For floating-point, check if it's an integer multiple
+		f := value.Float()
+		if f != float64(int64(f)) || int64(f)%divisor != 0 {
+			return errors.New(translator("validation.multiple", label, params...))
+		}
+	case reflect.String:
+		num, err := strconv.ParseInt(value.String(), 10, 64)
+		if err != nil || num%divisor != 0 {
+			return errors.New(translator("validation.multiple", label, params...))
+		}
+	default:
+		return nil // Not a numeric type, ignore
+	}
+	
+	return nil
+}
+
+// base64Validator checks if a field is a valid Base64 encoded string.
+// It returns an error if the field value is not a valid Base64 encoded string.
+// It returns nil if the field value is a valid Base64 encoded string.
+func base64Validator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value, ok := fieldValue.(string)
+	if !ok || value == "" {
+		return nil
+	}
+	
+	// Check if the string has valid Base64 length (multiple of 4)
+	if len(value)%4 != 0 {
+		return errors.New(translator("validation.base64", label, params...))
+	}
+	
+	// Try to decode the string using standard encoding
+	_, err := base64.StdEncoding.DecodeString(value)
+	if err != nil {
+		// Try URL encoding as fallback
+		_, err = base64.URLEncoding.DecodeString(value)
+		if err != nil {
+			return errors.New(translator("validation.base64", label, params...))
+		}
+	}
+	
+	return nil
+}
+
+// jsonValidator checks if a field is a valid JSON string.
+// It returns an error if the field value is not a valid JSON string.
+// It returns nil if the field value is a valid JSON string.
+func jsonValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value, ok := fieldValue.(string)
+	if !ok || value == "" {
+		return nil
+	}
+	
+	var js interface{}
+	err := json.Unmarshal([]byte(value), &js)
+	if err != nil {
+		return errors.New(translator("validation.json", label, params...))
+	}
+	
+	return nil
+}
+
+// semverRegex is a regular expression for validating semantic version strings.
+var semverRegex = regexp.MustCompile(`^v?([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$`)
+
+// semverValidator checks if a field is a valid semantic version string.
+// It returns an error if the field value is not a valid semantic version string.
+// It returns nil if the field value is a valid semantic version string.
+func semverValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	value, ok := fieldValue.(string)
+	if !ok || value == "" {
+		return nil
+	}
+	
+	if !semverRegex.MatchString(value) {
+		return errors.New(translator("validation.semver", label, params...))
+	}
+	
+	return nil
+}
+
+// extensionValidator checks if a file has one of the allowed extensions.
+// It returns an error if the field value does not have one of the allowed extensions.
+// It returns nil if the field value has one of the allowed extensions.
+// The allowed extensions are provided as parameters.
+func extensionValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
+	if len(params) == 0 {
+		return nil // No extensions specified
+	}
+	
+	value, ok := fieldValue.(string)
+	if !ok || value == "" {
+		return nil
+	}
+	
+	// Extract the extension (everything after the last dot)
+	ext := strings.ToLower(filepath.Ext(value))
+	if ext == "" {
+		return errors.New(translator("validation.extension", label, params...))
+	}
+	
+	// Remove the leading dot
+	if len(ext) > 0 && ext[0] == '.' {
+		ext = ext[1:]
+	}
+	
+	// Check if the extension is in the allowed list
+	for _, allowedExt := range params {
+		// Remove leading dot from allowed extension if present
+		if len(allowedExt) > 0 && allowedExt[0] == '.' {
+			allowedExt = allowedExt[1:]
+		}
+		
+		if strings.EqualFold(ext, allowedExt) {
+			return nil
+		}
+	}
+	
+	return errors.New(translator("validation.extension", label, params...))
 }
