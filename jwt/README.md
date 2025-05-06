@@ -4,23 +4,23 @@ A simple, high-performance JWT (JSON Web Token) implementation for Go applicatio
 
 ## Table of Contents
 
-* [Installation](#installation)
-* [Overview](#overview)
-* [Features](#features)
-* [Usage](#usage)
-	+ [Basic Token Generation and Parsing](#basic-token-generation-and-parsing)
-	+ [Custom Claims](#custom-claims)
-	+ [Error Handling](#error-handling)
-	+ [HTTP Middleware](#http-middleware)
-	+ [Type-Safe Claims in Handlers](#type-safe-claims-in-handlers)
-	+ [Custom Token Extraction](#custom-token-extraction)
-	+ [Skip Middleware for Public Routes](#skip-middleware-for-public-routes)
-* [Best Practices](#best-practices)
-* [API Reference](#api-reference)
-	+ [Types](#types)
-	+ [Functions](#functions)
-	+ [Methods](#methods)
-	+ [Error Types](#error-types)
+- [Installation](#installation)
+- [Overview](#overview)
+- [Features](#features)
+- [Usage](#usage)
+    - [Basic Token Generation and Parsing](#basic-token-generation-and-parsing)
+    - [Custom Claims](#custom-claims)
+    - [Error Handling](#error-handling)
+    - [HTTP Middleware](#http-middleware)
+    - [Type-Safe Claims in Handlers](#type-safe-claims-in-handlers)
+    - [Custom Token Extraction](#custom-token-extraction)
+    - [Skip Middleware for Public Routes](#skip-middleware-for-public-routes)
+- [Best Practices](#best-practices)
+- [API Reference](#api-reference)
+    - [Types](#types)
+    - [Functions](#functions)
+    - [Methods](#methods)
+    - [Error Types](#error-types)
 
 ## Installation
 
@@ -208,14 +208,14 @@ protectedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request
         http.Error(w, "Unauthorized", http.StatusUnauthorized)
         return
     }
-    
+
     // Get claims from context
     claims, ok := jwt.GetClaims[map[string]any](r.Context())
     if !ok {
         http.Error(w, "Unauthorized", http.StatusUnauthorized)
         return
     }
-    
+
     // Use the claims
     username, _ := claims["sub"].(string)
     w.Write([]byte("Hello, " + username))
@@ -242,13 +242,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Unauthorized", http.StatusUnauthorized)
         return
     }
-    
+
     // Now you have strongly typed claims
     if userClaims.Role != "admin" {
         http.Error(w, "Forbidden", http.StatusForbidden)
         return
     }
-    
+
     w.Write([]byte("Welcome, admin!"))
     // Output: "Welcome, admin!" (if token's role was "admin")
 }
@@ -302,27 +302,30 @@ middleware := jwt.MiddlewareWithConfig(jwt.MiddlewareConfig{
 ## Best Practices
 
 1. **Security**:
-   - Use strong, secret keys (at least 32 bytes) for signing tokens
-   - Set appropriate expiration times on tokens
-   - Regularly rotate signing keys for long-lived applications
-   - Validate all claims before trusting token content
+
+    - Use strong, secret keys (at least 32 bytes) for signing tokens
+    - Set appropriate expiration times on tokens
+    - Regularly rotate signing keys for long-lived applications
+    - Validate all claims before trusting token content
 
 2. **Token Management**:
-   - Keep tokens as short-lived as possible
-   - Implement token refresh mechanisms for longer sessions
-   - Store tokens securely on the client (HttpOnly cookies for web apps)
-   - Implement token revocation for sensitive applications
+
+    - Keep tokens as short-lived as possible
+    - Implement token refresh mechanisms for longer sessions
+    - Store tokens securely on the client (HttpOnly cookies for web apps)
+    - Implement token revocation for sensitive applications
 
 3. **Error Handling**:
-   - Always check for specific error types when parsing tokens
-   - Return appropriate HTTP status codes (401 for expired/invalid tokens)
-   - Log suspicious activity like invalid signatures (possible tampering)
-   - Provide user-friendly messages without exposing internal details
+
+    - Always check for specific error types when parsing tokens
+    - Return appropriate HTTP status codes (401 for expired/invalid tokens)
+    - Log suspicious activity like invalid signatures (possible tampering)
+    - Provide user-friendly messages without exposing internal details
 
 4. **Performance**:
-   - Keep claims minimal - tokens are passed with every request
-   - Use type-safe claim extraction with generics
-   - Implement caching strategies for frequently used tokens
+    - Keep claims minimal - tokens are passed with every request
+    - Use type-safe claim extraction with generics
+    - Implement caching strategies for frequently used tokens
 
 ## API Reference
 
@@ -333,6 +336,7 @@ type Service struct {
     signingKey []byte
 }
 ```
+
 Implementation of the JWT service for token generation and parsing.
 
 ```go
@@ -346,6 +350,7 @@ type StandardClaims struct {
     IssuedAt  int64  `json:"iat,omitempty"`
 }
 ```
+
 Standard claims structure as per JWT specification.
 
 ```go
@@ -355,16 +360,19 @@ type MiddlewareConfig struct {
     Skip      SkipFunc
 }
 ```
+
 Configuration for JWT middleware.
 
 ```go
 type TokenExtractorFunc func(*http.Request) (string, error)
 ```
+
 Function type for extracting JWT tokens from HTTP requests.
 
 ```go
 type SkipFunc func(*http.Request) bool
 ```
+
 Function type for determining whether to skip middleware.
 
 ### Functions
@@ -372,56 +380,67 @@ Function type for determining whether to skip middleware.
 ```go
 func New(signingKey []byte) (*Service, error)
 ```
+
 Creates a new JWT service with the given signing key.
 
 ```go
 func NewFromString(signingKey string) (*Service, error)
 ```
+
 Creates a new JWT service from a string signing key.
 
 ```go
 func Middleware(service *Service) func(http.Handler) http.Handler
 ```
+
 Creates HTTP middleware for JWT authentication with default configuration.
 
 ```go
 func MiddlewareWithConfig(config MiddlewareConfig) func(http.Handler) http.Handler
 ```
+
 Creates HTTP middleware for JWT authentication with custom configuration.
 
 ```go
 func GetToken(ctx context.Context) (string, bool)
 ```
+
 Gets the JWT token string from the context.
 
 ```go
 func GetClaims[T any](ctx context.Context) (T, bool)
 ```
+
 Gets claims from context as a strongly typed structure using generics.
 
 ```go
 func GetClaimsAs[T any](ctx context.Context, claims *T) error
 ```
+
 Gets claims from context as a strongly typed structure.
 
 ```go
 func BearerTokenExtractor(r *http.Request) (string, error)
 ```
+
 Extracts a JWT token from the Authorization header with "Bearer " prefix.
 
 ```go
 func CookieTokenExtractor(cookieName string) TokenExtractorFunc
 ```
+
 Creates a token extractor that gets tokens from an HTTP cookie.
 
 ```go
 func QueryTokenExtractor(paramName string) TokenExtractorFunc
 ```
+
 Creates a token extractor that gets tokens from a query parameter.
 
 ```go
 func HeaderTokenExtractor(headerName string) TokenExtractorFunc
 ```
+
 Creates a token extractor that gets tokens from an HTTP header.
 
 ### Methods
@@ -429,16 +448,19 @@ Creates a token extractor that gets tokens from an HTTP header.
 ```go
 func (s *Service) Generate(claims any) (string, error)
 ```
+
 Generates a JWT token with the given claims.
 
 ```go
 func (s *Service) Parse(tokenString string, claims any) error
 ```
+
 Parses a JWT token and returns the claims.
 
 ```go
 func (c StandardClaims) Valid() error
 ```
+
 Checks if the standard claims are valid (expiration, etc.).
 
 ### Error Types
