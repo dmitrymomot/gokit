@@ -14,6 +14,9 @@ func base64Validator(fieldValue any, fieldType reflect.StructField, params []str
 	if !ok {
 		return errors.New(translator("validation.type_mismatch", label, params...))
 	}
+	if val == "" {
+		return errors.New(translator("validation.base64", label, params...))
+	}
 	if _, err := base64.StdEncoding.DecodeString(val); err != nil {
 		return errors.New(translator("validation.base64", label, params...))
 	}
@@ -40,6 +43,9 @@ func semverValidator(fieldValue any, fieldType reflect.StructField, params []str
 	val, ok := fieldValue.(string)
 	if !ok {
 		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" {
+		return errors.New(translator("validation.semver", label, params...))
 	}
 	if !semverRegex.MatchString(val) {
 		return errors.New(translator("validation.semver", label, params...))
