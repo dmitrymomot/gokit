@@ -13,8 +13,11 @@ func dateValidator(fieldValue any, fieldType reflect.StructField, params []strin
 	}
 	format := params[0]
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
-		return nil
+	if !ok {
+		return errors.New(translator("validator.type_mismatch", label, params...))
+	}
+	if val == "" {
+		return errors.New(translator("validation.date", label, params...))
 	}
 	if _, err := time.Parse(format, val); err != nil {
 		return errors.New(translator("validation.date", label, params...))
@@ -29,8 +32,11 @@ func pastDateValidator(fieldValue any, fieldType reflect.StructField, params []s
 	}
 	format := params[0]
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
-		return nil
+	if !ok {
+		return errors.New(translator("validator.type_mismatch", label, params...))
+	}
+	if val == "" {
+		return errors.New(translator("validation.pastdate", label, params...))
 	}
 	t, err := time.Parse(format, val)
 	if err != nil {
@@ -49,8 +55,11 @@ func futureDateValidator(fieldValue any, fieldType reflect.StructField, params [
 	}
 	format := params[0]
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
-		return nil
+	if !ok {
+		return errors.New(translator("validator.type_mismatch", label, params...))
+	}
+	if val == "" {
+		return errors.New(translator("validation.futuredate", label, params...))
 	}
 	t, err := time.Parse(format, val)
 	if err != nil {
@@ -69,8 +78,11 @@ func workdayValidator(fieldValue any, fieldType reflect.StructField, params []st
 	}
 	format := params[0]
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
-		return nil
+	if !ok {
+		return errors.New(translator("validator.type_mismatch", label, params...))
+	}
+	if val == "" {
+		return errors.New(translator("validation.workday", label, params...))
 	}
 	t, err := time.Parse(format, val)
 	if err != nil {
@@ -90,8 +102,11 @@ func weekendValidator(fieldValue any, fieldType reflect.StructField, params []st
 	}
 	format := params[0]
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
-		return nil
+	if !ok {
+		return errors.New(translator("validator.type_mismatch", label, params...))
+	}
+	if val == "" {
+		return errors.New(translator("validation.weekend", label, params...))
 	}
 	t, err := time.Parse(format, val)
 	if err != nil {

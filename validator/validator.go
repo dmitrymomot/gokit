@@ -123,11 +123,11 @@ func (v *Validator) validateFields(val reflect.Value, typ reflect.Type, prefix s
 
 		// Split rules by the ruleSeparator
 		var rules []string
-		for ruleStr := range strings.SplitSeq(validationTag, v.ruleSeparator) {
+		for _, ruleStr := range strings.Split(validationTag, v.ruleSeparator) {
 			rules = append(rules, ruleStr)
 		}
 
-		// Check for 'omitempty' rule first
+		// Only skip validation if there is a standalone 'omitempty' rule
 		hasOmitempty := false
 		for _, ruleStr := range rules {
 			if strings.TrimSpace(ruleStr) == "omitempty" {
@@ -135,14 +135,13 @@ func (v *Validator) validateFields(val reflect.Value, typ reflect.Type, prefix s
 				break
 			}
 		}
-
 		if hasOmitempty && isZero(fieldVal.Interface()) {
 			continue // Skip validation for this field
 		}
 
 		for _, ruleStr := range rules {
 			trimmedRuleStr := strings.TrimSpace(ruleStr)
-			if trimmedRuleStr == "" || trimmedRuleStr == "omitempty" { // Also skip omitempty here as it's handled
+			if trimmedRuleStr == "" || trimmedRuleStr == "omitempty" {
 				continue
 			}
 			ruleName, params := v.parseRule(trimmedRuleStr)

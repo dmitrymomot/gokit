@@ -4,7 +4,7 @@ This document describes the standards and patterns for writing tests for validat
 
 ## 1. Test File and Package Structure
 
-- Place tests in a file named `<rule>_test.go` or in `data_test.go` if grouped.
+- **VERY IMPORTANT:** Each test file must follow the pattern: `<tested_file_name>_test.go`. Do NOT add tests for one file into another file's tests. For example, if you write tests for `date.go`, create `date_test.go`—do not add date tests into `data_test.go`.
 - Use the test package suffix: `package validator_test`.
 - Import `github.com/stretchr/testify/require` for assertions.
 
