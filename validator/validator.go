@@ -2,6 +2,7 @@ package validator
 
 import (
 	"fmt"
+	"maps"
 	"net/url"
 	"reflect"
 	"strings"
@@ -15,11 +16,11 @@ type ValidationFunc func(fieldValue any, fieldType reflect.StructField, params [
 // string separators for rules and parameters, and its own validators map.
 type Validator struct {
 	errorTranslator    ErrorTranslatorFunc
-	ruleSeparator      string // e.g., ";"
-	paramSeparator     string // e.g., ":"
-	paramListSeparator string // e.g., ","
+	ruleSeparator      string                    // e.g., ";"
+	paramSeparator     string                    // e.g., ":"
+	paramListSeparator string                    // e.g., ","
 	validators         map[string]ValidationFunc // Instance-specific validators
-	validatorsMutex    sync.RWMutex             // Instance-specific mutex
+	validatorsMutex    sync.RWMutex              // Instance-specific mutex
 }
 
 // ErrorTranslatorFunc defines the signature for error translation functions.
@@ -35,14 +36,22 @@ func New(options ...Option) (*Validator, error) {
 		paramListSeparator: ",",
 		validators:         make(map[string]ValidationFunc),
 	}
-	
+
+	// Copy built-in validators to the instance
+	// This ensures that each instance has access to the global validators
+	// without modifying the global map, allowing for instance-specific overrides
+	// or additions via RegisterValidation.
+	v.validatorsMutex.Lock()
+	maps.Copy(v.validators, builtInValidators)
+	v.validatorsMutex.Unlock()
+
 	// Apply all provided options
 	for _, option := range options {
 		if err := option(v); err != nil {
 			return nil, err
 		}
 	}
-	
+
 	return v, nil
 }
 

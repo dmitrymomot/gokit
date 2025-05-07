@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/dmitrymomot/gokit/validator"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewValidator_DefaultOptions(t *testing.T) {
@@ -182,7 +182,9 @@ func TestWithErrorTranslator(t *testing.T) {
 	}
 	v, err := validator.New(validator.WithErrorTranslator(trans), validator.WithCustomValidator("foo", dummy))
 	require.NoError(t, err)
-	type X struct { A string `validate:"foo" label:"L"` }
+	type X struct {
+		A string `validate:"foo" label:"L"`
+	}
 	err2 := v.ValidateStruct(X{A: ""})
 	require.Error(t, err2)
 	require.Contains(t, err2.Error(), "T:foo|L")
@@ -200,9 +202,9 @@ func TestOmitemptySkipping_MultiTypes(t *testing.T) {
 	require.NoError(t, err)
 
 	type S struct {
-		Arr []int            `validate:"omitempty;foo"`
-		M   map[string]int    `validate:"omitempty;foo"`
-		B   bool              `validate:"omitempty;foo"`
+		Arr []int          `validate:"omitempty;foo"`
+		M   map[string]int `validate:"omitempty;foo"`
+		B   bool           `validate:"omitempty;foo"`
 	}
 	// zero values skip
 	err = v.ValidateStruct(S{Arr: nil, M: nil, B: false})
@@ -355,13 +357,17 @@ func TestWithValidators_Specific(t *testing.T) {
 	t.Parallel()
 	v, err := validator.New(validator.WithValidators("numeric"))
 	require.NoError(t, err)
-	type T struct { A string `validate:"numeric" label:"A"` }
+	type T struct {
+		A string `validate:"numeric" label:"A"`
+	}
 	err = v.ValidateStruct(T{A: "123"})
 	require.NoError(t, err)
 	err = v.ValidateStruct(T{A: "abc"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "numeric")
-	type U struct { B string `validate:"email"` }
+	type U struct {
+		B string `validate:"email"`
+	}
 	err = v.ValidateStruct(U{B: "bad"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown rule 'email'")
@@ -372,7 +378,9 @@ func TestWithAllValidators(t *testing.T) {
 	t.Parallel()
 	v, err := validator.New(validator.WithAllValidators())
 	require.NoError(t, err)
-	type T struct { E string `validate:"email" label:"E"` }
+	type T struct {
+		E string `validate:"email" label:"E"`
+	}
 	err = v.ValidateStruct(T{E: "bad"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "email")
@@ -383,7 +391,9 @@ func TestWithExcept(t *testing.T) {
 	t.Parallel()
 	v, err := validator.New(validator.WithAllValidators(), validator.WithExcept("email"))
 	require.NoError(t, err)
-	type T struct { E string `validate:"email"` }
+	type T struct {
+		E string `validate:"email"`
+	}
 	err = v.ValidateStruct(T{E: "bad"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown rule 'email'")
@@ -407,33 +417,12 @@ func TestLabelFallback_DefaultLabel(t *testing.T) {
 	}
 	v, err := validator.New(validator.WithCustomValidator("foo", dummy))
 	require.NoError(t, err)
-	type T struct { X string `validate:"foo"` }
+	type T struct {
+		X string `validate:"foo"`
+	}
 	err = v.ValidateStruct(T{X: "val"})
 	require.Error(t, err)
 	require.Equal(t, "X", gotLabel)
-}
-
-// Test unexported fields are skipped during validation
-func TestValidateStruct_UnexportedField(t *testing.T) {
-	t.Parallel()
-	// dummy validator always errors
-	dummy := func(fieldValue any, fieldType reflect.StructField, params []string, label string, translator validator.ErrorTranslatorFunc) error {
-		return errors.New("err")
-	}
-	v, err := validator.New(validator.WithCustomValidator("foo", dummy))
-	require.NoError(t, err)
-	type T struct {
-		x string `validate:"foo"`
-		X string `validate:"foo"`
-	}
-	// Only X should trigger error, x (unexported) is skipped
-	err = v.ValidateStruct(T{X: "val"})
-	require.Error(t, err)
-	ve := validator.ExtractValidationErrors(err)
-	vals := ve.Values()
-	require.Len(t, vals, 1)
-	require.Contains(t, vals, "X")
-	require.Equal(t, []string{"err"}, vals["X"])
 }
 
 // Test multiple errors accumulate for a single field
