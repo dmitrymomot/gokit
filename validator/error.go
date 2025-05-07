@@ -9,6 +9,9 @@ import (
 // ErrInvalidSeparatorConfiguration is returned when validator separator characters are not distinct.
 var ErrInvalidSeparatorConfiguration = errors.New("rule, parameter, and parameter list separators must be distinct characters")
 
+// ErrInvalidValidatorConfiguration is returned when validator configuration is invalid.
+var ErrInvalidValidatorConfiguration = errors.New("invalid validator configuration")
+
 // ValidationError represents a validation error.
 // It contains the field name and the error message.
 type ValidationErrors url.Values

@@ -5,73 +5,56 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"sync"
 )
 
 // ValidationFunc defines the signature of a validation function.
 type ValidationFunc func(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error
 
 // Validator struct holds instance-specific data like the error translator function,
-// and string separators for rules and parameters.
+// string separators for rules and parameters, and its own validators map.
 type Validator struct {
 	errorTranslator    ErrorTranslatorFunc
 	ruleSeparator      string // e.g., ";"
 	paramSeparator     string // e.g., ":"
 	paramListSeparator string // e.g., ","
+	validators         map[string]ValidationFunc // Instance-specific validators
+	validatorsMutex    sync.RWMutex             // Instance-specific mutex
 }
 
 // ErrorTranslatorFunc defines the signature for error translation functions.
 type ErrorTranslatorFunc func(key string, label string, params ...string) string
 
-// NewValidator creates a new Validator instance with the provided error translator function
-// and default separators (";" for rules, ":" for params, "," for param lists).
-// It panics if the default separators are somehow invalid, which indicates an internal issue.
-func NewValidator(errorTranslator ErrorTranslatorFunc) *Validator {
-	v, err := NewValidatorWithSeparators(errorTranslator, ";", ":", ",")
-	if err != nil {
-		// This should not happen with default separators
-		panic("gokit/validator: internal error with default separator configuration: " + err.Error())
+// New creates a new Validator instance with the provided options
+func New(options ...Option) (*Validator, error) {
+	// Create with default values
+	v := &Validator{
+		errorTranslator:    defaultErrorTranslator,
+		ruleSeparator:      ";",
+		paramSeparator:     ":",
+		paramListSeparator: ",",
+		validators:         make(map[string]ValidationFunc),
 	}
-	return v
+	
+	// Apply all provided options
+	for _, option := range options {
+		if err := option(v); err != nil {
+			return nil, err
+		}
+	}
+	
+	return v, nil
 }
 
-// NewValidatorWithSeparators creates a new Validator instance with the provided error translator
-// function and custom string separators.
-// It returns an error if separators are empty, not single characters, or not distinct.
-func NewValidatorWithSeparators(errorTranslator ErrorTranslatorFunc, ruleSep, paramSep, paramListSep string) (*Validator, error) {
-	// Validate separators: must be non-empty, single-character strings
-	if ruleSep == "" || paramSep == "" || paramListSep == "" {
-		return nil, ErrInvalidSeparatorConfiguration // Or a more specific error like ErrEmptySeparator
-	}
-	if len(ruleSep) != 1 || len(paramSep) != 1 || len(paramListSep) != 1 {
-		return nil, ErrInvalidSeparatorConfiguration // Or a more specific error like ErrMultiCharSeparator
-	}
-
-	if ruleSep == paramSep || ruleSep == paramListSep || paramSep == paramListSep {
-		return nil, ErrInvalidSeparatorConfiguration
-	}
-
-	if errorTranslator == nil {
-		errorTranslator = defaultErrorTranslator
-	}
-	return &Validator{
-		errorTranslator:    errorTranslator,
-		ruleSeparator:      ruleSep,
-		paramSeparator:     paramSep,
-		paramListSeparator: paramListSep,
-	}, nil
-}
-
-// RegisterValidation registers a custom validation function globally.
-func RegisterValidation(tag string, fn ValidationFunc) {
+// RegisterValidation registers a custom validation function for this validator instance
+func (v *Validator) RegisterValidation(tag string, fn ValidationFunc) error {
 	if tag == "" || fn == nil {
-		return
+		return ErrInvalidValidatorConfiguration
 	}
-	validatorsMutex.Lock()
-	defer validatorsMutex.Unlock()
-	if validators == nil {
-		validators = make(map[string]ValidationFunc)
-	}
-	validators[tag] = fn
+	v.validatorsMutex.Lock()
+	defer v.validatorsMutex.Unlock()
+	v.validators[tag] = fn
+	return nil
 }
 
 // ValidateStruct validates the struct fields based on 'validate' tags.
@@ -145,9 +128,9 @@ func (v *Validator) validateFields(val reflect.Value, typ reflect.Type, prefix s
 				continue
 			}
 			ruleName, params := v.parseRule(trimmedRuleStr)
-			validatorsMutex.RLock()
-			validatorFunc, ok := validators[ruleName]
-			validatorsMutex.RUnlock()
+			v.validatorsMutex.RLock()
+			validatorFunc, ok := v.validators[ruleName]
+			v.validatorsMutex.RUnlock()
 			if ok {
 				err := validatorFunc(fieldVal.Interface(), fieldType, params, label, v.errorTranslator)
 				if err != nil {

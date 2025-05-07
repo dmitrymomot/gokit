@@ -41,7 +41,9 @@ func TestDateValidator(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.NewValidator(nil).ValidateStruct(tt.structWithTag)
+			v, err := validator.New(validator.WithAllValidators())
+			require.NoError(t, err)
+			err = v.ValidateStruct(tt.structWithTag)
 			if tt.wantErrContains == "" {
 				require.NoError(t, err)
 			} else {
@@ -93,7 +95,9 @@ func TestPastDateValidator(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.NewValidator(nil).ValidateStruct(tt.structWithTag)
+			v, err := validator.New(validator.WithAllValidators())
+			require.NoError(t, err)
+			err = v.ValidateStruct(tt.structWithTag)
 			if tt.wantErrContains == "" {
 				require.NoError(t, err)
 			} else {
@@ -145,7 +149,9 @@ func TestFutureDateValidator(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.NewValidator(nil).ValidateStruct(tt.structWithTag)
+			v, err := validator.New(validator.WithAllValidators())
+			require.NoError(t, err)
+			err = v.ValidateStruct(tt.structWithTag)
 			if tt.wantErrContains == "" {
 				require.NoError(t, err)
 			} else {
@@ -196,7 +202,9 @@ func TestWorkdayValidator(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.NewValidator(nil).ValidateStruct(tt.structWithTag)
+			v, err := validator.New(validator.WithAllValidators())
+			require.NoError(t, err)
+			err = v.ValidateStruct(tt.structWithTag)
 			if tt.wantErrContains == "" {
 				require.NoError(t, err)
 			} else {
@@ -247,7 +255,9 @@ func TestWeekendValidator(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validator.NewValidator(nil).ValidateStruct(tt.structWithTag)
+			v, err := validator.New(validator.WithAllValidators())
+			require.NoError(t, err)
+			err = v.ValidateStruct(tt.structWithTag)
 			if tt.wantErrContains == "" {
 				require.NoError(t, err)
 			} else {

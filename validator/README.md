@@ -40,7 +40,10 @@ type User struct {
 
 func main() {
     // Create a validator with default error messages
-    v := validator.NewValidator(nil)
+    v, err := validator.New(validator.WithAllValidators())
+    if err != nil {
+        panic(err)
+    }
     
     user := User{
         Username: "john_doe",
@@ -79,7 +82,10 @@ translator := func(key string, label string, params ...string) string {
 }
 
 // Create a validator with custom error messages
-v := validator.NewValidator(translator)
+v, err := validator.New(validator.WithErrorTranslator(translator), validator.WithAllValidators())
+if err != nil {
+    panic(err)
+}
 ```
 
 ### Custom Validation Rules
@@ -91,8 +97,8 @@ import (
     "github.com/dmitrymomot/gokit/validator"
 )
 
-// Register a custom validation function
-validator.RegisterValidation("zipcode", func(fieldValue any, fieldType reflect.StructField, params []string, label string, translator validator.ErrorTranslatorFunc) error {
+// Register the custom validator with this validator instance
+err := v.RegisterValidation("custom", func(fieldValue any, fieldType reflect.StructField, params []string, label string, translator validator.ErrorTranslatorFunc) error {
     // Convert field value to string
     val, ok := fieldValue.(string)
     if !ok {
@@ -218,14 +224,44 @@ type ValidationErrors url.Values
 ### Functions
 
 ```go
-func NewValidator(errorTranslator ErrorTranslatorFunc) *Validator
+func New(options ...Option) (*Validator, error)
 ```
-Creates a new Validator instance with the provided error translator function. If nil is provided, a default translator is used.
+Creates a new Validator instance with the provided options. Returns an error if any option configuration is invalid.
 
 ```go
-func RegisterValidation(tag string, fn ValidationFunc)
+func WithErrorTranslator(translator ErrorTranslatorFunc) Option
 ```
-Registers a custom validation function globally for use with the specified tag.
+Sets a custom error translator for the validator.
+
+```go
+func WithSeparators(ruleSep, paramSep, paramListSep string) Option
+```
+Sets custom separators for parsing validation rules.
+
+```go
+func WithValidators(validatorNames ...string) Option
+```
+Adds specific validators to the Validator instance.
+
+```go
+func WithAllValidators() Option
+```
+Adds all built-in validators to the Validator instance.
+
+```go
+func WithExcept(excludedNames ...string) Option
+```
+Adds all built-in validators except specified ones.
+
+```go
+func WithCustomValidator(name string, fn ValidationFunc) Option
+```
+Adds a custom validator function.
+
+```go
+func (v *Validator) RegisterValidation(tag string, fn ValidationFunc) error
+```
+Registers a custom validation function for this validator instance for use with the specified tag.
 
 ```go
 func NewValidationError(args ...string) ValidationErrors

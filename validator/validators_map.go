@@ -1,8 +1,7 @@
 package validator
 
-import "sync"
-
-var validators = map[string]ValidationFunc{
+// builtInValidators is a reference map of all available validation rules
+var builtInValidators = map[string]ValidationFunc{
 	"required":      requiredValidator,
 	"max":           maxValidator,
 	"min":           minValidator,
@@ -85,5 +84,3 @@ var validators = map[string]ValidationFunc{
 	"fname":         fullnameValidator,
 	"name":          nameValidator,
 }
-
-var validatorsMutex sync.RWMutex
