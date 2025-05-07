@@ -63,7 +63,7 @@ func (v *Validator) ValidateStruct(s any) error {
 
 // validateFields is a helper function to validate struct fields recursively
 func (v *Validator) validateFields(val reflect.Value, typ reflect.Type, prefix string, errors url.Values) {
-	for i := 0; i < val.NumField(); i++ {
+	for i := range val.NumField() {
 		fieldVal := val.Field(i)
 		fieldType := typ.Field(i)
 
@@ -89,8 +89,7 @@ func (v *Validator) validateFields(val reflect.Value, typ reflect.Type, prefix s
 			label = fieldType.Name
 		}
 
-		rules := strings.Split(validationTag, "|")
-		for _, rule := range rules {
+		for rule := range strings.SplitSeq(validationTag, "|") {
 			ruleName, params := parseRule(rule)
 			validatorsMutex.RLock()
 			validatorFunc, ok := validators[ruleName]
