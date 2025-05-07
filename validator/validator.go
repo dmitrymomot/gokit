@@ -32,7 +32,7 @@ func New(options ...Option) (*Validator, error) {
 	v := &Validator{
 		errorTranslator:    defaultErrorTranslator,
 		ruleSeparator:      ";",
-		paramSeparator:     ":",
+		paramSeparator:     ":", // Default parameter separator
 		paramListSeparator: ",",
 		validators:         make(map[string]ValidationFunc),
 	}
@@ -191,18 +191,11 @@ func isZero(value any) bool {
 // parseRule splits a rule into its name and parameters using the configured paramSeparator.
 // It also handles splitting of parameter lists using the configured paramListSeparator.
 func (v *Validator) parseRule(rule string) (string, []string) {
-	// Mimic SplitN(rule, v.paramSeparator, 2)
-	// to separate rule name from the full parameter string.
-	var partsSlice []string
-	for part := range strings.SplitSeq(rule, v.paramSeparator) {
-		partsSlice = append(partsSlice, part)
-	}
-
-	ruleName := strings.TrimSpace(partsSlice[0])
+	parts := strings.SplitN(rule, v.paramSeparator, 2)
+	ruleName := strings.TrimSpace(parts[0])
 	var paramsStr string
-	if len(partsSlice) > 1 {
-		// Re-join the rest if paramSeparator was in the params part, effectively taking only the first split.
-		paramsStr = strings.TrimSpace(strings.Join(partsSlice[1:], v.paramSeparator))
+	if len(parts) > 1 {
+		paramsStr = strings.TrimSpace(parts[1])
 	}
 
 	var params []string
@@ -212,11 +205,8 @@ func (v *Validator) parseRule(rule string) (string, []string) {
 			params = []string{paramsStr}
 		} else {
 			// For other rules, split the paramsStr by the paramListSeparator (e.g., comma).
-			var paramPartsSlice []string
-			for p := range strings.SplitSeq(paramsStr, v.paramListSeparator) {
-				paramPartsSlice = append(paramPartsSlice, p)
-			}
-			for _, p := range paramPartsSlice {
+			paramParts := strings.Split(paramsStr, v.paramListSeparator)
+			for _, p := range paramParts {
 				params = append(params, strings.TrimSpace(p))
 			}
 		}

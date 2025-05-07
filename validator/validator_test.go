@@ -283,13 +283,23 @@ func TestParseRule_MultiParamSeparator(t *testing.T) {
 		gotParams = params
 		return nil
 	}
-	v, err := validator.New(validator.WithCustomValidator("foo", dummy))
+	// Explicitly set default separators to ensure a clean state for this test
+	v, err := validator.New(
+		validator.WithSeparators(";", ":", ","),
+		validator.WithCustomValidator("foo", dummy),
+	)
 	require.NoError(t, err)
 	type T struct {
 		X string `validate:"foo:bar:baz"`
 	}
 	err = v.ValidateStruct(T{X: "anything"})
-	require.NoError(t, err)
+	require.NoError(t, err, "ValidateStruct returned an unexpected error")
+
+	// Log gotParams before assertion
+	t.Logf("TestParseRule_MultiParamSeparator: Rule string 'foo:bar:baz'")
+	t.Logf("TestParseRule_MultiParamSeparator: Expected params: []string{\"bar:baz\"}")
+	t.Logf("TestParseRule_MultiParamSeparator: Got params: %#v", gotParams)
+
 	require.Equal(t, []string{"bar:baz"}, gotParams)
 }
 

@@ -22,11 +22,14 @@ var (
 
 func urlValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
+	if !ok {
+		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" {
 		return nil
 	}
-	_, err := url.ParseRequestURI(val)
-	if err != nil {
+	parsedURL, err := url.Parse(val)
+	if err != nil || !parsedURL.IsAbs() {
 		return errors.New(translator("validation.url", label, params...))
 	}
 	return nil
@@ -35,7 +38,10 @@ func urlValidator(fieldValue any, fieldType reflect.StructField, params []string
 // ipv4Validator checks if a field is a valid IPv4 address.
 func ipv4Validator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
+	if !ok {
+		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" {
 		return nil
 	}
 	ip := net.ParseIP(val)
@@ -48,7 +54,10 @@ func ipv4Validator(fieldValue any, fieldType reflect.StructField, params []strin
 // ipv6Validator checks if a field is a valid IPv6 address.
 func ipv6Validator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
+	if !ok {
+		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" {
 		return nil
 	}
 	ip := net.ParseIP(val)
@@ -60,7 +69,10 @@ func ipv6Validator(fieldValue any, fieldType reflect.StructField, params []strin
 
 func ipValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
+	if !ok {
+		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" {
 		return nil
 	}
 	if net.ParseIP(val) == nil {
@@ -71,7 +83,10 @@ func ipValidator(fieldValue any, fieldType reflect.StructField, params []string,
 
 func domainValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
+	if !ok {
+		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" {
 		return nil
 	}
 	if !domainRegex.MatchString(val) {
@@ -82,7 +97,10 @@ func domainValidator(fieldValue any, fieldType reflect.StructField, params []str
 
 func macValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
+	if !ok {
+		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" {
 		return nil
 	}
 	if !macRegex.MatchString(val) {
@@ -92,20 +110,37 @@ func macValidator(fieldValue any, fieldType reflect.StructField, params []string
 }
 
 func portValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
-	val, ok := fieldValue.(string)
-	if !ok || val == "" {
-		return nil
-	}
-	port, err := strconv.Atoi(val)
-	if err != nil || port < 1 || port > 65535 {
-		return errors.New(translator("validation.port", label, params...))
+	// Port can be string or numeric, so type check is different
+	switch v := fieldValue.(type) {
+	case string:
+		if v == "" {
+			return nil
+		}
+		portNum, err := strconv.Atoi(v)
+		if err != nil {
+			return errors.New(translator("validation.port", label, params...)) // Not a number
+		}
+		if portNum < 1 || portNum > 65535 {
+			return errors.New(translator("validation.port", label, params...))
+		}
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		portNum := reflect.ValueOf(fieldValue).Convert(reflect.TypeOf(int64(0))).Int()
+		if portNum < 1 || portNum > 65535 {
+			return errors.New(translator("validation.port", label, params...))
+		}
+	default:
+		// Not a string or any standard integer type
+		return errors.New(translator("validation.type_mismatch", label, params...))
 	}
 	return nil
 }
 
 func phoneValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
+	if !ok {
+		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" {
 		return nil
 	}
 	if !phoneRegex.MatchString(val) {
@@ -116,7 +151,10 @@ func phoneValidator(fieldValue any, fieldType reflect.StructField, params []stri
 
 func usernameValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
+	if !ok {
+		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" {
 		return nil
 	}
 	if !usernameRegex.MatchString(val) {
@@ -128,6 +166,9 @@ func usernameValidator(fieldValue any, fieldType reflect.StructField, params []s
 func slugValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	val, ok := fieldValue.(string)
 	if !ok {
+		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" {
 		return nil
 	}
 	if len(val) < 3 {
@@ -143,7 +184,10 @@ func slugValidator(fieldValue any, fieldType reflect.StructField, params []strin
 
 func hexcolorValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
+	if !ok {
+		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" {
 		return nil
 	}
 	if !hexcolorRegex.MatchString(val) {
@@ -154,7 +198,10 @@ func hexcolorValidator(fieldValue any, fieldType reflect.StructField, params []s
 
 func extensionValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	val, ok := fieldValue.(string)
-	if !ok || val == "" || len(params) == 0 {
+	if !ok {
+		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" || len(params) == 0 {
 		return nil
 	}
 	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(val)), ".")
@@ -168,7 +215,10 @@ func extensionValidator(fieldValue any, fieldType reflect.StructField, params []
 
 func uuidValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	val, ok := fieldValue.(string)
-	if !ok || val == "" {
+	if !ok {
+		return errors.New(translator("validation.type_mismatch", label, params...))
+	}
+	if val == "" {
 		return nil
 	}
 	if !uuidRegex.MatchString(val) {

@@ -39,9 +39,16 @@ func WithSeparators(ruleSep, paramSep, paramListSep string) Option {
 // WithValidators adds specific validators to the Validator instance
 func WithValidators(validatorNames ...string) Option {
 	return func(v *Validator) error {
+		// Clear existing validators to ensure only specified ones are loaded
+		v.validatorsMutex.Lock()
+		v.validators = make(map[string]ValidationFunc)
+		v.validatorsMutex.Unlock()
+
 		for _, name := range validatorNames {
 			if fn, exists := builtInValidators[name]; exists {
+				v.validatorsMutex.Lock()
 				v.validators[name] = fn
+				v.validatorsMutex.Unlock()
 			}
 		}
 		return nil
@@ -76,7 +83,9 @@ func WithCustomValidator(name string, fn ValidationFunc) Option {
 		if name == "" || fn == nil {
 			return ErrInvalidValidatorConfiguration
 		}
+		v.validatorsMutex.Lock()
 		v.validators[name] = fn
+		v.validatorsMutex.Unlock()
 		return nil
 	}
 }

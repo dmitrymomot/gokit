@@ -40,9 +40,12 @@ func TestDateValidator(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			v, err := validator.New(validator.WithAllValidators())
-			require.NoError(t, err)
+			t.Parallel()
+			// Explicitly set separators for this test as default paramSeparator is now ':'
+			v, err := validator.New(validator.WithSeparators(";", ":", ","))
+			require.NoError(t, err, "Test: %s", tt.name)
 			err = v.ValidateStruct(tt.structWithTag)
 			if tt.wantErrContains == "" {
 				require.NoError(t, err)
@@ -94,9 +97,12 @@ func TestPastDateValidator(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			v, err := validator.New(validator.WithAllValidators())
-			require.NoError(t, err)
+			t.Parallel()
+			// Explicitly set separators for this test as default paramSeparator is now ':'
+			v, err := validator.New(validator.WithSeparators(";", ":", ","))
+			require.NoError(t, err, "Test: %s", tt.name)
 			err = v.ValidateStruct(tt.structWithTag)
 			if tt.wantErrContains == "" {
 				require.NoError(t, err)
@@ -148,9 +154,12 @@ func TestFutureDateValidator(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			v, err := validator.New(validator.WithAllValidators())
-			require.NoError(t, err)
+			t.Parallel()
+			// Explicitly set separators for this test as default paramSeparator is now ':'
+			v, err := validator.New(validator.WithSeparators(";", ":", ","))
+			require.NoError(t, err, "Test: %s", tt.name)
 			err = v.ValidateStruct(tt.structWithTag)
 			if tt.wantErrContains == "" {
 				require.NoError(t, err)
@@ -164,8 +173,6 @@ func TestFutureDateValidator(t *testing.T) {
 
 func TestWorkdayValidator(t *testing.T) {
 	t.Parallel()
-	monday := time.Date(2023, 5, 8, 0, 0, 0, 0, time.UTC).Format("2006-01-02") // Monday
-	saturday := time.Date(2023, 5, 13, 0, 0, 0, 0, time.UTC).Format("2006-01-02") // Saturday
 	tests := []struct {
 		name            string
 		structWithTag   any
@@ -173,11 +180,11 @@ func TestWorkdayValidator(t *testing.T) {
 	}{
 		{
 			name: "valid workday (Monday)",
-			structWithTag: struct{ Date string `validate:"workday:2006-01-02"` }{Date: monday},
+			structWithTag: struct{ Date string `validate:"workday:2006-01-02"` }{Date: "2023-05-08"},
 		},
 		{
 			name: "invalid (Saturday)",
-			structWithTag: struct{ Date string `validate:"workday:2006-01-02"` }{Date: saturday},
+			structWithTag: struct{ Date string `validate:"workday:2006-01-02"` }{Date: "2023-05-13"},
 			wantErrContains: "workday",
 		},
 		{
@@ -201,9 +208,12 @@ func TestWorkdayValidator(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			v, err := validator.New(validator.WithAllValidators())
-			require.NoError(t, err)
+			t.Parallel()
+			// Explicitly set separators for this test as default paramSeparator is now ':'
+			v, err := validator.New(validator.WithSeparators(";", ":", ","))
+			require.NoError(t, err, "Test: %s", tt.name)
 			err = v.ValidateStruct(tt.structWithTag)
 			if tt.wantErrContains == "" {
 				require.NoError(t, err)
@@ -217,8 +227,6 @@ func TestWorkdayValidator(t *testing.T) {
 
 func TestWeekendValidator(t *testing.T) {
 	t.Parallel()
-	sunday := time.Date(2023, 5, 14, 0, 0, 0, 0, time.UTC).Format("2006-01-02") // Sunday
-	wednesday := time.Date(2023, 5, 10, 0, 0, 0, 0, time.UTC).Format("2006-01-02") // Wednesday
 	tests := []struct {
 		name            string
 		structWithTag   any
@@ -226,11 +234,11 @@ func TestWeekendValidator(t *testing.T) {
 	}{
 		{
 			name: "valid weekend (Sunday)",
-			structWithTag: struct{ Date string `validate:"weekend:2006-01-02"` }{Date: sunday},
+			structWithTag: struct{ Date string `validate:"weekend:2006-01-02"` }{Date: "2023-05-14"},
 		},
 		{
 			name: "invalid (Wednesday)",
-			structWithTag: struct{ Date string `validate:"weekend:2006-01-02"` }{Date: wednesday},
+			structWithTag: struct{ Date string `validate:"weekend:2006-01-02"` }{Date: "2023-05-10"},
 			wantErrContains: "weekend",
 		},
 		{
@@ -254,9 +262,12 @@ func TestWeekendValidator(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			v, err := validator.New(validator.WithAllValidators())
-			require.NoError(t, err)
+			t.Parallel()
+			// Explicitly set separators for this test as default paramSeparator is now ':'
+			v, err := validator.New(validator.WithSeparators(";", ":", ","))
+			require.NoError(t, err, "Test: %s", tt.name)
 			err = v.ValidateStruct(tt.structWithTag)
 			if tt.wantErrContains == "" {
 				require.NoError(t, err)
