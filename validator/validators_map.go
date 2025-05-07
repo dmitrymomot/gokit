@@ -13,11 +13,11 @@ var validators = map[string]ValidationFunc{
 	"alpha":         alphaValidator,
 	"alphanum":      alphanumValidator,
 	"alphaspace":    alphaSpaceValidator,
-	"aspace":        alphaSpaceValidator,
+	"aspace":        alphaSpaceValidator, // Alias for alphaspace
 	"alphaspacenum": alphaSpaceNumValidator,
 	"aspacenum":     alphaSpaceNumValidator,
-	"startswith":    startsWithValidator,
 	"starts":        startsWithValidator,
+	"startswith":    startsWithValidator,
 	"endswith":      endsWithValidator,
 	"ends":          endsWithValidator,
 	"contains":      containsValidator,

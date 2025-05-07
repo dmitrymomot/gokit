@@ -14,7 +14,7 @@ var (
 	alphanumRegex      = regexp.MustCompile(`^[A-Za-z0-9]+$`)
 	alphaSpaceRegex    = regexp.MustCompile(`^[A-Za-z ]+$`)
 	alphaSpaceNumRegex = regexp.MustCompile(`^[A-Za-z0-9 ]+$`)
-	asciiRegex         = regexp.MustCompile(`^[\x00-\x7F]+$`)
+	asciiRegex         = regexp.MustCompile(`^[\x00-\x7F]*$`)
 )
 
 func regexValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
@@ -170,13 +170,15 @@ func endsWithValidator(fieldValue any, fieldType reflect.StructField, params []s
 }
 
 func containsValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
-	if len(params) == 0 {
-		return nil
-	}
 	val, ok := fieldValue.(string)
 	if !ok {
 		return errors.New(translator("validation.type_mismatch", label, params...))
 	}
+
+	if len(params) == 0 {
+		return nil
+	}
+
 	if strings.Contains(val, params[0]) {
 		return nil
 	}
