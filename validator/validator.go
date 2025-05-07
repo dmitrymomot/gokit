@@ -91,9 +91,13 @@ func (v *Validator) validateFields(val reflect.Value, typ reflect.Type, prefix s
 
 		validationTag := fieldType.Tag.Get("validate")
 		if validationTag == "" {
-			// Only handle nested structs if there is no validation tag
 			if fieldVal.Kind() == reflect.Struct {
-				v.validateFields(fieldVal, fieldType.Type, prefix, errors)
+				// Propagate prefix for nested fields
+				nestedPrefix := fieldType.Name
+				if prefix != "" {
+					nestedPrefix = prefix + "." + fieldType.Name
+				}
+				v.validateFields(fieldVal, fieldType.Type, nestedPrefix, errors)
 			}
 			continue
 		}

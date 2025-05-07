@@ -61,15 +61,10 @@ func WithAllValidators() Option {
 // WithExcept adds all built-in validators except specified ones
 func WithExcept(excludedNames ...string) Option {
 	return func(v *Validator) error {
-		excluded := make(map[string]struct{})
+		v.validatorsMutex.Lock()
+		defer v.validatorsMutex.Unlock()
 		for _, name := range excludedNames {
-			excluded[name] = struct{}{}
-		}
-		
-		for name, fn := range builtInValidators {
-			if _, isExcluded := excluded[name]; !isExcluded {
-				v.validators[name] = fn
-			}
+			delete(v.validators, name)
 		}
 		return nil
 	}
