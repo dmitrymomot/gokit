@@ -18,13 +18,13 @@ var (
 )
 
 func regexValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
-	if len(params) == 0 {
-		return nil
+	if len(params) == 0 || strings.TrimSpace(params[0]) == "" {
+		return errors.New(translator("validation.internal.missing_regex_pattern", label))
 	}
 	pattern := params[0]
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return nil
+		return errors.New(translator("validation.internal.invalid_regex_pattern", label, pattern))
 	}
 	str, ok := fieldValue.(string)
 	if !ok {
