@@ -19,6 +19,7 @@ type Validator struct {
 	ruleSeparator      string                    // e.g., ";"
 	paramSeparator     string                    // e.g., ":"
 	paramListSeparator string                    // e.g., ","
+	fieldNameTag       string                    // e.g., "json", "xml", "form", etc.
 	validators         map[string]ValidationFunc // Instance-specific validators
 	validatorsMutex    sync.RWMutex              // Instance-specific mutex
 }
@@ -102,7 +103,7 @@ func (v *Validator) validateFields(val reflect.Value, typ reflect.Type, prefix s
 		if validationTag == "" {
 			if fieldVal.Kind() == reflect.Struct {
 				// Propagate prefix for nested fields
-				nestedPrefix := fieldType.Name
+				nestedPrefix := v.getFieldNameByTag(fieldType)
 				if prefix != "" {
 					nestedPrefix = prefix + "." + fieldType.Name
 				}
@@ -118,10 +119,7 @@ func (v *Validator) validateFields(val reflect.Value, typ reflect.Type, prefix s
 		}
 
 		// Split rules by the ruleSeparator
-		var rules []string
-		for _, ruleStr := range strings.Split(validationTag, v.ruleSeparator) {
-			rules = append(rules, ruleStr)
-		}
+		rules := strings.Split(validationTag, v.ruleSeparator)
 
 		// Only skip validation if there is a standalone 'omitempty' rule
 		hasOmitempty := false
@@ -147,7 +145,7 @@ func (v *Validator) validateFields(val reflect.Value, typ reflect.Type, prefix s
 			if ok {
 				err := validatorFunc(fieldVal.Interface(), fieldType, params, label, v.errorTranslator)
 				if err != nil {
-					fieldName := fieldType.Name
+					fieldName := v.getFieldNameByTag(fieldType)
 					if prefix != "" {
 						fieldName = prefix + "." + fieldName
 					}
@@ -163,6 +161,15 @@ func (v *Validator) validateFields(val reflect.Value, typ reflect.Type, prefix s
 			}
 		}
 	}
+}
+
+// getFieldNameByTag retrieves the field name from a specified tag.
+// If the tag value is empty, it returns the fallback value.
+func (v *Validator) getFieldNameByTag(field reflect.StructField) string {
+	if tagValue := field.Tag.Get(v.fieldNameTag); tagValue != "" {
+		return tagValue
+	}
+	return field.Name
 }
 
 // isZero checks if the value is the zero value for its type.

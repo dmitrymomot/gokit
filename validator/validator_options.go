@@ -1,5 +1,7 @@
 package validator
 
+import "maps"
+
 // Option defines a function type for configuring a Validator
 type Option func(*Validator) error
 
@@ -28,7 +30,7 @@ func WithSeparators(ruleSep, paramSep, paramListSep string) Option {
 		if ruleSep == paramSep || ruleSep == paramListSep || paramSep == paramListSep {
 			return ErrInvalidSeparatorConfiguration
 		}
-		
+
 		v.ruleSeparator = ruleSep
 		v.paramSeparator = paramSep
 		v.paramListSeparator = paramListSep
@@ -58,9 +60,9 @@ func WithValidators(validatorNames ...string) Option {
 // WithAllValidators adds all built-in validators to the Validator instance
 func WithAllValidators() Option {
 	return func(v *Validator) error {
-		for name, fn := range builtInValidators {
-			v.validators[name] = fn
-		}
+		v.validatorsMutex.Lock()
+		defer v.validatorsMutex.Unlock()
+		maps.Copy(v.validators, builtInValidators)
 		return nil
 	}
 }
@@ -86,6 +88,17 @@ func WithCustomValidator(name string, fn ValidationFunc) Option {
 		v.validatorsMutex.Lock()
 		v.validators[name] = fn
 		v.validatorsMutex.Unlock()
+		return nil
+	}
+}
+
+// WithFieldNameTag sets the tag name used for identifying field validation rules
+func WithFieldNameTag(tagName string) Option {
+	return func(v *Validator) error {
+		if tagName == "" {
+			return ErrInvalidValidatorConfiguration
+		}
+		v.fieldNameTag = tagName
 		return nil
 	}
 }
