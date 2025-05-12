@@ -2,7 +2,7 @@ package validator
 
 import (
 	"errors"
-	"net/url"
+	"net"
 	"reflect"
 	"regexp"
 	"strings"
@@ -41,10 +41,50 @@ func emailValidator(fieldValue any, fieldType reflect.StructField, params []stri
 	if !ok {
 		return errors.New(translator("validation.type_mismatch", label, params...))
 	}
-	if emailRegex.MatchString(val) {
-		return nil
+	
+	// Basic email format check using regex
+	if !emailRegex.MatchString(val) {
+		return errors.New(translator("validation.email", label, params...))
 	}
-	return errors.New(translator("validation.email", label, params...))
+	
+	// More thorough checks for the email
+	parts := strings.Split(val, "@")
+	if len(parts) != 2 {
+		return errors.New(translator("validation.email", label, params...))
+	}
+	
+	// Check local part (username)
+	localPart := parts[0]
+	if len(localPart) == 0 || len(localPart) > 64 {
+		return errors.New(translator("validation.email", label, params...))
+	}
+	
+	// Check domain part
+	domain := parts[1]
+	if len(domain) < 3 || len(domain) > 255 {
+		return errors.New(translator("validation.email", label, params...))
+	}
+	
+	// Check domain format - must have at least one dot
+	if !strings.Contains(domain, ".") {
+		return errors.New(translator("validation.email", label, params...))
+	}
+	
+	// Check TLD format
+	domainParts := strings.Split(domain, ".")
+	tld := domainParts[len(domainParts)-1]
+	
+	// TLD must be at least 2 characters
+	if len(tld) < 2 {
+		return errors.New(translator("validation.email", label, params...))
+	}
+	
+	// TLD should be letters only
+	if !alphaRegex.MatchString(tld) {
+		return errors.New(translator("validation.email", label, params...))
+	}
+	
+	return nil
 }
 
 var nameRegex = regexp.MustCompile(`^[a-zA-Z][a-zA-Z ]*[a-zA-Z]$`)
@@ -90,10 +130,22 @@ func realEmailValidator(fieldValue any, fieldType reflect.StructField, params []
 	if !ok {
 		return errors.New(translator("validation.type_mismatch", label, params...))
 	}
-	parsed, err := url.Parse(val)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+	
+	// First perform basic email validation
+	if err := emailValidator(fieldValue, fieldType, params, label, translator); err != nil {
 		return errors.New(translator("validation.realemail", label, params...))
 	}
+	
+	// Then check if domain has MX records
+	parts := strings.Split(val, "@")
+	domain := parts[1]
+	
+	// Check if domain has valid MX records
+	_, err := net.LookupMX(domain)
+	if err != nil {
+		return errors.New(translator("validation.realemail", label, params...))
+	}
+	
 	return nil
 }
 
