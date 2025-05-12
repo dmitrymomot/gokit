@@ -33,6 +33,69 @@ func TestRequiredValidator(t *testing.T) {
 			wantErrContains: "required",
 		},
 		{
+			name:          "valid uint",
+			structWithTag: struct{ Field uint `validate:"required"` }{Field: 10},
+		},
+		{
+			name:            "zero uint",
+			structWithTag:   struct{ Field uint `validate:"required"` }{Field: 0},
+			wantErrContains: "required",
+		},
+		{
+			name:          "valid uint8",
+			structWithTag: struct{ Field uint8 `validate:"required"` }{Field: 10},
+		},
+		{
+			name:            "zero uint8",
+			structWithTag:   struct{ Field uint8 `validate:"required"` }{Field: 0},
+			wantErrContains: "required",
+		},
+		{
+			name:          "valid uint16",
+			structWithTag: struct{ Field uint16 `validate:"required"` }{Field: 10},
+		},
+		{
+			name:            "zero uint16",
+			structWithTag:   struct{ Field uint16 `validate:"required"` }{Field: 0},
+			wantErrContains: "required",
+		},
+		{
+			name:          "valid uint32",
+			structWithTag: struct{ Field uint32 `validate:"required"` }{Field: 10},
+		},
+		{
+			name:            "zero uint32",
+			structWithTag:   struct{ Field uint32 `validate:"required"` }{Field: 0},
+			wantErrContains: "required",
+		},
+		{
+			name:          "valid uint64",
+			structWithTag: struct{ Field uint64 `validate:"required"` }{Field: 10},
+		},
+		{
+			name:            "zero uint64",
+			structWithTag:   struct{ Field uint64 `validate:"required"` }{Field: 0},
+			wantErrContains: "required",
+		},
+		{
+			name:          "valid float32",
+			structWithTag: struct{ Field float32 `validate:"required"` }{Field: 10.5},
+		},
+		{
+			name:            "zero float32",
+			structWithTag:   struct{ Field float32 `validate:"required"` }{Field: 0},
+			wantErrContains: "required",
+		},
+		{
+			name:          "valid float64",
+			structWithTag: struct{ Field float64 `validate:"required"` }{Field: 10.5},
+		},
+		{
+			name:            "zero float64",
+			structWithTag:   struct{ Field float64 `validate:"required"` }{Field: 0},
+			wantErrContains: "required",
+		},
+		{
 			name:          "valid bool",
 			structWithTag: struct{ Field bool `validate:"required"` }{Field: true},
 		},
@@ -51,12 +114,22 @@ func TestRequiredValidator(t *testing.T) {
 			wantErrContains: "required",
 		},
 		{
+			name:            "nil slice",
+			structWithTag:   struct{ Field []string `validate:"required"` }{Field: nil},
+			wantErrContains: "required",
+		},
+		{
 			name:          "valid map",
 			structWithTag: struct{ Field map[string]string `validate:"required"` }{Field: map[string]string{"key": "value"}},
 		},
 		{
 			name:            "empty map",
 			structWithTag:   struct{ Field map[string]string `validate:"required"` }{Field: map[string]string{}},
+			wantErrContains: "required",
+		},
+		{
+			name:            "nil map",
+			structWithTag:   struct{ Field map[string]string `validate:"required"` }{Field: nil},
 			wantErrContains: "required",
 		},
 		{
@@ -120,6 +193,84 @@ func TestMaxValidator(t *testing.T) {
 			wantErrContains: "max",
 		},
 		{
+			name:          "uint below max",
+			structWithTag: struct{ Field uint `validate:"max:10"` }{Field: 5},
+		},
+		{
+			name:          "uint at max",
+			structWithTag: struct{ Field uint `validate:"max:5"` }{Field: 5},
+		},
+		{
+			name:            "uint above max",
+			structWithTag:   struct{ Field uint `validate:"max:4"` }{Field: 5},
+			wantErrContains: "max",
+		},
+		{
+			name:          "uint8 below max",
+			structWithTag: struct{ Field uint8 `validate:"max:10"` }{Field: 5},
+		},
+		{
+			name:          "uint8 at max",
+			structWithTag: struct{ Field uint8 `validate:"max:5"` }{Field: 5},
+		},
+		{
+			name:            "uint8 above max",
+			structWithTag:   struct{ Field uint8 `validate:"max:4"` }{Field: 5},
+			wantErrContains: "max",
+		},
+		{
+			name:          "uint16 below max",
+			structWithTag: struct{ Field uint16 `validate:"max:10"` }{Field: 5},
+		},
+		{
+			name:          "uint16 at max",
+			structWithTag: struct{ Field uint16 `validate:"max:5"` }{Field: 5},
+		},
+		{
+			name:            "uint16 above max",
+			structWithTag:   struct{ Field uint16 `validate:"max:4"` }{Field: 5},
+			wantErrContains: "max",
+		},
+		{
+			name:          "uint32 below max",
+			structWithTag: struct{ Field uint32 `validate:"max:10"` }{Field: 5},
+		},
+		{
+			name:          "uint32 at max",
+			structWithTag: struct{ Field uint32 `validate:"max:5"` }{Field: 5},
+		},
+		{
+			name:            "uint32 above max",
+			structWithTag:   struct{ Field uint32 `validate:"max:4"` }{Field: 5},
+			wantErrContains: "max",
+		},
+		{
+			name:          "uint64 below max",
+			structWithTag: struct{ Field uint64 `validate:"max:10"` }{Field: 5},
+		},
+		{
+			name:          "uint64 at max",
+			structWithTag: struct{ Field uint64 `validate:"max:5"` }{Field: 5},
+		},
+		{
+			name:            "uint64 above max",
+			structWithTag:   struct{ Field uint64 `validate:"max:4"` }{Field: 5},
+			wantErrContains: "max",
+		},
+		{
+			name:          "float32 below max",
+			structWithTag: struct{ Field float32 `validate:"max:10.5"` }{Field: 5.5},
+		},
+		{
+			name:          "float32 at max",
+			structWithTag: struct{ Field float32 `validate:"max:5.5"` }{Field: 5.5},
+		},
+		{
+			name:            "float32 above max",
+			structWithTag:   struct{ Field float32 `validate:"max:5.4"` }{Field: 5.5},
+			wantErrContains: "max",
+		},
+		{
 			name:          "float below max",
 			structWithTag: struct{ Field float64 `validate:"max:10.5"` }{Field: 5.5},
 		},
@@ -143,6 +294,19 @@ func TestMaxValidator(t *testing.T) {
 		{
 			name:            "slice above max",
 			structWithTag:   struct{ Field []string `validate:"max:1"` }{Field: []string{"a", "b"}},
+			wantErrContains: "max",
+		},
+		{
+			name:          "map below max",
+			structWithTag: struct{ Field map[string]string `validate:"max:3"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:          "map at max",
+			structWithTag: struct{ Field map[string]string `validate:"max:2"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:            "map above max",
+			structWithTag:   struct{ Field map[string]string `validate:"max:1"` }{Field: map[string]string{"a": "1", "b": "2"}},
 			wantErrContains: "max",
 		},
 		{
@@ -205,6 +369,84 @@ func TestMinValidator(t *testing.T) {
 			wantErrContains: "min",
 		},
 		{
+			name:          "uint above min",
+			structWithTag: struct{ Field uint `validate:"min:3"` }{Field: 5},
+		},
+		{
+			name:          "uint at min",
+			structWithTag: struct{ Field uint `validate:"min:5"` }{Field: 5},
+		},
+		{
+			name:            "uint below min",
+			structWithTag:   struct{ Field uint `validate:"min:6"` }{Field: 5},
+			wantErrContains: "min",
+		},
+		{
+			name:          "uint8 above min",
+			structWithTag: struct{ Field uint8 `validate:"min:3"` }{Field: 5},
+		},
+		{
+			name:          "uint8 at min",
+			structWithTag: struct{ Field uint8 `validate:"min:5"` }{Field: 5},
+		},
+		{
+			name:            "uint8 below min",
+			structWithTag:   struct{ Field uint8 `validate:"min:6"` }{Field: 5},
+			wantErrContains: "min",
+		},
+		{
+			name:          "uint16 above min",
+			structWithTag: struct{ Field uint16 `validate:"min:3"` }{Field: 5},
+		},
+		{
+			name:          "uint16 at min",
+			structWithTag: struct{ Field uint16 `validate:"min:5"` }{Field: 5},
+		},
+		{
+			name:            "uint16 below min",
+			structWithTag:   struct{ Field uint16 `validate:"min:6"` }{Field: 5},
+			wantErrContains: "min",
+		},
+		{
+			name:          "uint32 above min",
+			structWithTag: struct{ Field uint32 `validate:"min:3"` }{Field: 5},
+		},
+		{
+			name:          "uint32 at min",
+			structWithTag: struct{ Field uint32 `validate:"min:5"` }{Field: 5},
+		},
+		{
+			name:            "uint32 below min",
+			structWithTag:   struct{ Field uint32 `validate:"min:6"` }{Field: 5},
+			wantErrContains: "min",
+		},
+		{
+			name:          "uint64 above min",
+			structWithTag: struct{ Field uint64 `validate:"min:3"` }{Field: 5},
+		},
+		{
+			name:          "uint64 at min",
+			structWithTag: struct{ Field uint64 `validate:"min:5"` }{Field: 5},
+		},
+		{
+			name:            "uint64 below min",
+			structWithTag:   struct{ Field uint64 `validate:"min:6"` }{Field: 5},
+			wantErrContains: "min",
+		},
+		{
+			name:          "float32 above min",
+			structWithTag: struct{ Field float32 `validate:"min:3.5"` }{Field: 5.5},
+		},
+		{
+			name:          "float32 at min",
+			structWithTag: struct{ Field float32 `validate:"min:5.5"` }{Field: 5.5},
+		},
+		{
+			name:            "float32 below min",
+			structWithTag:   struct{ Field float32 `validate:"min:5.6"` }{Field: 5.5},
+			wantErrContains: "min",
+		},
+		{
 			name:          "float above min",
 			structWithTag: struct{ Field float64 `validate:"min:3.5"` }{Field: 5.5},
 		},
@@ -228,6 +470,19 @@ func TestMinValidator(t *testing.T) {
 		{
 			name:            "slice below min",
 			structWithTag:   struct{ Field []string `validate:"min:3"` }{Field: []string{"a", "b"}},
+			wantErrContains: "min",
+		},
+		{
+			name:          "map above min",
+			structWithTag: struct{ Field map[string]string `validate:"min:1"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:          "map at min",
+			structWithTag: struct{ Field map[string]string `validate:"min:2"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:            "map below min",
+			structWithTag:   struct{ Field map[string]string `validate:"min:3"` }{Field: map[string]string{"a": "1", "b": "2"}},
 			wantErrContains: "min",
 		},
 		{
@@ -352,6 +607,50 @@ func TestRangeValidator(t *testing.T) {
 			wantErrContains: "range",
 		},
 		{
+			name:          "map within range",
+			structWithTag: struct{ Field map[string]string `validate:"range:1,3"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:          "map at min range",
+			structWithTag: struct{ Field map[string]string `validate:"range:2,3"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:          "map at max range",
+			structWithTag: struct{ Field map[string]string `validate:"range:1,2"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:            "map below range",
+			structWithTag:   struct{ Field map[string]string `validate:"range:3,4"` }{Field: map[string]string{"a": "1", "b": "2"}},
+			wantErrContains: "range",
+		},
+		{
+			name:            "map above range",
+			structWithTag:   struct{ Field map[string]string `validate:"range:0,1"` }{Field: map[string]string{"a": "1", "b": "2"}},
+			wantErrContains: "range",
+		},
+		{
+			name:          "uint within range",
+			structWithTag: struct{ Field uint `validate:"range:3,10"` }{Field: 5},
+		},
+		{
+			name:          "uint at min range",
+			structWithTag: struct{ Field uint `validate:"range:5,10"` }{Field: 5},
+		},
+		{
+			name:          "uint at max range",
+			structWithTag: struct{ Field uint `validate:"range:1,5"` }{Field: 5},
+		},
+		{
+			name:            "uint below range",
+			structWithTag:   struct{ Field uint `validate:"range:6,10"` }{Field: 5},
+			wantErrContains: "range",
+		},
+		{
+			name:            "uint above range",
+			structWithTag:   struct{ Field uint `validate:"range:1,4"` }{Field: 5},
+			wantErrContains: "range",
+		},
+		{
 			name:          "invalid parameters",
 			structWithTag: struct{ Field string `validate:"range:invalid,10"` }{Field: "test"},
 		},
@@ -407,6 +706,14 @@ func TestLengthValidator(t *testing.T) {
 			wantErrContains: "length",
 		},
 		{
+			name:          "empty slice with zero length",
+			structWithTag: struct{ Field []string `validate:"length:0"` }{Field: []string{}},
+		},
+		{
+			name:          "nil slice with zero length",
+			structWithTag: struct{ Field []string `validate:"length:0"` }{Field: nil},
+		},
+		{
 			name:          "map with correct length",
 			structWithTag: struct{ Field map[string]string `validate:"length:2"` }{Field: map[string]string{"a": "1", "b": "2"}},
 		},
@@ -414,6 +721,14 @@ func TestLengthValidator(t *testing.T) {
 			name:            "map with incorrect length",
 			structWithTag:   struct{ Field map[string]string `validate:"length:1"` }{Field: map[string]string{"a": "1", "b": "2"}},
 			wantErrContains: "length",
+		},
+		{
+			name:          "empty map with zero length",
+			structWithTag: struct{ Field map[string]string `validate:"length:0"` }{Field: map[string]string{}},
+		},
+		{
+			name:          "nil map with zero length",
+			structWithTag: struct{ Field map[string]string `validate:"length:0"` }{Field: nil},
 		},
 		{
 			name:          "invalid parameter",
@@ -541,6 +856,58 @@ func TestBetweenValidator(t *testing.T) {
 			wantErrContains: "between",
 		},
 		{
+			name:          "map within range",
+			structWithTag: struct{ Field map[string]string `validate:"between:1,3"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:          "map at min range",
+			structWithTag: struct{ Field map[string]string `validate:"between:2,3"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:          "map at max range",
+			structWithTag: struct{ Field map[string]string `validate:"between:1,2"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:            "map below range",
+			structWithTag:   struct{ Field map[string]string `validate:"between:3,4"` }{Field: map[string]string{"a": "1", "b": "2"}},
+			wantErrContains: "between",
+		},
+		{
+			name:            "map above range",
+			structWithTag:   struct{ Field map[string]string `validate:"between:0,1"` }{Field: map[string]string{"a": "1", "b": "2"}},
+			wantErrContains: "between",
+		},
+		{
+			name:          "uint within range",
+			structWithTag: struct{ Field uint `validate:"between:3,10"` }{Field: 5},
+		},
+		{
+			name:          "uint at min range",
+			structWithTag: struct{ Field uint `validate:"between:5,10"` }{Field: 5},
+		},
+		{
+			name:          "uint at max range",
+			structWithTag: struct{ Field uint `validate:"between:1,5"` }{Field: 5},
+		},
+		{
+			name:            "uint below range",
+			structWithTag:   struct{ Field uint `validate:"between:6,10"` }{Field: 5},
+			wantErrContains: "between",
+		},
+		{
+			name:            "uint above range",
+			structWithTag:   struct{ Field uint `validate:"between:1,4"` }{Field: 5},
+			wantErrContains: "between",
+		},
+		{
+			name:          "uint32 within range",
+			structWithTag: struct{ Field uint32 `validate:"between:3,10"` }{Field: 5},
+		},
+		{
+			name:          "float32 within range",
+			structWithTag: struct{ Field float32 `validate:"between:3.5,10.5"` }{Field: 5.5},
+		},
+		{
 			name:          "invalid parameters",
 			structWithTag: struct{ Field string `validate:"between:invalid,10"` }{Field: "test"},
 		},
@@ -602,6 +969,42 @@ func TestEqualValidator(t *testing.T) {
 		{
 			name:            "float not equal",
 			structWithTag:   struct{ Field float64 `validate:"eq:5.6"` }{Field: 5.5},
+			wantErrContains: "eq",
+		},
+		{
+			name:          "uint equal",
+			structWithTag: struct{ Field uint `validate:"eq:5"` }{Field: 5},
+		},
+		{
+			name:            "uint not equal",
+			structWithTag:   struct{ Field uint `validate:"eq:6"` }{Field: 5},
+			wantErrContains: "eq",
+		},
+		{
+			name:          "uint32 equal",
+			structWithTag: struct{ Field uint32 `validate:"eq:5"` }{Field: 5},
+		},
+		{
+			name:            "uint32 not equal",
+			structWithTag:   struct{ Field uint32 `validate:"eq:6"` }{Field: 5},
+			wantErrContains: "eq",
+		},
+		{
+			name:          "float32 equal",
+			structWithTag: struct{ Field float32 `validate:"eq:5.5"` }{Field: 5.5},
+		},
+		{
+			name:            "float32 not equal",
+			structWithTag:   struct{ Field float32 `validate:"eq:5.6"` }{Field: 5.5},
+			wantErrContains: "eq",
+		},
+		{
+			name:          "boolean equal",
+			structWithTag: struct{ Field bool `validate:"eq:true"` }{Field: true},
+		},
+		{
+			name:            "boolean not equal",
+			structWithTag:   struct{ Field bool `validate:"eq:true"` }{Field: false},
 			wantErrContains: "eq",
 		},
 		{
@@ -746,6 +1149,47 @@ func TestLessThanValidator(t *testing.T) {
 			wantErrContains: "lt",
 		},
 		{
+			name:          "map less than",
+			structWithTag: struct{ Field map[string]string `validate:"lt:3"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:            "map equal",
+			structWithTag:   struct{ Field map[string]string `validate:"lt:2"` }{Field: map[string]string{"a": "1", "b": "2"}},
+			wantErrContains: "lt",
+		},
+		{
+			name:            "map greater than",
+			structWithTag:   struct{ Field map[string]string `validate:"lt:1"` }{Field: map[string]string{"a": "1", "b": "2"}},
+			wantErrContains: "lt",
+		},
+		{
+			name:          "uint less than",
+			structWithTag: struct{ Field uint `validate:"lt:6"` }{Field: 5},
+		},
+		{
+			name:            "uint equal",
+			structWithTag:   struct{ Field uint `validate:"lt:5"` }{Field: 5},
+			wantErrContains: "lt",
+		},
+		{
+			name:            "uint greater than",
+			structWithTag:   struct{ Field uint `validate:"lt:4"` }{Field: 5},
+			wantErrContains: "lt",
+		},
+		{
+			name:          "uint32 less than",
+			structWithTag: struct{ Field uint32 `validate:"lt:6"` }{Field: 5},
+		},
+		{
+			name:          "float32 less than",
+			structWithTag: struct{ Field float32 `validate:"lt:5.6"` }{Field: 5.5},
+		},
+		{
+			name:            "float32 equal",
+			structWithTag:   struct{ Field float32 `validate:"lt:5.5"` }{Field: 5.5},
+			wantErrContains: "lt",
+		},
+		{
 			name:          "invalid parameter",
 			structWithTag: struct{ Field string `validate:"lt:invalid"` }{Field: "test"},
 		},
@@ -832,6 +1276,53 @@ func TestLessThanOrEqualValidator(t *testing.T) {
 		{
 			name:            "slice greater than",
 			structWithTag:   struct{ Field []string `validate:"lte:1"` }{Field: []string{"a", "b"}},
+			wantErrContains: "lte",
+		},
+		{
+			name:          "map less than",
+			structWithTag: struct{ Field map[string]string `validate:"lte:3"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:          "map equal",
+			structWithTag: struct{ Field map[string]string `validate:"lte:2"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:            "map greater than",
+			structWithTag:   struct{ Field map[string]string `validate:"lte:1"` }{Field: map[string]string{"a": "1", "b": "2"}},
+			wantErrContains: "lte",
+		},
+		{
+			name:          "uint less than",
+			structWithTag: struct{ Field uint `validate:"lte:6"` }{Field: 5},
+		},
+		{
+			name:          "uint equal",
+			structWithTag: struct{ Field uint `validate:"lte:5"` }{Field: 5},
+		},
+		{
+			name:            "uint greater than",
+			structWithTag:   struct{ Field uint `validate:"lte:4"` }{Field: 5},
+			wantErrContains: "lte",
+		},
+		{
+			name:          "uint32 less than",
+			structWithTag: struct{ Field uint32 `validate:"lte:6"` }{Field: 5},
+		},
+		{
+			name:          "uint32 equal",
+			structWithTag: struct{ Field uint32 `validate:"lte:5"` }{Field: 5},
+		},
+		{
+			name:          "float32 less than",
+			structWithTag: struct{ Field float32 `validate:"lte:5.6"` }{Field: 5.5},
+		},
+		{
+			name:          "float32 equal",
+			structWithTag: struct{ Field float32 `validate:"lte:5.5"` }{Field: 5.5},
+		},
+		{
+			name:            "float32 greater than",
+			structWithTag:   struct{ Field float32 `validate:"lte:5.4"` }{Field: 5.5},
 			wantErrContains: "lte",
 		},
 		{
@@ -928,6 +1419,47 @@ func TestGreaterThanValidator(t *testing.T) {
 			wantErrContains: "gt",
 		},
 		{
+			name:          "map greater than",
+			structWithTag: struct{ Field map[string]string `validate:"gt:1"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:            "map equal",
+			structWithTag:   struct{ Field map[string]string `validate:"gt:2"` }{Field: map[string]string{"a": "1", "b": "2"}},
+			wantErrContains: "gt",
+		},
+		{
+			name:            "map less than",
+			structWithTag:   struct{ Field map[string]string `validate:"gt:3"` }{Field: map[string]string{"a": "1", "b": "2"}},
+			wantErrContains: "gt",
+		},
+		{
+			name:          "uint greater than",
+			structWithTag: struct{ Field uint `validate:"gt:4"` }{Field: 5},
+		},
+		{
+			name:            "uint equal",
+			structWithTag:   struct{ Field uint `validate:"gt:5"` }{Field: 5},
+			wantErrContains: "gt",
+		},
+		{
+			name:            "uint less than",
+			structWithTag:   struct{ Field uint `validate:"gt:6"` }{Field: 5},
+			wantErrContains: "gt",
+		},
+		{
+			name:          "uint32 greater than",
+			structWithTag: struct{ Field uint32 `validate:"gt:4"` }{Field: 5},
+		},
+		{
+			name:          "float32 greater than",
+			structWithTag: struct{ Field float32 `validate:"gt:5.4"` }{Field: 5.5},
+		},
+		{
+			name:            "float32 equal",
+			structWithTag:   struct{ Field float32 `validate:"gt:5.5"` }{Field: 5.5},
+			wantErrContains: "gt",
+		},
+		{
 			name:          "invalid parameter",
 			structWithTag: struct{ Field string `validate:"gt:invalid"` }{Field: "test"},
 		},
@@ -1017,6 +1549,53 @@ func TestGreaterThanOrEqualValidator(t *testing.T) {
 			wantErrContains: "gte",
 		},
 		{
+			name:          "map greater than",
+			structWithTag: struct{ Field map[string]string `validate:"gte:1"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:          "map equal",
+			structWithTag: struct{ Field map[string]string `validate:"gte:2"` }{Field: map[string]string{"a": "1", "b": "2"}},
+		},
+		{
+			name:            "map less than",
+			structWithTag:   struct{ Field map[string]string `validate:"gte:3"` }{Field: map[string]string{"a": "1", "b": "2"}},
+			wantErrContains: "gte",
+		},
+		{
+			name:          "uint greater than",
+			structWithTag: struct{ Field uint `validate:"gte:4"` }{Field: 5},
+		},
+		{
+			name:          "uint equal",
+			structWithTag: struct{ Field uint `validate:"gte:5"` }{Field: 5},
+		},
+		{
+			name:            "uint less than",
+			structWithTag:   struct{ Field uint `validate:"gte:6"` }{Field: 5},
+			wantErrContains: "gte",
+		},
+		{
+			name:          "uint32 greater than",
+			structWithTag: struct{ Field uint32 `validate:"gte:4"` }{Field: 5},
+		},
+		{
+			name:          "uint32 equal",
+			structWithTag: struct{ Field uint32 `validate:"gte:5"` }{Field: 5},
+		},
+		{
+			name:          "float32 greater than",
+			structWithTag: struct{ Field float32 `validate:"gte:5.4"` }{Field: 5.5},
+		},
+		{
+			name:          "float32 equal",
+			structWithTag: struct{ Field float32 `validate:"gte:5.5"` }{Field: 5.5},
+		},
+		{
+			name:            "float32 less than",
+			structWithTag:   struct{ Field float32 `validate:"gte:5.6"` }{Field: 5.5},
+			wantErrContains: "gte",
+		},
+		{
 			name:          "invalid parameter",
 			structWithTag: struct{ Field string `validate:"gte:invalid"` }{Field: "test"},
 		},
@@ -1090,6 +1669,28 @@ func TestInValidator(t *testing.T) {
 			wantErrContains: "in",
 		},
 		{
+			name:          "uint in list",
+			structWithTag: struct{ Field uint `validate:"in:5,10,15"` }{Field: 5},
+		},
+		{
+			name:            "uint not in list",
+			structWithTag:   struct{ Field uint `validate:"in:10,15,20"` }{Field: 5},
+			wantErrContains: "in",
+		},
+		{
+			name:          "uint32 in list",
+			structWithTag: struct{ Field uint32 `validate:"in:5,10,15"` }{Field: 5},
+		},
+		{
+			name:          "float32 in list",
+			structWithTag: struct{ Field float32 `validate:"in:5.5,10.5,15.5"` }{Field: 5.5},
+		},
+		{
+			name:            "float32 not in list",
+			structWithTag:   struct{ Field float32 `validate:"in:10.5,15.5"` }{Field: 5.5},
+			wantErrContains: "in",
+		},
+		{
 			name:          "missing parameter",
 			structWithTag: struct{ Field string `validate:"in"` }{Field: "test"},
 		},
@@ -1155,6 +1756,33 @@ func TestNotInValidator(t *testing.T) {
 			wantErrContains: "notin",
 		},
 		{
+			name:          "uint not in list",
+			structWithTag: struct{ Field uint `validate:"notin:10,15,20"` }{Field: 5},
+		},
+		{
+			name:            "uint in list",
+			structWithTag:   struct{ Field uint `validate:"notin:5,10,15"` }{Field: 5},
+			wantErrContains: "notin",
+		},
+		{
+			name:          "uint32 not in list",
+			structWithTag: struct{ Field uint32 `validate:"notin:10,15,20"` }{Field: 5},
+		},
+		{
+			name:            "uint32 in list",
+			structWithTag:   struct{ Field uint32 `validate:"notin:5,10,15"` }{Field: 5},
+			wantErrContains: "notin",
+		},
+		{
+			name:          "float32 not in list",
+			structWithTag: struct{ Field float32 `validate:"notin:10.5,15.5"` }{Field: 5.5},
+		},
+		{
+			name:            "float32 in list",
+			structWithTag:   struct{ Field float32 `validate:"notin:5.5,10.5,15.5"` }{Field: 5.5},
+			wantErrContains: "notin",
+		},
+		{
 			name:          "missing parameter",
 			structWithTag: struct{ Field string `validate:"notin"` }{Field: "test"},
 		},
@@ -1204,6 +1832,26 @@ func TestBooleanValidator(t *testing.T) {
 		{
 			name:            "float value",
 			structWithTag:   struct{ Field float64 `validate:"boolean"` }{Field: 1.0},
+			wantErrContains: "boolean",
+		},
+		{
+			name:            "nil pointer",
+			structWithTag:   struct{ Field *bool `validate:"boolean"` }{Field: nil},
+			wantErrContains: "boolean",
+		},
+		{
+			name:            "pointer to bool",
+			structWithTag:   struct{ Field *bool `validate:"boolean"` }{Field: func() *bool { b := true; return &b }()},
+			wantErrContains: "boolean",
+		},
+		{
+			name:            "string 'true'",
+			structWithTag:   struct{ Field string `validate:"boolean"` }{Field: "true"},
+			wantErrContains: "boolean",
+		},
+		{
+			name:            "string 'false'",
+			structWithTag:   struct{ Field string `validate:"boolean"` }{Field: "false"},
 			wantErrContains: "boolean",
 		},
 	}
