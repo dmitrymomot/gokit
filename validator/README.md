@@ -18,6 +18,7 @@ The `validator` package provides a robust validation system for Go structs using
 - 30+ built-in validators for common validation scenarios
 - Custom validation rule support with simple registration mechanism
 - Customizable error messages with translator function support
+- Customizable field names in error messages using struct tags
 - Recursive validation for nested structs and slices
 - Thread-safe implementation for concurrent use
 
@@ -93,6 +94,34 @@ if err != nil {
     // Handle initialization error
 }
 // Now validation errors will use your custom messages
+```
+
+### Custom Field Names
+
+```go
+import "github.com/dmitrymomot/gokit/validator"
+
+// Create a validator that uses JSON field names in error messages
+v, err := validator.New(validator.WithFieldNameTag("json"), validator.WithAllValidators())
+if err != nil {
+    // Handle initialization error
+}
+
+type User struct {
+    Username string `json:"user_name" validate:"required" label:"Username"`
+    Email    string `json:"email_address" validate:"required,email" label:"Email"`
+}
+
+user := User{
+    Username: "", // Empty, will trigger required validation
+    Email:    "invalid-email",
+}
+
+err = v.ValidateStruct(user)
+// Error will contain:
+// - "user_name": "Username field is required"
+// - "email_address": "Email must be a valid email"
+// Instead of "Username" and "Email" field names
 ```
 
 ### Custom Validation Rules
@@ -201,10 +230,12 @@ if err != nil {
 
 ## Best Practices
 
-1. **Field Labeling**: 
+1. **Field Naming and Labeling**: 
    - Use the `label` tag to provide user-friendly field names for error messages
    - Example: `label:"Email Address"` instead of just `label:"email"`
    - When no label is provided, the field name will be used
+   - For consistent field naming in errors, use `WithFieldNameTag` to match JSON, XML, or form field names
+   - Example: Configure with `WithFieldNameTag("json")` to use `json:"field_name"` tag values in errors
 
 2. **Validation Rules Organization**:
    - Group related validators together in a logical order
@@ -283,6 +314,11 @@ Adds all built-in validators except specifically excluded ones.
 func WithCustomValidator(name string, fn ValidationFunc) Option
 ```
 Adds a custom validator function at initialization time.
+
+```go
+func WithFieldNameTag(tagName string) Option
+```
+Sets the tag name used for identifying field names in validation errors. If a field has this tag, its value will be used in error messages instead of the field name.
 
 ### Validator Methods
 
