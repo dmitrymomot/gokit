@@ -396,7 +396,7 @@ func TestWithAllValidators(t *testing.T) {
 	require.Contains(t, err.Error(), "email")
 }
 
-// Test WithExcept excludes specified validators
+// TestWithExcept excludes specified validators
 func TestWithExcept(t *testing.T) {
 	t.Parallel()
 	v, err := validator.New(validator.WithAllValidators(), validator.WithExcept("email"))
@@ -409,10 +409,59 @@ func TestWithExcept(t *testing.T) {
 	require.Contains(t, err.Error(), "unknown rule 'email'")
 }
 
+// Test WithFieldNameTag to customize field name in errors
+func TestWithFieldNameTag(t *testing.T) {
+	t.Parallel()
+	
+	// Create validator with json field name tag
+	v, err := validator.New(
+		validator.WithFieldNameTag("json"),
+		validator.WithCustomValidator("fail", func(fieldValue any, fieldType reflect.StructField, params []string, label string, translator validator.ErrorTranslatorFunc) error {
+			return errors.New("validation failed")
+		}),
+	)
+	require.NoError(t, err)
+	
+	type Inner struct {
+		Value string `json:"inner_value" validate:"fail"`
+	}
+	
+	type TestStruct struct {
+		Name      string `json:"user_name" validate:"fail"`
+		Age       int    `json:"user_age" validate:"fail"`
+		NoTag     bool   `validate:"fail"`
+		InnerData Inner
+	}
+	
+	err = v.ValidateStruct(TestStruct{})
+	require.Error(t, err)
+	
+	valErrors := validator.ExtractValidationErrors(err)
+	errMap := valErrors.Values()
+	
+	// Field names should use json tags
+	require.Contains(t, errMap, "user_name")
+	require.Contains(t, errMap, "user_age")
+	
+	// Should fall back to field name when tag is not present
+	require.Contains(t, errMap, "NoTag")
+	
+	// Should work with nested structs
+	require.Contains(t, errMap, "InnerData.inner_value")
+}
+
 // Test WithCustomValidator invalid configuration via New option
 func TestNewWithCustomValidator_Invalid(t *testing.T) {
 	t.Parallel()
 	_, err := validator.New(validator.WithCustomValidator("", nil))
+	require.Error(t, err)
+	require.Equal(t, validator.ErrInvalidValidatorConfiguration, err)
+}
+
+// Test WithFieldNameTag with invalid configuration
+func TestWithFieldNameTag_Invalid(t *testing.T) {
+	t.Parallel()
+	_, err := validator.New(validator.WithFieldNameTag(""))
 	require.Error(t, err)
 	require.Equal(t, validator.ErrInvalidValidatorConfiguration, err)
 }
