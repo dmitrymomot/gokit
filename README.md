@@ -2,6 +2,16 @@
 
 A collection of Go packages and utilities for building robust applications.
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/dmitrymomot/gokit)
+[![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/dmitrymomot/gokit)](https://github.com/dmitrymomot/gokit/tags)
+[![Go Reference](https://pkg.go.dev/badge/github.com/dmitrymomot/gokit.svg)](https://pkg.go.dev/github.com/dmitrymomot/gokit)
+[![License](https://img.shields.io/github/license/dmitrymomot/gokit)](https://github.com/dmitrymomot/gokit/blob/main/LICENSE)
+
+[![Tests](https://github.com/dmitrymomot/gokit/actions/workflows/tests.yml/badge.svg)](https://github.com/dmitrymomot/gokit/actions/workflows/tests.yml)
+[![CodeQL Analysis](https://github.com/dmitrymomot/gokit/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/dmitrymomot/gokit/actions/workflows/codeql-analysis.yml)
+[![GolangCI Lint](https://github.com/dmitrymomot/gokit/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/dmitrymomot/gokit/actions/workflows/golangci-lint.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/dmitrymomot/gokit)](https://goreportcard.com/report/github.com/dmitrymomot/gokit)
+
 ## Installation
 
 ```sh
@@ -15,6 +25,7 @@ go get github.com/dmitrymomot/gokit
 The `apikey` package provides API key generation, hashing, and validation functionality for building secure API authentication systems.
 
 Key features:
+
 - Cryptographically secure API key generation
 - Time-ordered API key generation for sortability
 - Secure key hashing for storage
@@ -27,6 +38,7 @@ Key features:
 The `async` package provides a simple and type-safe way to run functions concurrently and wait for their results. It allows you to execute functions in parallel and retrieve their results once they are completed.
 
 Key features:
+
 - Type-safe async function execution with generics
 - Context cancellation support
 - Waiting with timeout
@@ -41,6 +53,7 @@ Key features:
 The `binder` package provides HTTP request data binding to Go structs with tag-based field mapping.
 
 Key features:
+
 - Automatic binding based on content type
 - JSON request body binding
 - Form data binding
@@ -67,6 +80,7 @@ The `config` package provides type-safe configuration loading using environment 
 The `cqrs` package implements Command Query Responsibility Segregation pattern for Go applications.
 
 Key features:
+
 - Command handling and dispatching
 - Event handling and publishing
 - Multiple message transport options (Redis, Kafka, in-memory channels, PostgreSQL)
@@ -86,6 +100,7 @@ The `feature` package provides feature flag functionality for Go applications.
 The `i18n` package provides internationalization support with middleware for HTTP servers.
 
 Key features:
+
 - Automatic language detection from HTTP requests
 - Accept-Language header parsing
 - Custom language extractors
@@ -100,6 +115,7 @@ Key features:
 The `jwt` package provides a minimalist JWT implementation with HMAC-SHA256 signing.
 
 Key features:
+
 - Token generation and validation
 - Context utilities
 - HTTP middleware with flexible token extraction strategies
@@ -112,6 +128,7 @@ Key features:
 The `logger` package provides context-aware structured logging built on Go's standard log/slog package.
 
 Key features:
+
 - Development and production logger configurations
 - Context value extraction
 - Environment-specific configuration
@@ -131,6 +148,7 @@ The `mailer` package provides email sending utilities.
 The `mongo` package provides a MongoDB client wrapper with configuration and health check support.
 
 Key features:
+
 - Client management
 - Environment-based configuration
 - Health check functionality
@@ -185,6 +203,7 @@ The `randomname` package provides random name generation.
 The `redis` package provides a Redis client wrapper for key-value storage.
 
 Key features:
+
 - Simple key-value storage interface compatible with caching and session systems
 - Support for any redis.UniversalClient implementation
 - Key expiration support
@@ -204,6 +223,7 @@ The `sanitizer` package provides input sanitization utilities.
 The `scopes` package provides functionality for handling authentication and authorization scopes in API systems.
 
 Key features:
+
 - Parsing and joining scope strings
 - Hierarchical scope support with wildcard matching
 - Scope validation and comparison utilities
@@ -217,6 +237,7 @@ Key features:
 The `semver` package provides utilities for parsing, validating, and comparing semantic versions.
 
 Key features:
+
 - Parsing and validating semantic version strings
 - Version comparison following SemVer 2.0.0 rules
 - Version manipulation (incrementing, modifying components)
@@ -236,6 +257,7 @@ The `sse` package provides Server-Sent Events implementation.
 The `statemachine` package provides a flexible state machine implementation with a fluent builder pattern.
 
 Key features:
+
 - Core interfaces for State, Event, Action, and Guard
 - Fluent builder pattern for configuration
 - Support for conditional transitions through Guards
@@ -256,6 +278,7 @@ The `storage` package provides storage interfaces and implementations.
 The `token` package provides a lightweight token generation and validation library with HMAC-SHA256 signatures.
 
 Key features:
+
 - Type-safe payload handling with Go generics
 - URL-safe Base64 encoding
 - Minimal API with zero external dependencies
@@ -286,6 +309,7 @@ The `utils` package provides lightweight utility functions including pointer cre
 The `validator` package provides a flexible, tag-based validation system for Go structs.
 
 Key features:
+
 - 30+ built-in validators
 - Customizable error messages
 - Support for nested structs
@@ -298,6 +322,7 @@ Key features:
 The `webhook` package provides webhook sending with retry, logging, and parallel execution.
 
 Key features:
+
 - Thread-safe parallel webhook sending
 - Retry mechanism for failed requests
 - Structured logging with `log/slog`
@@ -325,6 +350,7 @@ To install the git hooks, run:
 ```
 
 The hooks will ensure that:
+
 - Code is properly formatted according to Go standards
 - All tests pass before pushing commits
 - Only Go 1.24+ is used for development
