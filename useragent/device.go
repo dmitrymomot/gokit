@@ -37,7 +37,6 @@ var (
 	desktopKeywords = newKeywordSet("windows", "macintosh", "mac os x", "linux", "x11", "ubuntu", "fedora", "debian", "chromeos", "cros")
 
 	// Maps for mobile device models
-	iPhoneKeywords     = newKeywordSet("iphone")
 	samsungMobileWords = newKeywordSet("samsung", "sm-g", "sm-a", "sm-n", "samsungbrowser")
 	huaweiMobileWords  = newKeywordSet("huawei", "hwa-", "honor", "h60-", "h30-")
 	xiaomiMobileWords  = newKeywordSet("xiaomi", "mi ", "redmi", "miui")
@@ -45,8 +44,6 @@ var (
 	vivoMobileWords    = newKeywordSet("vivo", "viv-", "v1730", "v1731")
 
 	// Maps for tablet device models
-	iPadKeywords       = newKeywordSet("ipad")
-	surfaceWords       = newKeywordSet("windows touch", "windows tablet")
 	samsungTabletWords = newKeywordSet("sm-t", "gt-p", "sm-p")
 	huaweiTabletWords  = newKeywordSet("mediapad", "agassi")
 	kindleWords        = newKeywordSet("kindle", "silk", "kftt", "kfjwi")

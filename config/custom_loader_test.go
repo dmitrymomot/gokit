@@ -163,7 +163,7 @@ func TestLoadEnv_DefaultBehavior(t *testing.T) {
 		
 		// Restore the original .env file if it existed
 		if hasOldFile {
-			os.WriteFile(tmpEnv, oldEnvContent, 0644)
+			_ = os.WriteFile(tmpEnv, oldEnvContent, 0644)
 		}
 		
 		// Clean the environment variable

@@ -48,7 +48,7 @@ func TestWebhookSender_Send(t *testing.T) {
 
 			// Write response
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"success":true}`))
+			_, _ = w.Write([]byte(`{"success":true}`))
 		}))
 		defer server.Close()
 
@@ -81,7 +81,7 @@ func TestWebhookSender_Send(t *testing.T) {
 
 			// Write response
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"data":"received"}`))
+			_, _ = w.Write([]byte(`{"data":"received"}`))
 		}))
 		defer server.Close()
 
@@ -116,7 +116,7 @@ func TestWebhookSender_Send(t *testing.T) {
 
 			// Write response
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"success":true}`))
+			_, _ = w.Write([]byte(`{"success":true}`))
 		}))
 		defer server.Close()
 
@@ -153,7 +153,7 @@ func TestWebhookSender_Send(t *testing.T) {
 
 			// Write response
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"deleted":true}`))
+			_, _ = w.Write([]byte(`{"deleted":true}`))
 		}))
 		defer server.Close()
 
@@ -267,7 +267,7 @@ func TestWebhookSender_Send(t *testing.T) {
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"success":true}`))
+			_, _ = w.Write([]byte(`{"success":true}`))
 		}))
 		defer server.Close()
 

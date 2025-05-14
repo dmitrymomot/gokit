@@ -69,7 +69,7 @@ func TestLayeredCache_Get(t *testing.T) {
 	// 2. Set in L2 directly (simulating another service writing to Redis)
 	testKey := "test_l2_key"
 	testValue := []byte("test_value")
-	s.Set(testKey, string(testValue))
+	_ = s.Set(testKey, string(testValue))
 
 	// 3. Get should retrieve from L2 and populate L1
 	value, found, err = layeredCache.Get(ctx, testKey)
@@ -168,7 +168,7 @@ func TestLayeredCache_Delete(t *testing.T) {
 	testKey = "l2_error_key"
 	err = l1.Set(ctx, testKey, testValue, time.Minute)
 	require.NoError(t, err)
-	s.Set(testKey, string(testValue))
+	_ = s.Set(testKey, string(testValue))
 
 	s.Close() // Close Redis connection
 
@@ -203,7 +203,7 @@ func TestLayeredCache_Exists(t *testing.T) {
 	// 4. Delete from L1 but set in L2
 	_, err = l1.Delete(ctx, testKey)
 	require.NoError(t, err)
-	s.Set(testKey, string(testValue))
+	_ = s.Set(testKey, string(testValue))
 
 	// 5. Check Exists again (should be true from L2)
 	exists, err = layeredCache.Exists(ctx, testKey)

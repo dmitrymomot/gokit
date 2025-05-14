@@ -62,25 +62,6 @@ func matchPattern(ua string, pattern BrowserPattern) bool {
 	return true
 }
 
-// Version extraction regex patterns
-var (
-	edgeVersionRegex    = regexp.MustCompile(`(?i)(?:edge|edg)[/ ]([\d.]+)`)
-	chromeVersionRegex  = regexp.MustCompile(`(?i)chrome[/ ]([\d.]+)`)
-	firefoxVersionRegex = regexp.MustCompile(`(?i)firefox[/ ]([\d.]+)`)
-	safariVersionRegex  = regexp.MustCompile(`(?i)version[/ ]([\d.]+)`)
-	operaVersionRegex   = regexp.MustCompile(`(?i)(?:opr|opera)[/ ]([\d.]+)`)
-	ieVersionRegex      = regexp.MustCompile(`(?i)msie ([\d.]+)`)
-	samsungVersionRegex = regexp.MustCompile(`(?i)samsungbrowser[/\s]([\d.]+)`)
-	ucVersionRegex      = regexp.MustCompile(`(?i)ucbrowser[/\s]([\d.]+)`)
-	qqVersionRegex      = regexp.MustCompile(`(?i)(?:qqbrowser|qq)[/\s]([\d.]+)`)
-	vivoVersionRegex    = regexp.MustCompile(`(?i)vivobrowser[/\s]([\d.]+)`)
-	miuiVersionRegex    = regexp.MustCompile(`(?i)miuibrowser[/\s]([\d.]+)`)
-	braveVersionRegex   = regexp.MustCompile(`(?i)brave[/\s]([\d.]+)`)
-	vivaldiVersionRegex = regexp.MustCompile(`(?i)vivaldi[/\s]([\d.]+)`)
-	yandexVersionRegex  = regexp.MustCompile(`(?i)yabrowser[/\s]([\d.]+)`)
-	huaweiVersionRegex  = regexp.MustCompile(`(?i)huaweibrowser[/\s]([\d.]+)`)
-)
-
 // Browser detection patterns in order of checking priority
 var browserPatterns = []BrowserPattern{
 	{

@@ -10,7 +10,7 @@ import (
 // requiredValidator checks that a value is not the zero value for its type.
 func requiredValidator(fieldValue any, fieldType reflect.StructField, params []string, label string, translator ErrorTranslatorFunc) error {
 	value := reflect.ValueOf(fieldValue)
-	valid := true
+	var valid bool
 
 	switch value.Kind() {
 	case reflect.String, reflect.Array, reflect.Slice, reflect.Map:

@@ -43,7 +43,7 @@ func (s *TargetedStrategy) Evaluate(ctx context.Context) (bool, error) {
 	}
 
 	// Check deny list first (always takes precedence)
-	if s.Criteria.DenyList != nil && len(s.Criteria.DenyList) > 0 {
+	if len(s.Criteria.DenyList) > 0 {
 		userID, ok := ctx.Value(UserIDKey).(string)
 		if !ok || userID == "" {
 			// If we can't determine the user ID and there's a deny list, fail safe
@@ -56,7 +56,7 @@ func (s *TargetedStrategy) Evaluate(ctx context.Context) (bool, error) {
 	}
 
 	// Check allow list (if a user is on the allow list, they get the feature)
-	if s.Criteria.AllowList != nil && len(s.Criteria.AllowList) > 0 {
+	if len(s.Criteria.AllowList) > 0 {
 		userID, ok := ctx.Value(UserIDKey).(string)
 		if ok && userID != "" && slices.Contains(s.Criteria.AllowList, userID) {
 			return true, nil
@@ -64,7 +64,7 @@ func (s *TargetedStrategy) Evaluate(ctx context.Context) (bool, error) {
 	}
 
 	// Check for specific user IDs
-	if s.Criteria.UserIDs != nil && len(s.Criteria.UserIDs) > 0 {
+	if len(s.Criteria.UserIDs) > 0 {
 		userID, ok := ctx.Value(UserIDKey).(string)
 		if ok && userID != "" && slices.Contains(s.Criteria.UserIDs, userID) {
 			return true, nil
@@ -72,7 +72,7 @@ func (s *TargetedStrategy) Evaluate(ctx context.Context) (bool, error) {
 	}
 
 	// Check for groups
-	if s.Criteria.Groups != nil && len(s.Criteria.Groups) > 0 {
+	if len(s.Criteria.Groups) > 0 {
 		userGroups, ok := ctx.Value(UserGroupsKey).([]string)
 		if ok && len(userGroups) > 0 {
 			// Check if any user group is in the targeted groups

@@ -102,7 +102,7 @@ func (b *ChannelBus) Subscribe(ctx context.Context, topic string) (<-chan sse.Ev
 	// Clean up when context is done
 	go func() {
 		<-ctx.Done()
-		b.Unsubscribe(context.Background(), topic, ch)
+		_ = b.Unsubscribe(context.Background(), topic, ch)
 	}()
 
 	return ch, nil

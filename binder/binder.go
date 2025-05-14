@@ -333,8 +333,8 @@ func setFieldValue(fieldValue reflect.Value, values []string) error {
 
 	default:
 		// Try to handle custom types via TextUnmarshaler interface
-		if reflect.PtrTo(fieldValue.Type()).Implements(reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()) ||
-			reflect.PtrTo(fieldValue.Type()).Implements(reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()) {
+		if reflect.PointerTo(fieldValue.Type()).Implements(reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()) ||
+			reflect.PointerTo(fieldValue.Type()).Implements(reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()) {
 			// Create a new pointer to the value
 			ptr := reflect.New(fieldValue.Type())
 			ptr.Elem().Set(fieldValue)

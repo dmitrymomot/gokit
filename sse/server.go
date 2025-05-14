@@ -109,7 +109,7 @@ func (s *Server) Handler(topicExtractor func(r *http.Request) string) http.Handl
 		}
 
 		// Send a connected event
-		client.Send(Event{
+		_ = client.Send(Event{
 			Event: "connected",
 			Data:  fmt.Sprintf("Connected to %s", topic),
 		})

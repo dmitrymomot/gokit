@@ -45,7 +45,7 @@ func TestMiddleware(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	t.Run("DefaultTokenExtractor", func(t *testing.T) {
@@ -211,7 +211,7 @@ func TestMiddleware(t *testing.T) {
 		// Create a test handler that always succeeds
 		skipHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("skipped"))
+			_, _ = w.Write([]byte("skipped"))
 		})
 
 		// Create a test server with the middleware
@@ -261,7 +261,7 @@ func TestMiddleware(t *testing.T) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("success"))
+			_, _ = w.Write([]byte("success"))
 		})
 
 		// Create middleware with default extractor

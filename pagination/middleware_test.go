@@ -29,7 +29,7 @@ func TestMiddleware(t *testing.T) {
 
 			// Update total items and write response
 			updatedPaginator := paginator.WithTotalItems(100)
-			updatedPaginator.RespondWithJSON(w, []string{"test1", "test2"})
+			_ = updatedPaginator.RespondWithJSON(w, []string{"test1", "test2"})
 		})
 
 		// Create test request
