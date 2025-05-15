@@ -136,7 +136,8 @@ func TestIndividualStringSanitizers(t *testing.T) {
 					Field string `sanitize:"trim"`
 				}
 				ts := &testStruct{Field: input}
-				s.SanitizeStruct(ts)
+				err := s.SanitizeStruct(ts)
+				require.NoError(t, err)
 				return ts.Field
 			},
 			input:    "  hello  ",
@@ -149,7 +150,8 @@ func TestIndividualStringSanitizers(t *testing.T) {
 					Field string `sanitize:"lower"`
 				}
 				ts := &testStruct{Field: input}
-				s.SanitizeStruct(ts)
+				err := s.SanitizeStruct(ts)
+				require.NoError(t, err)
 				return ts.Field
 			},
 			input:    "HELLO",
@@ -162,7 +164,8 @@ func TestIndividualStringSanitizers(t *testing.T) {
 					Field string `sanitize:"upper"`
 				}
 				ts := &testStruct{Field: input}
-				s.SanitizeStruct(ts)
+				err := s.SanitizeStruct(ts)
+				require.NoError(t, err)
 				return ts.Field
 			},
 			input:    "hello",
@@ -175,7 +178,8 @@ func TestIndividualStringSanitizers(t *testing.T) {
 					Field string `sanitize:"replace:old:new"`
 				}
 				ts := &testStruct{Field: input}
-				s.SanitizeStruct(ts)
+				err := s.SanitizeStruct(ts)
+				require.NoError(t, err)
 				return ts.Field
 			},
 			input:    "this is old text",
@@ -188,7 +192,8 @@ func TestIndividualStringSanitizers(t *testing.T) {
 					Field string `sanitize:"striphtml"`
 				}
 				ts := &testStruct{Field: input}
-				s.SanitizeStruct(ts)
+				err := s.SanitizeStruct(ts)
+				require.NoError(t, err)
 				return ts.Field
 			},
 			input:    "<p>Hello <b>World</b></p>",
@@ -201,7 +206,8 @@ func TestIndividualStringSanitizers(t *testing.T) {
 					Field string `sanitize:"escape"`
 				}
 				ts := &testStruct{Field: input}
-				s.SanitizeStruct(ts)
+				err := s.SanitizeStruct(ts)
+				require.NoError(t, err)
 				return ts.Field
 			},
 			input:    `<a href="test">Link</a>`,
@@ -214,7 +220,8 @@ func TestIndividualStringSanitizers(t *testing.T) {
 					Field string `sanitize:"alphanum"`
 				}
 				ts := &testStruct{Field: input}
-				s.SanitizeStruct(ts)
+				err := s.SanitizeStruct(ts)
+				require.NoError(t, err)
 				return ts.Field
 			},
 			input:    "abc123!@#",
@@ -227,7 +234,8 @@ func TestIndividualStringSanitizers(t *testing.T) {
 					Field string `sanitize:"numeric"`
 				}
 				ts := &testStruct{Field: input}
-				s.SanitizeStruct(ts)
+				err := s.SanitizeStruct(ts)
+				require.NoError(t, err)
 				return ts.Field
 			},
 			input:    "a1b2c3",
@@ -240,7 +248,8 @@ func TestIndividualStringSanitizers(t *testing.T) {
 					Field string `sanitize:"truncate:5"`
 				}
 				ts := &testStruct{Field: input}
-				s.SanitizeStruct(ts)
+				err := s.SanitizeStruct(ts)
+				require.NoError(t, err)
 				return ts.Field
 			},
 			input:    "hello world",
@@ -253,7 +262,8 @@ func TestIndividualStringSanitizers(t *testing.T) {
 					Field string `sanitize:"normalize"`
 				}
 				ts := &testStruct{Field: input}
-				s.SanitizeStruct(ts)
+				err := s.SanitizeStruct(ts)
+				require.NoError(t, err)
 				return ts.Field
 			},
 			input:    "line1\r\nline2\rline3",
@@ -266,7 +276,8 @@ func TestIndividualStringSanitizers(t *testing.T) {
 					Field string `sanitize:"trimspace"`
 				}
 				ts := &testStruct{Field: input}
-				s.SanitizeStruct(ts)
+				err := s.SanitizeStruct(ts)
+				require.NoError(t, err)
 				return ts.Field
 			},
 			input:    "  no  spaces  ",
@@ -279,7 +290,8 @@ func TestIndividualStringSanitizers(t *testing.T) {
 					Field string `sanitize:"email"`
 				}
 				ts := &testStruct{Field: input}
-				s.SanitizeStruct(ts)
+				err := s.SanitizeStruct(ts)
+				require.NoError(t, err)
 				return ts.Field
 			},
 			input:    "  Test@Example.COM  ",
