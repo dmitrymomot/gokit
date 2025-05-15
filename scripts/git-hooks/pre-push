@@ -52,6 +52,20 @@ if go_files_changed; then
     echo "Reformatted files have been added to the commit."
   fi
   
+  # Run golangci-lint if available
+  if command -v golangci-lint >/dev/null 2>&1; then
+    echo "Running golangci-lint..."
+    golangci-lint run
+    
+    if [ $? -ne 0 ]; then
+      echo "golangci-lint check failed. Please fix the issues before pushing."
+      exit 1
+    fi
+  else
+    echo "Warning: golangci-lint not installed. Skipping linting."
+    echo "Consider installing with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+  fi
+  
   # Run tests on all packages
   echo "Running tests on all packages (excluding _legacy_packages)..."
   PACKAGES=$(go list ./... | grep -v "_legacy_packages")

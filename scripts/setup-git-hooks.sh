@@ -39,4 +39,11 @@ if ! command -v goimports >/dev/null 2>&1; then
   echo "  go install golang.org/x/tools/cmd/goimports@latest"
 fi
 
+# Check if golangci-lint is installed
+if ! command -v golangci-lint >/dev/null 2>&1; then
+  echo "Warning: golangci-lint not found."
+  echo "For pre-push validation, install golangci-lint with:"
+  echo "  go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+fi
+
 echo "Setup complete!"
