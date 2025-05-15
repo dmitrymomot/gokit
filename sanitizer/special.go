@@ -38,15 +38,16 @@ func validateUUID(uuid string) bool {
 	return r.MatchString(uuid)
 }
 
-// boolSanitizer converts string representations to boolean values.
+// boolSanitizer converts string representations to boolean strings.
+// It returns string values ("true"/"false") to maintain consistency with the field type.
 func boolSanitizer(fieldValue any, fieldType reflect.StructField, params []string) any {
 	if v, ok := fieldValue.(string); ok {
 		v = strings.TrimSpace(strings.ToLower(v))
 		switch v {
 		case "true", "t", "yes", "y", "1", "on":
-			return true
+			return "true"
 		case "false", "f", "no", "n", "0", "off", "":
-			return false
+			return "false"
 		}
 	}
 	return fieldValue
