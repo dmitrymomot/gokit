@@ -23,10 +23,10 @@ type Flag struct {
 	Tags []string `json:"tags,omitempty"`
 
 	// CreatedAt is when the flag was created.
-	CreatedAt time.Time `json:"created_at,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitzero"`
 
 	// UpdatedAt is when the flag was last updated.
-	UpdatedAt time.Time `json:"updated_at,omitempty"`
+	UpdatedAt time.Time `json:"updated_at,omitzero"`
 }
 
 // Strategy defines different ways to roll out a feature.
